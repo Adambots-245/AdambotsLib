@@ -1,0 +1,61 @@
+plugins {
+    id "java-library"
+    id "edu.wpi.first.GradleRIO" version "2025.3.1"
+}
+
+group = "com.adambots"
+version = "2025.1.0" // Update this for each release
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+// Set this to true to enable desktop support for testing
+def includeDesktopSupport = true
+
+dependencies {
+    annotationProcessor wpi.java.deps.wpilibAnnotations()
+    implementation wpi.java.deps.wpilib()
+    implementation wpi.java.vendor.java()
+
+    if (includeDesktopSupport) {
+        nativeDebug wpi.java.deps.wpilibJniDebug(wpi.platforms.desktop)
+        nativeDebug wpi.java.vendor.jniDebug(wpi.platforms.desktop)
+        simulationDebug wpi.sim.enableDebug()
+
+        nativeRelease wpi.java.deps.wpilibJniRelease(wpi.platforms.desktop)
+        nativeRelease wpi.java.vendor.jniRelease(wpi.platforms.desktop)
+        simulationRelease wpi.sim.enableRelease()
+    }
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.1'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+    systemProperty 'junit.jupiter.extensions.autodetection.enabled', 'true'
+}
+
+tasks.withType(JavaCompile) {
+    options.compilerArgs.add '-XDstringConcat=inline'
+}
+
+jar {
+    from sourceSets.main.allSource
+    manifest {
+        attributes(
+            'Implementation-Title': 'AdambotsLib',
+            'Implementation-Version': project.version,
+            'Implementation-Vendor': 'Adambots Team 245'
+        )
+    }
+}
+
+wpi.java.configureTestTasks(test)
+
+if (includeDesktopSupport) {
+    wpi.sim.addGui().defaultEnabled = true
+    wpi.sim.addDriverstation()
+}

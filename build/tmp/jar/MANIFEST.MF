@@ -1,0 +1,5 @@
+Manifest-Version: 1.0
+Implementation-Title: AdambotsLib
+Implementation-Version: 2025.1.0
+Implementation-Vendor: Adambots Team 245
+
