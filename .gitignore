@@ -12,6 +12,7 @@
 
 # Package Files #
 *.jar
+!docs/maven/com/adambots/AdambotsLib/2025.1.0/AdambotsLib-2025.1.0.jar
 *.war
 *.nar
 *.ear
