@@ -36,13 +36,13 @@
       <scope>compile</scope>
     </dependency>
 
-    <!-- Vendor Dependencies -->
+    <!-- Vendor Dependencies (ACTUAL coordinates from vendor JSON files) -->
     
     <!-- maple-sim -->
     <dependency>
-      <groupId>org.shenzhen_robotics_alliance</groupId>
-      <artifactId>maple-sim</artifactId>
-      <version>0.3.11prev</version>
+      <groupId>org.ironmaple</groupId>
+      <artifactId>maplesim-java</artifactId>
+      <version>0.3.11</version>
       <scope>compile</scope>
     </dependency>
 
@@ -54,7 +54,7 @@
       <scope>compile</scope>
     </dependency>
 
-    <!-- Phoenix 5 -->
+    <!-- Phoenix 5 (requires 2 artifacts) -->
     <dependency>
       <groupId>com.ctre.phoenix</groupId>
       <artifactId>api-java</artifactId>
@@ -78,8 +78,8 @@
 
     <!-- PhotonLib -->
     <dependency>
-      <groupId>org.photonvision</groupId>
-      <artifactId>photonlib-java</artifactId>
+      <groupId>org.photonvision.lib</groupId>
+      <artifactId>PhotonLib-java</artifactId>
       <version>v2025.3.1</version>
       <scope>compile</scope>
     </dependency>
@@ -103,24 +103,24 @@
     <!-- Studica -->
     <dependency>
       <groupId>com.studica.frc</groupId>
-      <artifactId>studica-java</artifactId>
+      <artifactId>Studica-java</artifactId>
       <version>2025.0.1</version>
       <scope>compile</scope>
     </dependency>
 
     <!-- ThriftyLib -->
-    <dependency>
-      <groupId>org.thriftyfield</groupId>
-      <artifactId>ThriftyLib-java</artifactId>
-      <version>2025.1.1</version>
-      <scope>compile</scope>
-    </dependency>
+<dependency>
+  <groupId>com.thethriftybot.frc</groupId>
+  <artifactId>ThriftyLib-java</artifactId>
+  <version>2025.1.1</version>
+  <scope>compile</scope>
+</dependency>
 
     <!-- YAGSL -->
     <dependency>
-      <groupId>com.github.broncbotz3481</groupId>
-      <artifactId>YAGSL-Lib</artifactId>
-      <version>2025.7.2</version>
+      <groupId>swervelib</groupId>
+      <artifactId>YAGSL-java</artifactId>
+      <version>2025.8.0</version>
       <scope>compile</scope>
     </dependency>
   </dependencies>
