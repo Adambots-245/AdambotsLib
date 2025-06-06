@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "com.adambots"
-version = "2025.1.0" // Update this for each release
+version = "2025.1.1" // Update this for each release
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17

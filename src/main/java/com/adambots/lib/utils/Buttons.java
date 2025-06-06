@@ -19,8 +19,8 @@ public class Buttons {
 
         // Declare controllers and triggers as static, but NOT final initially.
         // They will be initialized in the static init() method.
-        private static CommandXboxController xBoxController;
-        private static CommandJoystick ex3dPro;
+        public static CommandXboxController xBoxController;
+        public static CommandJoystick ex3dPro;
 
         private static boolean initialized = false;
 
