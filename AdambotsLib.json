@@ -5,7 +5,7 @@
     "uuid": "245ab245-lib2-45ab-cdef-245adambots245",
     "frcYear": "2025",
     "mavenUrls": [
-        "https://github.com/Adambots-245/AdambotsLib/releases/download/v2025.1.0/"
+        "https://adambots-245.github.io/AdambotsLib/maven"
     ],
     "jsonUrl": "https://raw.githubusercontent.com/Adambots-245/AdambotsLib/main/AdambotsLib.json",
     "javaDependencies": [
