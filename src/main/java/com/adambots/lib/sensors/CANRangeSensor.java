@@ -1,5 +1,6 @@
 package com.adambots.lib.sensors;
 
+import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.hardware.CANrange;
 import com.ctre.phoenix6.sim.CANrangeSimState;
 import edu.wpi.first.wpilibj.RobotBase;
@@ -21,12 +22,12 @@ public class CANRangeSensor implements BaseDistanceSensor {
     public CANRangeSensor(int deviceId, boolean isOnCANivore) {
 
         if (isOnCANivore) {
-            canRangeSensor = new CANrange(deviceId, "*");
+            canRangeSensor = new CANrange(deviceId, new CANBus("*"));
         } else {
             canRangeSensor = new CANrange(deviceId);
         }
             isSim = RobotBase.isSimulation();
-            
+
             if (isSim) {
                 simState = canRangeSensor.getSimState();
                 // Set default simulation values

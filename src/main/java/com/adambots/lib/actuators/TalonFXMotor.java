@@ -1,6 +1,7 @@
 package com.adambots.lib.actuators;
 
 import com.ctre.phoenix6.StatusCode;
+import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.configs.*;
 import com.ctre.phoenix6.controls.*;
 import com.ctre.phoenix6.hardware.TalonFX;
@@ -74,7 +75,7 @@ public class TalonFXMotor implements BaseMotor {
 
         // Initialize motor on either CANivore or regular CAN bus
         if (isOnCANivore) {
-            motor = new TalonFX(portNum, "*");
+            motor = new TalonFX(portNum, new CANBus("*"));
         } else {
             motor = new TalonFX(portNum);
         }
@@ -150,7 +151,7 @@ public class TalonFXMotor implements BaseMotor {
             case FOLLOWER:
                 // Follow another Talon FX controller
                 int deviceID = (int) value;
-                motor.setControl(new com.ctre.phoenix6.controls.Follower(deviceID, false));
+                motor.setControl(new com.ctre.phoenix6.controls.Follower(deviceID, MotorAlignmentValue.Aligned));
                 break;
         }
     }
@@ -456,7 +457,7 @@ public class TalonFXMotor implements BaseMotor {
     @Override
     public void setStrictFollower(int deviceID) {
         // Set this motor as a follower using the Follower control request
-        motor.setControl(new com.ctre.phoenix6.controls.Follower(deviceID, false)); // false = don't oppose master
+        motor.setControl(new com.ctre.phoenix6.controls.Follower(deviceID, MotorAlignmentValue.Aligned)); // Aligned = don't oppose master
                                                                                     // direction
     }
 

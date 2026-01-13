@@ -1,5 +1,6 @@
 package com.adambots.lib.actuators;
 
+import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.controls.DutyCycleOut;
 import com.ctre.phoenix6.controls.Follower;
 import com.ctre.phoenix6.controls.MotionMagicVoltage;
@@ -8,6 +9,7 @@ import com.ctre.phoenix6.controls.VelocityVoltage;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.TalonFXS;
 import com.ctre.phoenix6.signals.ForwardLimitValue;
+import com.ctre.phoenix6.signals.MotorAlignmentValue;
 import com.ctre.phoenix6.signals.ReverseLimitValue;
 import com.ctre.phoenix6.StatusCode;
 import com.ctre.phoenix6.configs.CurrentLimitsConfigs;
@@ -56,12 +58,12 @@ public class MinionMotor implements BaseMotor {
     
     /**
      * Constructor for MinionMotor using TalonFXS with specific CAN bus
-     * 
+     *
      * @param deviceID The CAN ID of the motor controller
      * @param canBus The name of the CAN bus
      */
     public MinionMotor(int deviceID, String canBus) {
-        motor = new TalonFXS(deviceID, canBus);
+        motor = new TalonFXS(deviceID, new CANBus(canBus));
         configurator = motor.getConfigurator();
     }
 
@@ -91,7 +93,7 @@ public class MinionMotor implements BaseMotor {
             case FOLLOWER:
                 // In Phoenix 6, Follower requires device ID
                 // value here is assumed to be the device ID to follow
-                motor.setControl(new Follower((int)value, false));
+                motor.setControl(new Follower((int)value, MotorAlignmentValue.Aligned));
                 break;
             default:
                 System.err.println("Unsupported control mode");
@@ -297,7 +299,7 @@ public class MinionMotor implements BaseMotor {
     @Override
     public void setStrictFollower(int deviceID) {
         // Set this motor to follow another device
-        motor.setControl(new Follower(deviceID, false));
+        motor.setControl(new Follower(deviceID, MotorAlignmentValue.Aligned));
     }
 
     @Override

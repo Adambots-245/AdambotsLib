@@ -8,6 +8,8 @@ import com.revrobotics.spark.SparkLowLevel.MotorType;
 import com.revrobotics.spark.config.SparkMaxConfig;
 import com.revrobotics.spark.config.LimitSwitchConfig.Type;
 import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
+import com.revrobotics.ResetMode;
+import com.revrobotics.PersistMode;
 
 /**
  * Implementation for REV NEO and NEO Vortex motors using SPARK MAX controller
@@ -36,7 +38,7 @@ public class NEOMotor implements BaseMotor {
 
         // Default configuration
         config.voltageCompensation(12.0);
-        motor.configure(config, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
+        motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     }
 
     /**
@@ -52,23 +54,23 @@ public class NEOMotor implements BaseMotor {
                 motor.set(value);
                 break;
             case POSITION:
-                closedLoopController.setReference(value, SparkBase.ControlType.kPosition);
+                closedLoopController.setSetpoint(value, SparkBase.ControlType.kPosition);
                 break;
             case VELOCITY:
-                closedLoopController.setReference(value, SparkBase.ControlType.kVelocity);
+                closedLoopController.setSetpoint(value, SparkBase.ControlType.kVelocity);
                 break;
             case VOLTAGE:
                 motor.setVoltage(value);
                 break;
             case CURRENT:
-                closedLoopController.setReference(value, SparkBase.ControlType.kCurrent);
+                closedLoopController.setSetpoint(value, SparkBase.ControlType.kCurrent);
                 break;
             case MOTION_MAGIC:
-                // Use Smart Motion for motion profiling
-                closedLoopController.setReference(value, SparkBase.ControlType.kSmartMotion);
+                // Use MAXMotion Position Control for motion profiling
+                closedLoopController.setSetpoint(value, SparkBase.ControlType.kMAXMotionPositionControl);
                 break;
             case MOTION_MAGIC_FOC_TORQUE:
-                closedLoopController.setReference(value, SparkBase.ControlType.kSmartMotion);
+                closedLoopController.setSetpoint(value, SparkBase.ControlType.kMAXMotionPositionControl);
                 break;
             case FOLLOWER:
                 config.follow((int) value);
@@ -97,8 +99,9 @@ public class NEOMotor implements BaseMotor {
      */
     @Override
     public void setPID(int slotIdx, double kP, double kI, double kD, double kF) {
-        config.closedLoop.pidf(kP, kI, kD, kF);
-        motor.configure(config, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
+        config.closedLoop.pid(kP, kI, kD);
+        config.closedLoop.feedForward.kV(kF);
+        motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     }
 
     /**
@@ -110,10 +113,10 @@ public class NEOMotor implements BaseMotor {
      */
     @Override
     public void configureMotionMagic(double cruiseVelocity, double acceleration, double jerk) {
-        config.closedLoop.smartMotion
-                .maxVelocity(cruiseVelocity)
+        config.closedLoop.maxMotion
+                .cruiseVelocity(cruiseVelocity)
                 .maxAcceleration(acceleration);
-        motor.configure(config, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
+        motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     }
 
     /**
@@ -126,7 +129,7 @@ public class NEOMotor implements BaseMotor {
     @Override
     public void configureCurrentLimits(double stallLimit, double freeLimit, double limitRPM) {
         config.smartCurrentLimit((int) stallLimit, (int) freeLimit, (int) limitRPM);
-        motor.configure(config, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
+        motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     }
 
     /**
@@ -140,7 +143,7 @@ public class NEOMotor implements BaseMotor {
     public void configureSoftLimits(double forwardLimit, double reverseLimit, boolean enable) {
         config.softLimit.forwardSoftLimitEnabled(enable).forwardSoftLimit(forwardLimit);
         config.softLimit.reverseSoftLimitEnabled(enable).reverseSoftLimit(reverseLimit);
-        motor.configure(config, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
+        motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     }
 
     /**
@@ -152,7 +155,7 @@ public class NEOMotor implements BaseMotor {
     public void enableSoftLimits(boolean enable) {
         config.softLimit.forwardSoftLimitEnabled(enable);
         config.softLimit.reverseSoftLimitEnabled(enable);
-        motor.configure(config, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
+        motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     }
 
     /**
@@ -163,7 +166,7 @@ public class NEOMotor implements BaseMotor {
     @Override
     public void setInverted(boolean inverted) {
         config.inverted(inverted);
-        motor.configure(config, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
+        motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     }
 
     /**
@@ -174,7 +177,7 @@ public class NEOMotor implements BaseMotor {
     @Override
     public void setBrakeMode(boolean brake) {
         config.idleMode(brake ? IdleMode.kBrake : IdleMode.kCoast);
-        motor.configure(config, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
+        motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     }
 
     /**
@@ -195,7 +198,7 @@ public class NEOMotor implements BaseMotor {
     @Override
     public void enableVoltageCompensation(double voltage) {
         config.voltageCompensation(voltage);
-        motor.configure(config, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
+        motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     }
 
     /**
@@ -289,7 +292,7 @@ public class NEOMotor implements BaseMotor {
     @Override
     public void setStrictFollower(int deviceID) {
         config.follow(deviceID);
-        motor.configure(config, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
+        motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     }
 
     /**
@@ -310,6 +313,6 @@ public class NEOMotor implements BaseMotor {
         if (enableReverse) {
             config.limitSwitch.reverseLimitSwitchType(Type.kNormallyClosed);
         }
-        motor.configure(config, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
+        motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     }
 }

@@ -44,7 +44,7 @@ public class CANdleSubsystem extends SubsystemBase {
     configAll.brightnessScalar = 1;
     configAll.vBatOutputMode = VBatOutputMode.Off;
     configAll.v5Enabled = true;
-    
+
     candleDevice.configAllSettings(configAll);
 
     setColor(LEDConstants.yellow);

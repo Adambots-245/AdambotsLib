@@ -27,6 +27,7 @@ import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Config;
 import swervelib.SwerveController;
@@ -201,14 +202,14 @@ public class DriveCommands {
 
                     // If pose changed significantly, recalculate path
                     if (poseChangedSignificantly(currentPose, swerveDrive.getPose())) {
-                        driveToPose(nearestPose).schedule();
+                        CommandScheduler.getInstance().schedule(driveToPose(nearestPose));
                     }
                 }
             }
 
             // If no tags visible, continue with last known path
             if (!hasVisibleTags) {
-                driveToPose(nearestPose).schedule();
+                CommandScheduler.getInstance().schedule(driveToPose(nearestPose));
             }
         })
                 .until(() -> hasReachedPose(swerveDrive.getPose(),
