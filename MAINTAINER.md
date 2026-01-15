@@ -16,11 +16,21 @@ AdambotsLib/
 ├── gradle.properties         # Version and publishing configuration
 ├── build.gradle              # Build configuration with publishing
 ├── publish-to-maven.sh       # Helper script for publishing
+├── verify-jar.sh             # JAR verification script
+├── docs/                     # Documentation (NOT in JAR)
+│   ├── actuators/
+│   ├── sensors/
+│   ├── subsystems/
+│   └── utils/
+├── tests/                    # Test/example programs (NOT in JAR)
+│   └── StateMachineTest.java
 ├── maven/                    # Published artifacts (committed to Git)
 │   └── com/adambots/lib/AdambotsLib-java/2026.1.0/
 ├── src/main/java/            # Library source code
 └── vendordeps/               # Library dependencies
 ```
+
+**Important:** The `docs/` and `tests/` folders are NOT included in the published JAR file. They are for development and documentation only.
 
 ## Building the Library
 
@@ -109,6 +119,33 @@ Verify `AdambotsLib.json` has the correct version:
 ```bash
 cat AdambotsLib.json
 ```
+
+**Verify JAR Contents** (Important):
+
+Run the verification script to ensure docs/ and tests/ are NOT included in the JAR:
+
+```bash
+./verify-jar.sh
+```
+
+**Expected Output:**
+```
+✓ Confirmed: docs/ and tests/ are NOT in JAR
+✓ Total entries in JAR: ~5800
+✓ Library classes found in JAR
+✓ Backup folder included in JAR
+```
+
+**What's in the JAR:**
+- Compiled .class files from `src/main/java/`
+- All runtime dependencies (WPILib, vendor libs, etc.)
+- Backup copies of source code (`backup/src/`)
+- Backup of build files (`backup/build.gradle`, `backup/vendordeps/`)
+
+**What's NOT in the JAR:**
+- `docs/` folder (documentation - not needed at runtime)
+- `tests/` folder (test/example programs - not part of library)
+- Development files (.git, .gradle, etc.)
 
 ### Step 4: Commit to Git
 

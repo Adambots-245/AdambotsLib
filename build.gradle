@@ -89,11 +89,26 @@ wpi.sim.addDriverstation()
 // Setting up my Jar File. In this case, adding all libraries into the main jar ('fat jar')
 // in order to make them all available at runtime. Also adding the manifest so WPILib
 // knows where to look for our Robot Class.
+//
+// NOTE: The JAR will only include:
+//   - Compiled .class files from src/main/java/
+//   - Runtime dependencies
+//   - Backup copies of source code and build files
+//
+// The following folders are EXCLUDED from the JAR:
+//   - docs/ (documentation - not needed at runtime)
+//   - tests/ (test/example programs - not part of library)
 jar {
     from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
     from('src') { into 'backup/src' }
     from('vendordeps') { into 'backup/vendordeps' }
     from('build.gradle') { into 'backup' }
+
+    // Explicitly exclude docs and tests from JAR (they're not in src/ so already excluded,
+    // but making it explicit for clarity)
+    exclude 'docs/**'
+    exclude 'tests/**'
+
     manifest edu.wpi.first.gradlerio.GradleRIOPlugin.javaManifest(ROBOT_MAIN_CLASS)
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
 }

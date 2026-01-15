@@ -29,6 +29,13 @@ public class AngularHubServo implements BaseServo {
      * @param maxAngle The maximum angle in degrees (typically 355 for Axon Max+)
      */
     public AngularHubServo(ServoHub hub, int servoPortNum, double maxAngle) {
+        // Validate port number range
+        if (servoPortNum < 0 || servoPortNum > 5) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "AngularHubServo: Invalid port number " + servoPortNum + ". Must be 0-5. Defaulting to port 0.", false);
+            servoPortNum = 0;
+        }
+
         this.hub = hub;
         this.maxAngle = maxAngle;
         hub.setBankPulsePeriod(Bank.kBank3_5, 5000);
@@ -54,6 +61,12 @@ public class AngularHubServo implements BaseServo {
                 break;
             case 5:
                 channel = hub.getServoChannel(ChannelId.kChannelId5);
+                break;
+            default:
+                // Should never reach here due to constructor validation, but handle defensively
+                edu.wpi.first.wpilibj.DriverStation.reportError(
+                    "AngularHubServo: Invalid servo port in setServo(). Using channel 0.", false);
+                channel = hub.getServoChannel(ChannelId.kChannelId0);
                 break;
         }
         channel.setEnabled(true);
@@ -82,6 +95,13 @@ public class AngularHubServo implements BaseServo {
 
     @Override
     public void setPulseWidth(int pulseWidth) {
+        // Validate pulse width bounds
+        if (pulseWidth < MIN_PULSE_WIDTH || pulseWidth > MAX_PULSE_WIDTH) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "AngularHubServo: Pulse width " + pulseWidth + " out of range [" +
+                MIN_PULSE_WIDTH + ", " + MAX_PULSE_WIDTH + "]. Clamping.", false);
+            pulseWidth = Math.min(MAX_PULSE_WIDTH, Math.max(MIN_PULSE_WIDTH, pulseWidth));
+        }
         channel.setPulseWidth(pulseWidth);
     }
 
@@ -92,9 +112,16 @@ public class AngularHubServo implements BaseServo {
 
     @Override
     public void setAngle(double degrees) {
-        // Clamp to valid range
+        // Validate and clamp to valid range
+        double originalDegrees = degrees;
         degrees = Math.min(maxAngle, Math.max(0, degrees));
-        
+
+        if (degrees != originalDegrees) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "AngularHubServo: Angle " + originalDegrees + " out of range [0, " +
+                maxAngle + "]. Clamping to " + degrees + ".", false);
+        }
+
         // Map angle to pulse width
         double normalizedPosition = degrees / maxAngle;
         int pulseWidth = (int)(MIN_PULSE_WIDTH + (normalizedPosition * (MAX_PULSE_WIDTH - MIN_PULSE_WIDTH)));

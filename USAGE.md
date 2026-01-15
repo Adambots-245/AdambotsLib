@@ -67,9 +67,6 @@ import com.adambots.lib.actuators.MinionMotor;
 // Subsystems
 import com.adambots.lib.subsystems.SwerveSubsystem;
 
-// Commands
-import com.adambots.lib.commands.driveCommands.DriveCommands;
-
 // Vision
 import com.adambots.lib.vision.PhotonVision;
 
@@ -87,11 +84,8 @@ AdambotsLib provides reusable components for:
 - `AngularHubServo` - REV Robotics servo control
 
 **Subsystems:**
-- `SwerveSubsystem` - YAGSL-based swerve drive
+- `SwerveSubsystem` - YAGSL-based swerve drive with command factories
 - Vision subsystems
-
-**Commands:**
-- `DriveCommands` - Pre-built swerve drive commands
 
 **Utilities:**
 - Vision processing helpers
@@ -140,7 +134,6 @@ Build your project to download the library:
 import com.adambots.lib.actuators.TalonFXMotor;
 import com.adambots.lib.actuators.NEOMotor;
 import com.adambots.lib.subsystems.SwerveSubsystem;
-import com.adambots.lib.commands.driveCommands.DriveCommands;
 import com.adambots.lib.vision.PhotonVision;
 // ... and other classes
 ```
@@ -154,12 +147,7 @@ import com.adambots.lib.vision.PhotonVision;
 - `AngularHubServo` - Servo control wrapper
 
 **Subsystems:**
-- `SwerveSubsystem` - Swerve drive subsystem using YAGSL
-- Base classes for common subsystems
-
-**Commands:**
-- `DriveCommands` - Pre-built drive commands
-- Auto-alignment and path-following utilities
+- `SwerveSubsystem` - Swerve drive subsystem using YAGSL with built-in command factories
 
 **Vision:**
 - `PhotonVision` - Camera and vision processing helpers
@@ -202,7 +190,6 @@ Once installed, you can import and use AdambotsLib classes:
 import com.adambots.lib.actuators.NEOMotor;
 import com.adambots.lib.actuators.TalonFXMotor;
 import com.adambots.lib.subsystems.SwerveSubsystem;
-import com.adambots.lib.commands.driveCommands.DriveCommands;
 import com.adambots.lib.vision.PhotonVision;
 ```
 
@@ -218,14 +205,16 @@ public class MySubsystem extends SubsystemBase {
     private final NEOMotor motor;
 
     public MySubsystem() {
-        // Create a NEO motor on CAN ID 1
-        motor = new NEOMotor(1, false); // false = not inverted
+        // Create a NEO motor on CAN ID 1, brushless, not inverted
+        motor = new NEOMotor(1, false);
 
-        // Configure PID
-        motor.configurePID(0.1, 0.0, 0.0, 0.0);
-
-        // Configure current limits
-        motor.configureCurrentLimits(40, 30, 0);
+        // Configure using builder pattern (recommended)
+        motor.configure()
+            .pid(0.1, 0.0, 0.05, 0.0)
+            .currentLimits(40, 60, 5000)
+            .brakeMode(true)
+            .voltageCompensation(12.0)
+            .apply();
     }
 
     public void setSpeed(double speed) {
@@ -244,18 +233,21 @@ public class ShooterSubsystem extends SubsystemBase {
     private final TalonFXMotor shooterMotor;
 
     public ShooterSubsystem() {
-        // Create a Falcon 500/Kraken motor on CAN ID 5
-        shooterMotor = new TalonFXMotor(5, false);
+        // Create a Kraken X60 motor on CAN ID 5, not inverted, is Kraken
+        shooterMotor = new TalonFXMotor(5, false, true);
 
-        // Configure velocity PID
-        shooterMotor.configurePID(0.05, 0.0, 0.0, 0.12);
-
-        // Configure motion magic
-        shooterMotor.configureMotionMagic(5000, 10000, 0);
+        // Configure using builder pattern (recommended)
+        shooterMotor.configure()
+            .pid(0.05, 0.0, 0.001, 0.12)
+            .currentLimits(60, 80, 3000)
+            .motionMagic(80.0, 160.0, 0.0)
+            .brakeMode(false)  // Coast mode for shooter
+            .voltageCompensation(12.0)
+            .apply();
     }
 
-    public void setVelocity(double rpm) {
-        shooterMotor.set(ControlMode.VELOCITY, rpm);
+    public void setVelocity(double rps) {
+        shooterMotor.set(ControlMode.VELOCITY, rps);
     }
 }
 ```
@@ -298,13 +290,8 @@ public class VisionSubsystem extends SubsystemBase {
   - Supports field-relative driving
   - Auto-alignment features
   - PathPlanner integration
-
-### Commands
-
-- **DriveCommands** - Pre-built drive commands for swerve
-  - Field-relative driving
-  - Robot-relative driving
-  - Auto-alignment to targets
+  - Built-in command factories for all drive operations
+  - Trigger methods for state-based command composition
 
 ### Vision
 
@@ -326,23 +313,67 @@ AdambotsLib provides a unified `ControlMode` enum across all motor types:
 - `MOTION_MAGIC_FOC_TORQUE` - FOC torque-based motion magic (TalonFX only)
 - `FOLLOWER` - Follow another motor
 
-## Configuration Methods
+## Motor Configuration
 
-All motor classes support these common configuration methods:
+### Builder Pattern (Recommended)
+
+**New in 2026.2.0** - Configure motors using the fluent builder pattern for clean, readable code:
+
+```java
+// Configure a drive motor with common settings
+motor.configure()
+    .pid(0.1, 0.0, 0.05, 0.0)
+    .currentLimits(40, 60, 5000)
+    .motionMagic(50.0, 100.0, 200.0)
+    .brakeMode(true)
+    .voltageCompensation(12.0)
+    .apply();
+
+// Minimal configuration for a simple mechanism
+motor.configure()
+    .currentLimits(20, 40, 3000)
+    .brakeMode(true)
+    .apply();
+```
+
+**Available Builder Methods:**
+
+- `.pid(kP, kI, kD, kF)` - Configure PID gains for slot 0
+- `.pid(slot, kP, kI, kD, kF)` - Configure PID gains for specific slot
+- `.currentLimits(stallAmps, freeAmps, limitRpm)` - Set current limits
+- `.motionMagic(cruiseVelRPS, accelRPSPerSec, jerkRPSPerSecPerSec)` - Configure motion profiling
+- `.brakeMode(brake)` - Set brake (true) or coast (false) mode
+- `.voltageCompensation(voltage)` - Enable voltage compensation (typically 12.0)
+- `.apply()` - Apply all configured settings (must call last)
+
+**Parameter Units:**
+
+All parameters now include units in their names for clarity:
+- `cruiseVelocityRPS` - rotations per second
+- `accelerationRPSPerSec` - rotations per second²
+- `jerkRPSPerSecPerSec` - rotations per second³
+- `stallLimitAmps` - amperes
+- `freeLimitAmps` - amperes
+- `limitRpmThreshold` - RPM
+- `forwardLimitRotations` - rotations
+- `reverseLimitRotations` - rotations
+
+### Traditional Methods
+
+All motor classes also support direct configuration methods:
 
 ```java
 // PID Configuration
-motor.configurePID(double kP, double kI, double kD, double kF);
+motor.setPID(int slot, double kP, double kI, double kD, double kF);
 
 // Current Limiting
-motor.configureCurrentLimits(double stallLimit, double freeLimit, double limitRPM);
+motor.configureCurrentLimits(double stallLimitAmps, double freeLimitAmps, double limitRpmThreshold);
 
 // Soft Limits
-motor.configureSoftLimits(boolean enableForward, boolean enableReverse,
-                          double forwardLimit, double reverseLimit);
+motor.configureSoftLimits(double forwardLimitRotations, double reverseLimitRotations, boolean enable);
 
 // Motion Magic/Profiling
-motor.configureMotionMagic(double cruiseVelocity, double acceleration, double jerk);
+motor.configureMotionMagic(double cruiseVelocityRPS, double accelerationRPSPerSec, double jerkRPSPerSecPerSec);
 
 // Motor Inversion
 motor.setInverted(boolean inverted);
@@ -350,8 +381,11 @@ motor.setInverted(boolean inverted);
 // Brake/Coast Mode
 motor.setBrakeMode(boolean brake);
 
+// Voltage Compensation
+motor.enableVoltageCompensation(double voltage);
+
 // Follower Mode
-motor.setStrictFollower(int leaderID);
+motor.setStrictFollower(int leaderDeviceID);
 ```
 
 ## Updating AdambotsLib

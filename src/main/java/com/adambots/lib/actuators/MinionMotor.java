@@ -83,9 +83,10 @@ public class MinionMotor implements BaseMotor {
                 motor.setControl(voltageRequest.withOutput(value));
                 break;
             case CURRENT:
-                // TalonFXS doesn't have a direct current control mode in Phoenix 6
-                // This could be implemented with a custom control request if needed
-                System.err.println("CURRENT control mode not directly supported by TalonFXS");
+                // TalonFXS doesn't have a direct current control mode - fallback to percent output
+                edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                    "MinionMotor: CURRENT mode not supported. Falling back to PERCENT_OUTPUT.", false);
+                motor.setControl(percentRequest.withOutput(value));
                 break;
             case MOTION_MAGIC:
                 motor.setControl(motionMagicRequest.withPosition(value));
@@ -95,9 +96,14 @@ public class MinionMotor implements BaseMotor {
                 // value here is assumed to be the device ID to follow
                 motor.setControl(new Follower((int)value, MotorAlignmentValue.Aligned));
                 break;
-            default:
-                System.err.println("Unsupported control mode");
+            case MOTION_MAGIC_FOC_TORQUE:
+                // TalonFXS doesn't support FOC torque mode - fallback to regular Motion Magic
+                edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                    "MinionMotor: MOTION_MAGIC_FOC_TORQUE not supported. Falling back to MOTION_MAGIC.", false);
+                motor.setControl(motionMagicRequest.withPosition(value));
                 break;
+            default:
+                throw new IllegalArgumentException("Unsupported control mode: " + mode);
         }
     }
 
@@ -105,115 +111,179 @@ public class MinionMotor implements BaseMotor {
     public void setPID(int slotIdx, double kP, double kI, double kD, double kF) {
         // In Phoenix 6, slot configuration is done differently
         Slot0Configs slot0Configs = new Slot0Configs();
-        
-        // Read current configuration first to avoid overwriting other settings
-        configurator.refresh(slot0Configs);
-        
+
+        // CRITICAL: Check if refresh fails - failed refresh causes config apply to factory default
+        StatusCode refreshStatus = configurator.refresh(slot0Configs);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "MinionMotor: Failed to refresh config before setPID (Status: " + refreshStatus +
+                "). Configuration may be factory defaulted!", true);
+            // Continue anyway to attempt configuration, but user is warned
+        }
+
         // Update PID values
         slot0Configs.kP = kP;
         slot0Configs.kI = kI;
         slot0Configs.kD = kD;
         slot0Configs.kV = kF;  // kV is the feed forward in Phoenix 6
-        
-        // Apply configuration
-        applyConfigWithRetry(() -> configurator.apply(slot0Configs));
+
+        // Apply configuration - check return value
+        boolean success = applyConfigWithRetry(() -> configurator.apply(slot0Configs));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "MinionMotor: Failed to apply PID configuration after retries", false);
+        }
     }
 
     @Override
-    public void configureMotionMagic(double cruiseVelocity, double acceleration, double jerk) {
+    public void configureMotionMagic(double cruiseVelocityRPS, double accelerationRPSPerSec, double jerkRPSPerSecPerSec) {
         MotionMagicConfigs configs = new MotionMagicConfigs();
-        
-        // Read current configuration
-        configurator.refresh(configs);
-        
+
+        // CRITICAL: Check if refresh fails
+        StatusCode refreshStatus = configurator.refresh(configs);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "MinionMotor: Failed to refresh config before configureMotionMagic (Status: " + refreshStatus +
+                "). Configuration may be factory defaulted!", true);
+        }
+
         // Set new values
-        configs.MotionMagicCruiseVelocity = cruiseVelocity;
-        configs.MotionMagicAcceleration = acceleration;
-        configs.MotionMagicJerk = jerk;
-        
-        // Apply configuration
-        applyConfigWithRetry(() -> configurator.apply(configs));
+        configs.MotionMagicCruiseVelocity = cruiseVelocityRPS;
+        configs.MotionMagicAcceleration = accelerationRPSPerSec;
+        configs.MotionMagicJerk = jerkRPSPerSecPerSec;
+
+        // Apply configuration - check return value
+        boolean success = applyConfigWithRetry(() -> configurator.apply(configs));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "MinionMotor: Failed to apply Motion Magic configuration after retries", false);
+        }
     }
 
     @Override
-    public void configureCurrentLimits(double stallLimit, double freeLimit, double limitRPM) {
+    public void configureCurrentLimits(double stallLimitAmps, double freeLimitAmps, double limitRpmThreshold) {
         CurrentLimitsConfigs configs = new CurrentLimitsConfigs();
-        
-        // Read current configuration
-        configurator.refresh(configs);
-        
+
+        // CRITICAL: Check if refresh fails
+        StatusCode refreshStatus = configurator.refresh(configs);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "MinionMotor: Failed to refresh config before configureCurrentLimits (Status: " + refreshStatus +
+                "). Configuration may be factory defaulted!", true);
+        }
+
         // Set new values - note that Phoenix 6 has different terminology
-        configs.StatorCurrentLimit = stallLimit;
+        configs.StatorCurrentLimit = stallLimitAmps;
         configs.StatorCurrentLimitEnable = true;
-        configs.SupplyCurrentLimit = freeLimit;
+        configs.SupplyCurrentLimit = freeLimitAmps;
         configs.SupplyCurrentLimitEnable = true;
-        configs.SupplyCurrentLowerLimit = freeLimit * 0.8; // Lower limit after time threshold
+        configs.SupplyCurrentLowerLimit = freeLimitAmps * 0.8; // Lower limit after time threshold
         configs.SupplyCurrentLowerTime = 0.1; // Time to exceed threshold before lowering limit
-        
-        // Apply configuration
-        applyConfigWithRetry(()-> configurator.apply(configs));
+
+        // Apply configuration - check return value
+        boolean success = applyConfigWithRetry(() -> configurator.apply(configs));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "MinionMotor: Failed to apply current limit configuration after retries", false);
+        }
     }
 
     @Override
-    public void configureSoftLimits(double forwardLimit, double reverseLimit, boolean enable) {
+    public void configureSoftLimits(double forwardLimitRotations, double reverseLimitRotations, boolean enable) {
         SoftwareLimitSwitchConfigs configs = new SoftwareLimitSwitchConfigs();
-        
-        // Read current configuration
-        configurator.refresh(configs);
-        
+
+        // CRITICAL: Check if refresh fails
+        StatusCode refreshStatus = configurator.refresh(configs);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "MinionMotor: Failed to refresh config before configureSoftLimits (Status: " + refreshStatus +
+                "). Configuration may be factory defaulted!", true);
+        }
+
         // Set new values
-        configs.ForwardSoftLimitThreshold = forwardLimit;
+        configs.ForwardSoftLimitThreshold = forwardLimitRotations;
         configs.ForwardSoftLimitEnable = enable;
-        configs.ReverseSoftLimitThreshold = reverseLimit;
+        configs.ReverseSoftLimitThreshold = reverseLimitRotations;
         configs.ReverseSoftLimitEnable = enable;
-        
-        // Apply configuration
-        applyConfigWithRetry(() -> configurator.apply(configs));
+
+        // Apply configuration - check return value
+        boolean success = applyConfigWithRetry(() -> configurator.apply(configs));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "MinionMotor: Failed to apply soft limit configuration after retries", false);
+        }
     }
 
     @Override
     public void enableSoftLimits(boolean enable) {
         SoftwareLimitSwitchConfigs configs = new SoftwareLimitSwitchConfigs();
-        
-        // Read current configuration
-        configurator.refresh(configs);
-        
+
+        // CRITICAL: Check if refresh fails
+        StatusCode refreshStatus = configurator.refresh(configs);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "MinionMotor: Failed to refresh config before enableSoftLimits (Status: " + refreshStatus +
+                "). Configuration may be factory defaulted!", true);
+        }
+
         // Update enable values only
         configs.ForwardSoftLimitEnable = enable;
         configs.ReverseSoftLimitEnable = enable;
-        
-        // Apply configuration
-        applyConfigWithRetry(() -> configurator.apply(configs));
+
+        // Apply configuration - check return value
+        boolean success = applyConfigWithRetry(() -> configurator.apply(configs));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "MinionMotor: Failed to apply soft limit enable configuration after retries", false);
+        }
     }
 
     @Override
     public void setInverted(boolean inverted) {
         MotorOutputConfigs configs = new MotorOutputConfigs();
-        
-        // Read current configuration
-        configurator.refresh(configs);
-        
+
+        // CRITICAL: Check if refresh fails
+        StatusCode refreshStatus = configurator.refresh(configs);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "MinionMotor: Failed to refresh config before setInverted (Status: " + refreshStatus +
+                "). Configuration may be factory defaulted!", true);
+        }
+
         // Update inversion setting
-        configs.Inverted = inverted ? com.ctre.phoenix6.signals.InvertedValue.Clockwise_Positive : 
+        configs.Inverted = inverted ? com.ctre.phoenix6.signals.InvertedValue.Clockwise_Positive :
                                      com.ctre.phoenix6.signals.InvertedValue.CounterClockwise_Positive;
-        
-        // Apply configuration
-        applyConfigWithRetry(() -> configurator.apply(configs));
+
+        // Apply configuration - check return value
+        boolean success = applyConfigWithRetry(() -> configurator.apply(configs));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "MinionMotor: Failed to apply inversion configuration after retries", false);
+        }
     }
 
     @Override
     public void setBrakeMode(boolean brake) {
         MotorOutputConfigs configs = new MotorOutputConfigs();
-        
-        // Read current configuration
-        configurator.refresh(configs);
-        
+
+        // CRITICAL: Check if refresh fails
+        StatusCode refreshStatus = configurator.refresh(configs);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "MinionMotor: Failed to refresh config before setBrakeMode (Status: " + refreshStatus +
+                "). Configuration may be factory defaulted!", true);
+        }
+
         // Update neutral mode setting
-        configs.NeutralMode = brake ? com.ctre.phoenix6.signals.NeutralModeValue.Brake : 
+        configs.NeutralMode = brake ? com.ctre.phoenix6.signals.NeutralModeValue.Brake :
                                      com.ctre.phoenix6.signals.NeutralModeValue.Coast;
-        
-        // Apply configuration
-        applyConfigWithRetry(() -> configurator.apply(configs));
+
+        // Apply configuration - check return value
+        boolean success = applyConfigWithRetry(() -> configurator.apply(configs));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "MinionMotor: Failed to apply brake mode configuration after retries", false);
+        }
     }
 
     @Override
@@ -224,18 +294,23 @@ public class MinionMotor implements BaseMotor {
 
     @Override
     public void enableVoltageCompensation(double voltage) {
-        VoltageConfigs configs = new VoltageConfigs();
-        
-        // Read current configuration
-        configurator.refresh(configs);
-        
-        // Set voltage compensation
-        configs.PeakForwardVoltage = voltage;
-        configs.PeakReverseVoltage = -voltage;
-        configs.SupplyVoltageTimeConstant = 0.1; // Filter time constant
-        
-        // Apply configuration
-        configurator.apply(configs);
+        // NOTE: This method is deprecated and does NOT provide proper voltage compensation in Phoenix 6.
+        // Setting PeakForwardVoltage/PeakReverseVoltage just caps the voltage output,
+        // it does NOT compensate for battery droop like WPILib voltage compensation does.
+        //
+        // CORRECT APPROACH for Phoenix 6:
+        // - Use voltage-based control modes (VoltageOut, PositionVoltage, VelocityVoltage, MotionMagicVoltage)
+        // - These explicitly request a voltage output and handle compensation internally
+        // - Duty cycle based controls (DutyCycleOut) can exceed the peak voltage cap
+        //
+        // This method is retained for interface compliance but logs a warning.
+
+        edu.wpi.first.wpilibj.DriverStation.reportWarning(
+            "MinionMotor.enableVoltageCompensation() does NOT work as expected in Phoenix 6. " +
+            "Use voltage-based control modes (VoltageOut, PositionVoltage, VelocityVoltage, MotionMagicVoltage) " +
+            "instead of duty cycle control modes. See Phoenix 6 documentation.", false);
+
+        // DO NOT apply configuration - this would incorrectly cap voltage
     }
 
     @Override
@@ -303,23 +378,33 @@ public class MinionMotor implements BaseMotor {
     }
 
     @Override
-    public void configureHardLimits(boolean enableForward, boolean enableReverse, double forwardValue, double reverseValue) {
+    public void configureHardLimits(boolean enableForward, boolean enableReverse,
+                                   double forwardResetValueRotations, double reverseResetValueRotations) {
         HardwareLimitSwitchConfigs configs = new HardwareLimitSwitchConfigs();
-        
-        // Read current configuration
-        configurator.refresh(configs);
-        
+
+        // CRITICAL: Check if refresh fails
+        StatusCode refreshStatus = configurator.refresh(configs);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "MinionMotor: Failed to refresh config before configureHardLimits (Status: " + refreshStatus +
+                "). Configuration may be factory defaulted!", true);
+        }
+
         // Configure limits
         configs.ForwardLimitEnable = enableForward;
         configs.ForwardLimitAutosetPositionEnable = enableForward;
-        configs.ForwardLimitAutosetPositionValue = forwardValue;
-        
+        configs.ForwardLimitAutosetPositionValue = forwardResetValueRotations;
+
         configs.ReverseLimitEnable = enableReverse;
         configs.ReverseLimitAutosetPositionEnable = enableReverse;
-        configs.ReverseLimitAutosetPositionValue = reverseValue;
-        
-        // Apply configuration
-        applyConfigWithRetry(() -> configurator.apply(configs));
+        configs.ReverseLimitAutosetPositionValue = reverseResetValueRotations;
+
+        // Apply configuration - check return value
+        boolean success = applyConfigWithRetry(() -> configurator.apply(configs));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "MinionMotor: Failed to apply hard limit configuration after retries", false);
+        }
     }
 
     @Override
@@ -328,33 +413,49 @@ public class MinionMotor implements BaseMotor {
     }
 
     /**
-     * Applies a configuration with retries using a functional interface.
+     * Applies a configuration with automatic retries.
      *
-     * @param applyAction The action to apply the configuration.
-     * @return true if the configuration was applied successfully, false otherwise.
+     * <p>This method attempts to apply a configuration multiple times if initial attempts fail.
+     * Motor controllers sometimes reject configurations during startup or high CAN bus traffic.
+     *
+     * @param applyAction The configuration action to apply
+     * @return True if configuration was applied successfully, false after all retries exhausted
      */
     public boolean applyConfigWithRetry(ConfigApplyAction applyAction) {
         for (int i = 0; i < maxRetries; i++) {
             StatusCode status = applyAction.apply();
 
             if (status.isOK()) {
-                System.out.println("TalonFXS configuration applied successfully!");
-                return true; // Configuration successful
-            } else {
-                System.err.println("Failed to apply configuration. Status: " + status);
-                System.err.println("Retrying... Attempt " + (i + 1) + " of " + maxRetries);
-                // Add a small delay before retrying
-                try {
-                    Thread.sleep(100); // 100 milliseconds delay
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt(); // Restore the interrupted status
-                    return false; // Exit if the thread is interrupted
+                if (i > 0) {
+                    // Only log if we had to retry
+                    edu.wpi.first.wpilibj.DataLogManager.log(
+                        "MinionMotor configuration succeeded on attempt " + (i + 1));
                 }
+                return true; // Configuration successful
+            } else if (i < maxRetries - 1) {
+                // Not the last attempt - log retry
+                edu.wpi.first.wpilibj.DataLogManager.log(
+                    "MinionMotor configuration failed (Status: " + status + "), retrying... (" +
+                    (i + 1) + "/" + maxRetries + ")");
+                // No Thread.sleep - retry immediately
             }
         }
 
-        System.err.println("Failed to apply configuration after " + maxRetries + " retries.");
+        // All retries exhausted - report warning to driver station
+        edu.wpi.first.wpilibj.DriverStation.reportWarning(
+            "MinionMotor configuration failed after " + maxRetries + " attempts", false);
         return false; // Configuration failed after retries
+    }
+
+    @Override
+    public boolean supportsControlMode(ControlMode mode) {
+        // MinionMotor doesn't support CURRENT or MOTION_MAGIC_FOC_TORQUE natively
+        return mode != ControlMode.CURRENT && mode != ControlMode.MOTION_MAGIC_FOC_TORQUE;
+    }
+
+    @Override
+    public String getMotorType() {
+        return "MinionMotor (TalonFXS)";
     }
 
 }

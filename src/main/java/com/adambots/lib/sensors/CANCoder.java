@@ -7,6 +7,7 @@
 
 package com.adambots.lib.sensors;
 
+import com.adambots.lib.utils.Utils;
 import com.ctre.phoenix6.hardware.CANcoder;
 
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -19,6 +20,12 @@ public class CANCoder implements BaseAbsoluteEncoder {
     private CANcoder encoder;
     
     public CANCoder (int port){
+        // Validate CAN ID range
+        if (port < 0 || port > 62) {
+            Utils.reportError("CANCoder: Invalid CAN ID " + port +
+                ". Valid range: 0-62. Defaulting to 1.");
+            port = 1;
+        }
         this.encoder = new CANcoder(port); //Defining the encoder using the port passed in
     }
 

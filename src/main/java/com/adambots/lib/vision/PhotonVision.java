@@ -8,7 +8,6 @@ import static edu.wpi.first.units.Units.Microseconds;
 import static edu.wpi.first.units.Units.Milliseconds;
 import static edu.wpi.first.units.Units.Seconds;
 
-import java.awt.Desktop;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -35,7 +34,6 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform2d;
 import edu.wpi.first.math.geometry.Transform3d;
-import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
@@ -49,8 +47,43 @@ import swervelib.SwerveDrive;
 import swervelib.telemetry.SwerveDriveTelemetry;
 
 /**
- * Modified from Ironclad 2024's Vision class.
- * https://gitlab.com/ironclad_code/ironclad-2024/-/blob/master/src/main/java/frc/robot/vision/Vision.java?ref_type=heads
+ * PhotonVision integration for AprilTag-based vision pose estimation.
+ *
+ * <p>This class provides comprehensive vision functionality including:
+ * <ul>
+ *   <li>Multi-camera support with independent pose estimation</li>
+ *   <li>AprilTag detection and tracking</li>
+ *   <li>Vision-corrected odometry updates</li>
+ *   <li>Simulation support with PhotonVision sim</li>
+ *   <li>Camera filtering for human player vs reef tags</li>
+ * </ul>
+ *
+ * <p><strong>Camera Management:</strong>
+ * Cameras can be filtered to only use specific AprilTags:
+ * <ul>
+ *   <li>Front cameras (LEFT_CAM, RIGHT_CAM) - typically for reef scoring</li>
+ *   <li>Back camera (CENTER_CAM) - typically for human player station</li>
+ * </ul>
+ *
+ * <p><strong>Usage Example:</strong>
+ * <pre>{@code
+ * // In SwerveSubsystem constructor
+ * vision = new PhotonVision(this::getPose, field);
+ *
+ * // In periodic()
+ * vision.updatePoseEstimation(swerveDrive);
+ * vision.updateVisionField();
+ *
+ * // Switch to human player cameras only
+ * vision.useHumanPlayerCamerasOnly();
+ *
+ * // Re-enable all cameras
+ * vision.useAllCameras();
+ * }</pre>
+ *
+ * <p><strong>Based on:</strong> Modified from Ironclad 2024's Vision class.
+ * @see <a href="https://gitlab.com/ironclad_code/ironclad-2024/-/blob/master/src/main/java/frc/robot/vision/Vision.java">Ironclad Vision</a>
+ * @see <a href="https://docs.photonvision.org/">PhotonVision Documentation</a>
  */
 public class PhotonVision {
 
@@ -59,8 +92,8 @@ public class PhotonVision {
    */
   public static final AprilTagFieldLayout fieldLayout = AprilTagFieldLayout.loadField(AprilTagFields.kDefaultField);
   /**
-   * Ambiguity defined as a value between (0,1). Used in
-   * {@link PhotonVision#filterPose}.
+   * Ambiguity defined as a value between (0,1). Used for filtering pose estimates.
+   * Higher ambiguity = less confident pose estimate.
    */
   private final double maximumAmbiguity = 0.25;
   /**
@@ -68,10 +101,10 @@ public class PhotonVision {
    */
   public VisionSystemSim visionSim;
   /**
-   * Count of times that the odom thinks we're more than 10meters away from the
-   * april tag.
+   * Count of times that odometry estimates the robot is more than 10 meters away from
+   * the AprilTag. Used to filter out incorrect pose jumps.
    */
-  private double longDistangePoseEstimationCount = 0;
+  private double longDistancePoseEstimationCount = 0;
   /**
    * Current pose from the pose estimator using wheel odometry.
    */
@@ -80,11 +113,19 @@ public class PhotonVision {
    * Field from {@link swervelib.SwerveDrive#field}
    */
   private Field2d field2d;
-  int counter = 0;
 
-  private static boolean humanPlayerFlag = false;
+  /**
+   * When true, only the CENTER_CAM (back camera) is used for pose estimation.
+   * Front cameras (LEFT_CAM, RIGHT_CAM) are disabled.
+   * This is useful when at the human player station where front cameras may see incorrect tags.
+   */
+  private static boolean useHumanPlayerCamerasOnly = false;
 
-  private static boolean isAllCameraDisable = false;
+  /**
+   * When true, all cameras are disabled and no vision measurements are added to odometry.
+   * Use this when vision is unreliable or causing issues.
+   */
+  private static boolean areAllCamerasDisabled = false;
 
 
   /**
@@ -149,37 +190,28 @@ public class PhotonVision {
        */
       visionSim.update(swerveDrive.getSimulationDriveTrainPose().get());
     }
-    // System.out.println("CHeckpoint 0");
     for (Cameras camera : Cameras.values()) {
       Cameras.updatedCache = false;
-      // System.out.println("Checkpoints 1");
       Optional<EstimatedRobotPose> poseEst = getEstimatedGlobalPose(camera);
       if (poseEst != null && poseEst.isPresent()) {
         var pose = poseEst.get();
-        // counter++;
-        // if (counter > 25) {
-        // System.out.println(pose.estimatedPose.getX() + " Y " +
-        // pose.estimatedPose.getY());
-        // counter = 0;
-        // }
-        // System.out.println(pose.estimatedPose.getX() + "Y " +
-        // pose.estimatedPose.getY());
-        // System.err.println("Checkpoint 4");
-        // System.out.println(camera);
-        if (!isAllCameraDisable){
-          if (!humanPlayerFlag && camera != Cameras.CENTER_CAM) {
-            swerveDrive.addVisionMeasurement(pose.estimatedPose.toPose2d(),
-                pose.timestampSeconds,
-                camera.curStdDevs);
-            // System.out.println("REEF UPDATE for " + camera.name());
-          }
-  
-          if (camera == Cameras.CENTER_CAM && humanPlayerFlag) {
-            swerveDrive.addVisionMeasurement(pose.estimatedPose.toPose2d(),
-                pose.timestampSeconds,
-                camera.curStdDevs);
-            // System.out.println("CENTER UPDATE for " + camera.name());
-          }
+
+        // Skip if all cameras are disabled
+        if (areAllCamerasDisabled) {
+          continue;
+        }
+
+        // If using human player cameras only, only use CENTER_CAM
+        if (useHumanPlayerCamerasOnly && camera == Cameras.CENTER_CAM) {
+          swerveDrive.addVisionMeasurement(pose.estimatedPose.toPose2d(),
+              pose.timestampSeconds,
+              camera.curStdDevs);
+        }
+        // If using all cameras, use front cameras (not CENTER_CAM)
+        else if (!useHumanPlayerCamerasOnly && camera != Cameras.CENTER_CAM) {
+          swerveDrive.addVisionMeasurement(pose.estimatedPose.toPose2d(),
+              pose.timestampSeconds,
+              camera.curStdDevs);
         }
       }
     }
@@ -198,10 +230,10 @@ public class PhotonVision {
    */
   public Optional<EstimatedRobotPose> getEstimatedGlobalPose(Cameras camera) {
     Optional<EstimatedRobotPose> poseEst = camera.getEstimatedGlobalPose();
-    // System.out.println("Checkpoint 1");
+
     if (RobotBase.isSimulation()) {
       Field2d debugField = visionSim.getDebugField();
-      // Uncomment to enable outputting of vision targets in sim.
+      // Update simulation debug field with vision estimation
       poseEst.ifPresentOrElse(
           est -> debugField
               .getObject("VisionEstimation")
@@ -213,60 +245,158 @@ public class PhotonVision {
     return poseEst;
   }
 
-  /**
-   * Filter pose via the ambiguity and find best estimate between all of the
-   * camera's throwing out distances more than
-   * 10m for a short amount of time.
-   *
-   * @param pose Estimated robot pose.
-   * @return Could be empty if there isn't a good reading.
-   */
-  @Deprecated(since = "2024", forRemoval = true)
-  private Optional<EstimatedRobotPose> filterPose(Optional<EstimatedRobotPose> pose) {
-    if (pose.isPresent()) {
-      double bestTargetAmbiguity = 1; // 1 is max ambiguity
-      for (PhotonTrackedTarget target : pose.get().targetsUsed) {
-        double ambiguity = target.getPoseAmbiguity();
-        if (ambiguity != -1 && ambiguity < bestTargetAmbiguity) {
-          bestTargetAmbiguity = ambiguity;
-        }
-      }
-      // ambiguity to high dont use estimate
-      if (bestTargetAmbiguity > maximumAmbiguity) {
-        return Optional.empty();
-      }
-
-      // est pose is very far from recorded robot pose
-      if (PhotonUtils.getDistanceToPose(currentPose.get(), pose.get().estimatedPose.toPose2d()) > 1) {
-        longDistangePoseEstimationCount++;
-
-        // if it calculates that were 10 meter away for more than 10 times in a row its
-        // probably right
-        if (longDistangePoseEstimationCount < 10) {
-          return Optional.empty();
-        }
-      } else {
-        longDistangePoseEstimationCount = 0;
-      }
-      return pose;
-    }
-    return Optional.empty();
-  }
 
   /**
    * Get distance of the robot from the AprilTag pose.
    *
    * @param id AprilTag ID
-   * @return Distance
+   * @return Distance in meters, or -1.0 if tag doesn't exist
    */
   public double getDistanceFromAprilTag(int id) {
     Optional<Pose3d> tag = fieldLayout.getTagPose(id);
     return tag.map(pose3d -> PhotonUtils.getDistanceToPose(currentPose.get(), pose3d.toPose2d())).orElse(-1.0);
   }
 
-  public Transform2d getDistanceFromAprilTagX(int id) {
+  /**
+   * Get the transform (distance and angle) from the robot to the AprilTag.
+   *
+   * @param id AprilTag ID
+   * @return Transform from robot to tag
+   */
+  public Transform2d getTransformToAprilTag(int id) {
     Pose2d aprilTagPose = getAprilTagPose(id, new Transform2d());
     return aprilTagPose.minus(currentPose.get());
+  }
+
+  /**
+   * Get the yaw angle (left/right) from the robot to the AprilTag.
+   * Positive = tag is to the left, negative = tag is to the right.
+   *
+   * @param id AprilTag ID
+   * @return Rotation2d representing yaw to the tag, or null if tag doesn't exist
+   */
+  public Rotation2d getYawToAprilTag(int id) {
+    Optional<Pose3d> tag = fieldLayout.getTagPose(id);
+    if (tag.isEmpty()) {
+      return null;
+    }
+
+    Pose2d tagPose = tag.get().toPose2d();
+    Pose2d robotPose = currentPose.get();
+
+    // Calculate angle from robot to tag
+    double dx = tagPose.getX() - robotPose.getX();
+    double dy = tagPose.getY() - robotPose.getY();
+    Rotation2d angleToTag = new Rotation2d(dx, dy);
+
+    // Return relative angle (difference between robot heading and angle to tag)
+    return angleToTag.minus(robotPose.getRotation());
+  }
+
+  /**
+   * Get the closest visible AprilTag from all cameras.
+   *
+   * @return The ID of the closest visible tag, or -1 if no tags are visible
+   */
+  public int getClosestVisibleTag() {
+    int closestTagID = -1;
+    double closestDistance = Double.MAX_VALUE;
+
+    for (Cameras camera : Cameras.values()) {
+      for (PhotonPipelineResult result : camera.resultsList) {
+        if (result.hasTargets()) {
+          for (PhotonTrackedTarget target : result.getTargets()) {
+            int tagID = target.getFiducialId();
+            double distance = getDistanceFromAprilTag(tagID);
+            if (distance > 0 && distance < closestDistance) {
+              closestDistance = distance;
+              closestTagID = tagID;
+            }
+          }
+        }
+      }
+    }
+
+    return closestTagID;
+  }
+
+  /**
+   * Get the distance to the closest visible AprilTag.
+   *
+   * @return Distance in meters to the closest tag, or -1.0 if no tags are visible
+   */
+  public double getDistanceToClosestTag() {
+    int closestTag = getClosestVisibleTag();
+    if (closestTag == -1) {
+      return -1.0;
+    }
+    return getDistanceFromAprilTag(closestTag);
+  }
+
+  /**
+   * Check if a specific AprilTag is currently visible in any camera.
+   *
+   * @param tagID AprilTag ID to check
+   * @return true if the tag is visible in any camera
+   */
+  public boolean isTagVisible(int tagID) {
+    for (Cameras camera : Cameras.values()) {
+      for (PhotonPipelineResult result : camera.resultsList) {
+        if (result.hasTargets()) {
+          for (PhotonTrackedTarget target : result.getTargets()) {
+            if (target.getFiducialId() == tagID) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Check if a specific AprilTag is visible in a specific camera.
+   *
+   * @param tagID  AprilTag ID to check
+   * @param camera Camera to check
+   * @return true if the tag is visible in the specified camera
+   */
+  public boolean isTagVisibleInCamera(int tagID, Cameras camera) {
+    for (PhotonPipelineResult result : camera.resultsList) {
+      if (result.hasTargets()) {
+        for (PhotonTrackedTarget target : result.getTargets()) {
+          if (target.getFiducialId() == tagID) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Get the best (lowest ambiguity) target from a specific camera.
+   *
+   * @param camera Camera to check
+   * @return PhotonTrackedTarget with lowest ambiguity, or null if no targets
+   */
+  public PhotonTrackedTarget getBestTargetFromCamera(Cameras camera) {
+    PhotonTrackedTarget bestTarget = null;
+    double bestAmbiguity = Double.MAX_VALUE;
+
+    for (PhotonPipelineResult result : camera.resultsList) {
+      if (result.hasTargets()) {
+        for (PhotonTrackedTarget target : result.getTargets()) {
+          double ambiguity = target.getPoseAmbiguity();
+          if (ambiguity >= 0 && ambiguity < bestAmbiguity) {
+            bestAmbiguity = ambiguity;
+            bestTarget = target;
+          }
+        }
+      }
+    }
+
+    return bestTarget;
   }
 
   /**
@@ -291,18 +421,20 @@ public class PhotonVision {
 
   }
 
+  /**
+   * Check if any of the specified AprilTag IDs are currently visible in any camera.
+   *
+   * @param tagIDs Array of AprilTag IDs to check
+   * @return The first matching tag ID found, or -1 if none are visible
+   */
   public int hasID(int[] tagIDs) {
     for (Cameras camera : Cameras.values()) {
       for (PhotonPipelineResult result : camera.resultsList) {
-        // System.out.println("RESULTS " + result);
-
         if (result.hasTargets()) {
-          // System.out.println("HAS TARGETS " + camera.name());
-
-          for (PhotonTrackedTarget i : result.getTargets()) {
+          for (PhotonTrackedTarget target : result.getTargets()) {
             for (int id : tagIDs) {
-              if (i.getFiducialId() == id) {
-                return i.getFiducialId();
+              if (target.getFiducialId() == id) {
+                return target.getFiducialId();
               }
             }
           }
@@ -342,30 +474,10 @@ public class PhotonVision {
    * photon vision on localhost.
    */
   private void openSimCameraViews() {
-    // if (Desktop.isDesktopSupported() &&
-    // Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-    // try
-    // {
-    // Desktop.getDesktop().browse(new URI("http://localhost:1182/"));
-    // Desktop.getDesktop().browse(new URI("http://localhost:1184/"));
-    // Desktop.getDesktop().browse(new URI("http://localhost:1186/"));
-    // } catch (IOException | URISyntaxException e)
-    // {
-    // e.printStackTrace();
-    // }
-    // }
+    // Implementation removed - can be re-added if needed for debugging
   }
 
   public boolean hasTarget() {
-    // boolean isTarget = false;
-    // for (Cameras c : Cameras.values()){
-    // c.clearCache();
-    // c.updateUnreadResults();
-    // if (!c.getLatestResult().isEmpty()){
-    // isTarget = true;
-    // }
-    // isTarget = Cameras.updatedCache;
-    // }
     return Cameras.updatedCache;
   }
 
@@ -393,7 +505,6 @@ public class PhotonVision {
     }
 
     field2d.getObject("tracked targets").setPoses(poses);
-    System.out.println(Cameras.CENTER_CAM.allowedTagIDs[0]);
   }
 
   /**
@@ -455,8 +566,6 @@ public class PhotonVision {
             Units.inchesToMeters(0),
             Units.inchesToMeters(41)),
         VecBuilder.fill(0.5, 0.5, 0.5), VecBuilder.fill(0.5, 0.5, 1), getHumanPlayerTagIDs());
-
-    // Aarush Gota was here :0
 
     /**
      * Latency alert to use when high latency is detected.
@@ -578,8 +687,7 @@ public class PhotonVision {
 
     /**
      * Get the result with the least ambiguity from the best tracked target within
-     * the Cache. This may not be the most
-     * recent result!
+     * the cache. This may not be the most recent result!
      *
      * @return The result in the cache with the least ambiguous best tracked target.
      *         This is not the most recent result!
@@ -590,14 +698,20 @@ public class PhotonVision {
       }
 
       PhotonPipelineResult bestResult = resultsList.get(0);
-      double amiguity = 0;
-      amiguity = bestResult.getBestTarget().getPoseAmbiguity();
-      double currentAmbiguity = 0;
+      if (!bestResult.hasTargets()) {
+        return Optional.empty();
+      }
+
+      double bestAmbiguity = bestResult.getBestTarget().getPoseAmbiguity();
+
       for (PhotonPipelineResult result : resultsList) {
-        currentAmbiguity = result.getBestTarget().getPoseAmbiguity();
-        if (currentAmbiguity < amiguity && currentAmbiguity > 0) {
+        if (!result.hasTargets()) {
+          continue;
+        }
+        double currentAmbiguity = result.getBestTarget().getPoseAmbiguity();
+        if (currentAmbiguity < bestAmbiguity && currentAmbiguity > 0) {
           bestResult = result;
-          amiguity = currentAmbiguity;
+          bestAmbiguity = currentAmbiguity;
         }
       }
       return Optional.of(bestResult);
@@ -634,33 +748,25 @@ public class PhotonVision {
       double mostRecentTimestamp = resultsList.isEmpty() ? 0.0 : resultsList.get(0).getTimestampSeconds();
       double currentTimestamp = Microseconds.of(NetworkTablesJNI.now()).in(Seconds);
       double debounceTime = Milliseconds.of(15).in(Seconds);
-      // System.out.println("Results: " + resultsList.size());
+
       for (PhotonPipelineResult result : resultsList) {
         mostRecentTimestamp = Math.max(mostRecentTimestamp, result.getTimestampSeconds());
       }
-      // System.out.println("Cts: " + currentTimestamp + "Mrt: " + lastReadTimestamp +
-      // " current - mostRecent " + (currentTimestamp - mostRecentTimestamp + "
-      // debounce" + debounceTime));
-      // if ((resultsList.isEmpty() || (currentTimestamp - mostRecentTimestamp >=
-      // debounceTime)) &&
-      // (currentTimestamp - lastReadTimestamp) >= debounceTime)
-      // {
-      if (true) {
-        // System.err.println("Checkpoint 6");
+
+      // Update results if debounce time has passed
+      if ((resultsList.isEmpty() || (currentTimestamp - mostRecentTimestamp >= debounceTime)) &&
+          (currentTimestamp - lastReadTimestamp) >= debounceTime) {
         resultsList.clear();
-        ;
         resultsList = RobotBase.isReal() ? camera.getAllUnreadResults() : cameraSim.getCamera().getAllUnreadResults();
         lastReadTimestamp = currentTimestamp;
         resultsList.sort((PhotonPipelineResult a, PhotonPipelineResult b) -> {
           return a.getTimestampSeconds() >= b.getTimestampSeconds() ? 1 : -1;
         });
+
         if (!resultsList.isEmpty()) {
           if (resultsList.get(0).targets.size() > 0) {
             updatedCache = true;
           }
-          // System.err.println(resultsList.get(0).targets.size());
-          // updatedCache = true;
-          // System.err.println("Checkpoint 7");
           updateEstimatedGlobalPose();
         }
       }
@@ -682,23 +788,6 @@ public class PhotonVision {
      */
     private void updateEstimatedGlobalPose() {
       Optional<EstimatedRobotPose> visionEst = Optional.empty();
-      // for (var change : resultsList) {
-      // visionEst = poseEstimator.update(change);
-      // // try {
-      // // if (visionEst != null)
-      // // // System.out.println("Updated Pose " +
-      // visionEst.get().estimatedPose.getX()
-      // // + "y: " + visionEst.get().estimatedPose.getY());
-      // // } catch (Exception e) {
-      // // // TODO: handle exception
-      // // System.out.println("Pose died!?! ( big problem !!!)");
-      // // }
-      // updateEstimationStdDevs(visionEst, change.getTargets());
-      // }
-      // estimatedRobotPose = visionEst;
-
-      // If you don't need target filtering, comment everything below this and
-      // uncomment the top part.
 
       for (var result : resultsList) {
         // Skip this result if there are no targets
@@ -812,55 +901,110 @@ public class PhotonVision {
         }
       }
     }
-
-    public void disableCamera() {
-      // camera.setPipelineIndex(1);
-      // camera.setDriverMode(true);
-    }
-
-    public void enableCamera() {
-      // camera.setPipelineIndex(0);
-
-      // camera.setDriverMode(false);
-
-    }
   }
 
   /**
-   * Gets a list of tag IDs that are on the human player station (both sides)
-   * 
+   * Gets a list of tag IDs that are on the human player station (both alliances).
+   *
+   * <p>For 2025 Reefscape field:
+   * <ul>
+   *   <li>Tags 1, 2, 4, 5 - Blue alliance human player station</li>
+   *   <li>Tags 12, 13, 14, 15 - Red alliance human player station</li>
+   * </ul>
+   *
+   * <p><strong>Note:</strong> Modify these values based on the actual game field layout.
+   *
    * @return Array of human player station tag IDs
    */
   public static int[] getHumanPlayerTagIDs() {
-    // In the 2025 Reefscape field, tags 1,2,12,13 are human player station tags
-    // Modify these values based on the actual game field
-    // return new int[] { 1, 2, 12, 13};
     return new int[] { 1, 2, 4, 5, 12, 13, 14, 15 };
   }
 
   /**
-   * Gets a list of tag IDs that are on the Reefs (both sides)
-   * 
-   * @return
+   * Gets a list of tag IDs that are on the reefs (both alliances).
+   *
+   * <p>For 2025 Reefscape field:
+   * <ul>
+   *   <li>Tags 6-11 - Red alliance reef</li>
+   *   <li>Tags 17-22 - Blue alliance reef</li>
+   * </ul>
+   *
+   * <p><strong>Note:</strong> Modify these values based on the actual game field layout.
+   *
+   * @return Array of reef tag IDs
    */
   public static int[] getReefTagIDs() {
-    // 2025 reefscape field - tags 6-11 on red side, 17-22 on blue side
     return new int[] { 6, 7, 8, 9, 10, 11, 17, 18, 19, 20, 21, 22 };
   }
 
-  public void disableFrontCameras() {
-    humanPlayerFlag = true;
+  /**
+   * Switch to using only the human player camera (CENTER_CAM).
+   * This disables front cameras (LEFT_CAM, RIGHT_CAM) from contributing to pose estimation.
+   *
+   * <p><strong>Use this when:</strong>
+   * <ul>
+   *   <li>Robot is at human player station</li>
+   *   <li>Front cameras would see incorrect/conflicting tags</li>
+   *   <li>You only want back camera for pose estimation</li>
+   * </ul>
+   */
+  public void useHumanPlayerCamerasOnly() {
+    useHumanPlayerCamerasOnly = true;
   }
 
-  public void enableFrontCameras() {
-    humanPlayerFlag = false;
+  /**
+   * Switch to using all cameras for pose estimation.
+   * This enables front cameras (LEFT_CAM, RIGHT_CAM) and disables back camera (CENTER_CAM).
+   *
+   * <p><strong>Use this when:</strong>
+   * <ul>
+   *   <li>Robot is on the field away from human player station</li>
+   *   <li>Front cameras see reef or other game element tags</li>
+   *   <li>You want normal vision-corrected odometry</li>
+   * </ul>
+   */
+  public void useAllCameras() {
+    useHumanPlayerCamerasOnly = false;
   }
 
+  /**
+   * Disable all cameras from contributing to pose estimation.
+   * Vision measurements will not be added to odometry.
+   *
+   * <p><strong>Use this when:</strong>
+   * <ul>
+   *   <li>Vision is unreliable or causing problems</li>
+   *   <li>You want pure wheel odometry</li>
+   *   <li>Debugging odometry issues</li>
+   * </ul>
+   */
   public void disableAllCameras() {
-    isAllCameraDisable = true;
+    areAllCamerasDisabled = true;
   }
 
+  /**
+   * Enable all cameras to contribute to pose estimation.
+   * Respects the current camera filtering mode (all cameras vs human player cameras only).
+   */
   public void enableAllCameras() {
-    isAllCameraDisable = false;
+    areAllCamerasDisabled = false;
+  }
+
+  /**
+   * Check if vision is currently disabled.
+   *
+   * @return true if all cameras are disabled
+   */
+  public boolean areAllCamerasDisabled() {
+    return areAllCamerasDisabled;
+  }
+
+  /**
+   * Check if only human player cameras are active.
+   *
+   * @return true if only CENTER_CAM is used for pose estimation
+   */
+  public boolean isUsingHumanPlayerCamerasOnly() {
+    return useHumanPlayerCamerasOnly;
   }
 }

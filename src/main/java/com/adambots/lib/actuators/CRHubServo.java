@@ -32,6 +32,13 @@ public class CRHubServo implements BaseServo {
     private static final int SERVO_STOP_PULSE_WIDTH = 1500;
 
     public CRHubServo(ServoHub hub, int servoPortNum) {
+        // Validate port number range
+        if (servoPortNum < 0 || servoPortNum > 5) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "CRHubServo: Invalid port number " + servoPortNum + ". Must be 0-5. Defaulting to port 0.", false);
+            servoPortNum = 0;
+        }
+
         this.hub = hub;
         this.isSim = RobotBase.isSimulation();
         if (!isSim) {
@@ -61,11 +68,18 @@ public class CRHubServo implements BaseServo {
                 case 5:
                     channel = hub.getServoChannel(ChannelId.kChannelId5);
                     break;
+                default:
+                    // Should never reach here due to constructor validation, but handle defensively
+                    edu.wpi.first.wpilibj.DriverStation.reportError(
+                        "CRHubServo: Invalid servo port in setServo(). Using channel 0.", false);
+                    channel = hub.getServoChannel(ChannelId.kChannelId0);
+                    break;
             }
             channel.setEnabled(true);
             channel.setPowered(true);
         } else {
-            pwmSim = new PWMSim(1);
+            // FIXED: Use servoPortNum instead of hardcoded 1
+            pwmSim = new PWMSim(servoPortNum);
         }
     }
 
@@ -103,9 +117,17 @@ public class CRHubServo implements BaseServo {
 
     @Override
     public void setPulseWidth(int pulseWidth) {
+        // Validate pulse width bounds
+        if (pulseWidth < SERVO_CCW_PULSE_WIDTH || pulseWidth > SERVO_CW_PULSE_WIDTH) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "CRHubServo: Pulse width " + pulseWidth + " out of range [" +
+                SERVO_CCW_PULSE_WIDTH + ", " + SERVO_CW_PULSE_WIDTH + "]. Clamping.", false);
+            pulseWidth = Math.min(SERVO_CW_PULSE_WIDTH, Math.max(SERVO_CCW_PULSE_WIDTH, pulseWidth));
+        }
+
         if (isSim) {
             // Map pulse width to -1.0 to 1.0 range for simulation
-            double normalizedSpeed = (pulseWidth - SERVO_STOP_PULSE_WIDTH) / 
+            double normalizedSpeed = (pulseWidth - SERVO_STOP_PULSE_WIDTH) /
                                    (double)(SERVO_CW_PULSE_WIDTH - SERVO_STOP_PULSE_WIDTH);
             pwmSim.setSpeed(normalizedSpeed);
         } else {
@@ -119,11 +141,20 @@ public class CRHubServo implements BaseServo {
      */
     @Override
     public void set(double speed) {
+        // Validate speed bounds
+        double originalSpeed = speed;
+        speed = Math.min(1.0, Math.max(-1.0, speed));
+
+        if (speed != originalSpeed) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "CRHubServo: Speed " + originalSpeed + " out of range [-1.0, 1.0]. Clamping to " + speed + ".", false);
+        }
+
         if (isSim) {
             pwmSim.setSpeed(speed);
         } else {
             // Map -1.0 to 1.0 to pulse width range
-            int pulseWidth = (int)(SERVO_STOP_PULSE_WIDTH + 
+            int pulseWidth = (int)(SERVO_STOP_PULSE_WIDTH +
                                  (speed * (SERVO_CW_PULSE_WIDTH - SERVO_STOP_PULSE_WIDTH)));
             channel.setPulseWidth(pulseWidth);
         }

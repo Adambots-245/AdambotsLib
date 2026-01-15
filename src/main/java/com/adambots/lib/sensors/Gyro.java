@@ -7,6 +7,7 @@
 
 package com.adambots.lib.sensors;
 
+import com.adambots.lib.utils.Utils;
 import com.ctre.phoenix6.hardware.Pigeon2;
 
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -18,6 +19,12 @@ public class Gyro implements BaseGyro {
     private Pigeon2 gyro;
     
     public Gyro (int CANport){
+        // Validate CAN ID range (typically 0-62 for CTRE devices)
+        if (CANport < 0 || CANport > 62) {
+            Utils.reportError("Gyro: Invalid CAN ID " + CANport +
+                ". Valid range: 0-62. Defaulting to 1.");
+            CANport = 1;
+        }
         this.gyro = new Pigeon2(CANport); //Defining the gyroscrope using the configured CAN ID
     }
 
@@ -29,9 +36,7 @@ public class Gyro implements BaseGyro {
      */
     @Override
     public double getContinuousYawDeg () {
-        
         return -gyro.getYaw().getValueAsDouble();
-        // return -gyro.getAngle(); //COUNTERCLOCKWISE NEEDS TO BE POSITIVE
     }
 
     /**
@@ -74,7 +79,8 @@ public class Gyro implements BaseGyro {
      * Offsets the current yaw of the gyroscope by a specified angle in degrees
      */
     public void offsetYawByAngle (double offsetDeg) {
-        gyro.setYaw((getContinuousYawDeg() + offsetDeg) % 360);
+        // Do NOT wrap continuous angles - they need to track beyond 360 for navigation
+        gyro.setYaw(getContinuousYawDeg() + offsetDeg);
     }
 
     /**

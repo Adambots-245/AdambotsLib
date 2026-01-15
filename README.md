@@ -4,8 +4,17 @@ Reusable components library for FRC Team 245 (Adambots).
 
 ## Documentation
 
+📖 **[Complete API Documentation](docs/README.md)** - Comprehensive guides with examples for all components
+
+**Quick References:**
 - **[USAGE.md](USAGE.md)** - How to add and use AdambotsLib in your robot projects
 - **[MAINTAINER.md](MAINTAINER.md)** - How to build, publish, and maintain the library
+
+**Component Documentation:**
+- **[Actuators](docs/actuators/README.md)** - Motors, servos, and solenoids
+  - [Motors](docs/actuators/motors/README.md) - NEO, TalonFX/Falcon/Kraken, Minion
+  - [Servos](docs/actuators/servos/README.md) - Angular, CR, Direct PWM
+  - [Solenoids](docs/actuators/solenoids/README.md) - Pneumatic and electrical
 
 ## Quick Start
 

@@ -19,14 +19,40 @@ public class NEOMotor implements BaseMotor {
     private final RelativeEncoder encoder;
     private final SparkClosedLoopController closedLoopController;
     private final SparkMaxConfig config;
+    private double feedForward = 0.0;
+
+    // Conversion constants for velocity units (NEO uses RPM, BaseMotor interface uses RPS)
+    private static final double RPM_TO_RPS = 1.0 / 60.0;
+    private static final double RPS_TO_RPM = 60.0;
+
+    /**
+     * Constructs a NEOMotor object with default current limiting.
+     *
+     * <p><strong>NOTE:</strong> This constructor uses a default current limit of 40A.
+     * For production code, use {@link #NEOMotor(int, boolean, int, boolean)} to specify
+     * appropriate current limits for your application.
+     *
+     * @param portNum The port number for the motor.
+     * @param brushed True if the motor is brushed, false if brushless.
+     * @deprecated Use {@link #NEOMotor(int, boolean, int, boolean)} to explicitly specify
+     *             current limits and inversion. This constructor exists for backwards compatibility.
+     */
+    @Deprecated
+    public NEOMotor(int portNum, boolean brushed) {
+        this(portNum, brushed, 40, false); // Default: 40A current limit, not inverted
+    }
 
     /**
      * Constructs a NEOMotor object.
      *
      * @param portNum The port number for the motor.
      * @param brushed True if the motor is brushed, false if brushless.
+     * @param supplyCurrentLimit The supply current limit for the motor (amperes).
+     *                           CRITICAL: Current limiting is essential for NEO motors
+     *                           due to their low internal resistance.
+     * @param inverted True to invert the motor direction, false for normal operation.
      */
-    public NEOMotor(int portNum, boolean brushed) {
+    public NEOMotor(int portNum, boolean brushed, int supplyCurrentLimit, boolean inverted) {
         motor = new SparkMax(portNum, brushed ? MotorType.kBrushed : MotorType.kBrushless);
         config = new SparkMaxConfig();
 
@@ -36,8 +62,12 @@ public class NEOMotor implements BaseMotor {
         // Get the closed loop controller
         closedLoopController = motor.getClosedLoopController();
 
-        // Default configuration
+        // Default configuration with CRITICAL current limiting for NEO safety
         config.voltageCompensation(12.0);
+        config.smartCurrentLimit(supplyCurrentLimit);
+        config.inverted(inverted);
+
+        // PERSIST on initial setup only (survive brownouts)
         motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     }
 
@@ -57,7 +87,10 @@ public class NEOMotor implements BaseMotor {
                 closedLoopController.setSetpoint(value, SparkBase.ControlType.kPosition);
                 break;
             case VELOCITY:
-                closedLoopController.setSetpoint(value, SparkBase.ControlType.kVelocity);
+                // Convert RPS to RPM for NEO controller
+                // BREAKING CHANGE (v2026.2.0): Now accepts RPS instead of RPM
+                double velocityRPM = value * RPS_TO_RPM;
+                closedLoopController.setSetpoint(velocityRPM, SparkBase.ControlType.kVelocity);
                 break;
             case VOLTAGE:
                 motor.setVoltage(value);
@@ -70,10 +103,16 @@ public class NEOMotor implements BaseMotor {
                 closedLoopController.setSetpoint(value, SparkBase.ControlType.kMAXMotionPositionControl);
                 break;
             case MOTION_MAGIC_FOC_TORQUE:
+                // NEO motors don't support FOC torque mode - fallback to MOTION_MAGIC
+                edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                    "NEOMotor: MOTION_MAGIC_FOC_TORQUE not supported. Falling back to MOTION_MAGIC.", false);
                 closedLoopController.setSetpoint(value, SparkBase.ControlType.kMAXMotionPositionControl);
                 break;
             case FOLLOWER:
                 config.follow((int) value);
+                // CRITICAL FIX: Must call configure() to apply follower
+                // PERSIST because follower is one-time setup
+                motor.configure(config, ResetMode.kNoResetSafeParameters, PersistMode.kPersistParameters);
                 break;
         }
     }
@@ -89,6 +128,15 @@ public class NEOMotor implements BaseMotor {
     }
 
     /**
+     * Sets the feed-forward value for closed-loop control modes.
+     *
+     * @param value The feed-forward value to use in closed-loop control.
+     */
+    public void setFeedForward(double value) {
+        this.feedForward = value;
+    }
+
+    /**
      * Sets the PIDF constants for the motor's closed loop control.
      *
      * @param slotIdx The slot index for the PIDF constants.
@@ -101,22 +149,28 @@ public class NEOMotor implements BaseMotor {
     public void setPID(int slotIdx, double kP, double kI, double kD, double kF) {
         config.closedLoop.pid(kP, kI, kD);
         config.closedLoop.feedForward.kV(kF);
-        motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+        // NO PERSIST during runtime - avoid blocking flash writes
+        motor.configure(config, ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
     }
 
     /**
      * Configures motion magic settings for motion profiling.
      *
-     * @param cruiseVelocity The cruise velocity for motion magic.
-     * @param acceleration   The acceleration for motion magic.
-     * @param jerk           The jerk for motion magic.
+     * <p><strong>BREAKING CHANGE (v2026.2.0):</strong> Now accepts RPS instead of RPM
+     * for consistency with Phoenix 6 motors.
+     *
+     * @param cruiseVelocityRPS Maximum velocity during motion in rotations per second
+     * @param accelerationRPSPerSec Acceleration rate in rotations per second²
+     * @param jerkRPSPerSecPerSec Jerk (rate of acceleration change) in rotations per second³
      */
     @Override
-    public void configureMotionMagic(double cruiseVelocity, double acceleration, double jerk) {
+    public void configureMotionMagic(double cruiseVelocityRPS, double accelerationRPSPerSec, double jerkRPSPerSecPerSec) {
+        // Convert RPS to RPM for NEO controller
         config.closedLoop.maxMotion
-                .cruiseVelocity(cruiseVelocity)
-                .maxAcceleration(acceleration);
-        motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+                .cruiseVelocity(cruiseVelocityRPS * RPS_TO_RPM)
+                .maxAcceleration(accelerationRPSPerSec * RPS_TO_RPM);
+        // NO PERSIST during runtime - avoid blocking flash writes
+        motor.configure(config, ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
     }
 
     /**
@@ -127,9 +181,10 @@ public class NEOMotor implements BaseMotor {
      * @param limitRPM   The RPM limit for current limiting.
      */
     @Override
-    public void configureCurrentLimits(double stallLimit, double freeLimit, double limitRPM) {
-        config.smartCurrentLimit((int) stallLimit, (int) freeLimit, (int) limitRPM);
-        motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+    public void configureCurrentLimits(double stallLimitAmps, double freeLimitAmps, double limitRpmThreshold) {
+        config.smartCurrentLimit((int) stallLimitAmps, (int) freeLimitAmps, (int) limitRpmThreshold);
+        // NO PERSIST during runtime - avoid blocking flash writes
+        motor.configure(config, ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
     }
 
     /**
@@ -140,10 +195,11 @@ public class NEOMotor implements BaseMotor {
      * @param enable        True to enable soft limits, false to disable.
      */
     @Override
-    public void configureSoftLimits(double forwardLimit, double reverseLimit, boolean enable) {
-        config.softLimit.forwardSoftLimitEnabled(enable).forwardSoftLimit(forwardLimit);
-        config.softLimit.reverseSoftLimitEnabled(enable).reverseSoftLimit(reverseLimit);
-        motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+    public void configureSoftLimits(double forwardLimitRotations, double reverseLimitRotations, boolean enable) {
+        config.softLimit.forwardSoftLimitEnabled(enable).forwardSoftLimit(forwardLimitRotations);
+        config.softLimit.reverseSoftLimitEnabled(enable).reverseSoftLimit(reverseLimitRotations);
+        // NO PERSIST during runtime - avoid blocking flash writes
+        motor.configure(config, ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
     }
 
     /**
@@ -155,7 +211,8 @@ public class NEOMotor implements BaseMotor {
     public void enableSoftLimits(boolean enable) {
         config.softLimit.forwardSoftLimitEnabled(enable);
         config.softLimit.reverseSoftLimitEnabled(enable);
-        motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+        // NO PERSIST during runtime - avoid blocking flash writes
+        motor.configure(config, ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
     }
 
     /**
@@ -166,7 +223,8 @@ public class NEOMotor implements BaseMotor {
     @Override
     public void setInverted(boolean inverted) {
         config.inverted(inverted);
-        motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+        // NO PERSIST during runtime - avoid blocking flash writes
+        motor.configure(config, ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
     }
 
     /**
@@ -177,7 +235,8 @@ public class NEOMotor implements BaseMotor {
     @Override
     public void setBrakeMode(boolean brake) {
         config.idleMode(brake ? IdleMode.kBrake : IdleMode.kCoast);
-        motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+        // NO PERSIST during runtime - avoid blocking flash writes
+        motor.configure(config, ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
     }
 
     /**
@@ -198,7 +257,8 @@ public class NEOMotor implements BaseMotor {
     @Override
     public void enableVoltageCompensation(double voltage) {
         config.voltageCompensation(voltage);
-        motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+        // NO PERSIST during runtime - avoid blocking flash writes
+        motor.configure(config, ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
     }
 
     /**
@@ -212,13 +272,17 @@ public class NEOMotor implements BaseMotor {
     }
 
     /**
-     * Gets the current velocity of the motor in RPM.
+     * Gets the current velocity of the motor in rotations per second (RPS).
      *
-     * @return The current velocity of the motor in RPM.
+     * <p><strong>BREAKING CHANGE (v2026.2.0):</strong> This method now returns RPS instead of RPM
+     * for consistency with Phoenix 6 motors (TalonFX, Minion).
+     *
+     * @return The current velocity of the motor in rotations per second (RPS).
      */
     @Override
     public double getVelocity() {
-        return encoder.getVelocity();
+        // Convert RPM to RPS for consistent interface with Phoenix 6 motors
+        return encoder.getVelocity() * RPM_TO_RPS;
     }
 
     /**
@@ -292,7 +356,8 @@ public class NEOMotor implements BaseMotor {
     @Override
     public void setStrictFollower(int deviceID) {
         config.follow(deviceID);
-        motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+        // PERSIST because follower is one-time setup that should survive brownouts
+        motor.configure(config, ResetMode.kNoResetSafeParameters, PersistMode.kPersistParameters);
     }
 
     /**
@@ -302,7 +367,8 @@ public class NEOMotor implements BaseMotor {
      * @param enableReverse  True to enable the reverse limit switch, false otherwise.
      */
     @Override
-    public void configureHardLimits(boolean enableForward, boolean enableReverse, double forwardValue, double reverseValue) {
+    public void configureHardLimits(boolean enableForward, boolean enableReverse,
+                                   double forwardResetValueRotations, double reverseResetValueRotations) {
         config.limitSwitch.setSparkMaxDataPortConfig()
                 .forwardLimitSwitchEnabled(enableForward)
                 .reverseLimitSwitchEnabled(enableReverse);
@@ -313,6 +379,18 @@ public class NEOMotor implements BaseMotor {
         if (enableReverse) {
             config.limitSwitch.reverseLimitSwitchType(Type.kNormallyClosed);
         }
-        motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+        // NO PERSIST during runtime - avoid blocking flash writes
+        motor.configure(config, ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
+    }
+
+    @Override
+    public boolean supportsControlMode(ControlMode mode) {
+        // NEOMotor doesn't support MOTION_MAGIC_FOC_TORQUE
+        return mode != ControlMode.MOTION_MAGIC_FOC_TORQUE;
+    }
+
+    @Override
+    public String getMotorType() {
+        return "NEOMotor (SPARK MAX)";
     }
 }

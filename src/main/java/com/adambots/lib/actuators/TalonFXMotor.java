@@ -52,6 +52,12 @@ public class TalonFXMotor implements BaseMotor {
     private double feedForward = 0.0;
     private final int maxRetries = 3; // Maximum retries for configuration
 
+    // Reusable control request objects to avoid allocation overhead
+    private final VoltageOut voltageRequest = new VoltageOut(0);
+    private final PositionDutyCycle positionRequest = new PositionDutyCycle(0);
+    private final VelocityDutyCycle velocityRequest = new VelocityDutyCycle(0);
+    private final MotionMagicDutyCycle motionMagicRequest = new MotionMagicDutyCycle(0);
+
     /**
      * Functional interface for applying a configuration and returning a StatusCode.
      */
@@ -81,10 +87,24 @@ public class TalonFXMotor implements BaseMotor {
         }
 
         // Configure default current limits
-        var currentLimits = new CurrentLimitsConfigs()
-                .withSupplyCurrentLimit(supplyCurrentLimit)
+        var currentLimits = new CurrentLimitsConfigs();
+
+        // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
+        StatusCode refreshStatus = motor.getConfigurator().refresh(currentLimits);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "TalonFXMotor: Failed to refresh current limits config (Status: " + refreshStatus +
+                "). Configuration may be factory defaulted!", true);
+        }
+
+        currentLimits.withSupplyCurrentLimit(supplyCurrentLimit)
                 .withSupplyCurrentLimitEnable(true);
-        motor.getConfigurator().apply(currentLimits);
+
+        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(currentLimits));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "TalonFXMotor: Failed to apply current limits after retries", false);
+        }
 
         // Configure status frame periods for efficiency
         motor.getVelocity().setUpdateFrequency(50);
@@ -118,13 +138,28 @@ public class TalonFXMotor implements BaseMotor {
                 motor.setControl(new DutyCycleOut(value).withEnableFOC(focFlag));
                 break;
             case POSITION:
-                motor.setControl(new PositionDutyCycle(value).withSlot(0).withEnableFOC(focFlag));
+                // Apply feed-forward if set
+                if (feedForward != 0) {
+                    motor.setControl(positionRequest.withPosition(value)
+                            .withSlot(0).withEnableFOC(focFlag).withFeedForward(feedForward));
+                } else {
+                    motor.setControl(positionRequest.withPosition(value)
+                            .withSlot(0).withEnableFOC(focFlag));
+                }
                 break;
             case VELOCITY:
-                motor.setControl(new VelocityDutyCycle(value).withSlot(0).withEnableFOC(focFlag));
+                // Apply feed-forward if set
+                if (feedForward != 0) {
+                    motor.setControl(velocityRequest.withVelocity(value)
+                            .withSlot(0).withEnableFOC(focFlag).withFeedForward(feedForward));
+                } else {
+                    motor.setControl(velocityRequest.withVelocity(value)
+                            .withSlot(0).withEnableFOC(focFlag));
+                }
                 break;
             case VOLTAGE:
-                motor.setControl(new DutyCycleOut(value).withEnableFOC(focFlag));
+                // Use VoltageOut for proper voltage control, not DutyCycleOut
+                motor.setControl(voltageRequest.withOutput(value).withEnableFOC(focFlag));
                 break;
             case CURRENT:
                 if (isKraken) {
@@ -137,12 +172,13 @@ public class TalonFXMotor implements BaseMotor {
                 }
                 break;
             case MOTION_MAGIC:
+                // Apply feed-forward if set
                 if (feedForward != 0) {
-                    motor.setControl(new MotionMagicDutyCycle(value).withSlot(0).withEnableFOC(focFlag)
-                            .withFeedForward(feedForward));
-
+                    motor.setControl(motionMagicRequest.withPosition(value)
+                            .withSlot(0).withEnableFOC(focFlag).withFeedForward(feedForward));
                 } else {
-                    motor.setControl(new MotionMagicDutyCycle(value).withSlot(0).withEnableFOC(focFlag));
+                    motor.setControl(motionMagicRequest.withPosition(value)
+                            .withSlot(0).withEnableFOC(focFlag));
                 }
                 break;
             case MOTION_MAGIC_FOC_TORQUE:
@@ -194,30 +230,63 @@ public class TalonFXMotor implements BaseMotor {
     public void setPID(int slotIdx, double kP, double kI, double kD, double kF) {
         switch (slotIdx) {
             case 0:
-                var slot0Config = new Slot0Configs()
-                        .withKP(kP)
-                        .withKI(kI)
-                        .withKD(kD)
-                        .withKV(kF);
-                applyConfigWithRetry(() -> motor.getConfigurator().apply(slot0Config, slotIdx));
+                var slot0Config = new Slot0Configs();
+
+                // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
+                StatusCode refreshStatus0 = motor.getConfigurator().refresh(slot0Config);
+                if (!refreshStatus0.isOK()) {
+                    edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                        "TalonFXMotor: Failed to refresh slot 0 PID config (Status: " + refreshStatus0 +
+                        "). Configuration may be factory defaulted!", true);
+                }
+
+                slot0Config.withKP(kP).withKI(kI).withKD(kD).withKV(kF);
+
+                boolean success0 = applyConfigWithRetry(() -> motor.getConfigurator().apply(slot0Config, slotIdx));
+                if (!success0) {
+                    edu.wpi.first.wpilibj.DriverStation.reportError(
+                        "TalonFXMotor: Failed to apply slot 0 PID after retries", false);
+                }
                 break;
 
             case 1:
-                var slot1Config = new Slot1Configs()
-                        .withKP(kP)
-                        .withKI(kI)
-                        .withKD(kD)
-                        .withKV(kF);
-                applyConfigWithRetry(() -> motor.getConfigurator().apply(slot1Config, slotIdx));
+                var slot1Config = new Slot1Configs();
+
+                // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
+                StatusCode refreshStatus1 = motor.getConfigurator().refresh(slot1Config);
+                if (!refreshStatus1.isOK()) {
+                    edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                        "TalonFXMotor: Failed to refresh slot 1 PID config (Status: " + refreshStatus1 +
+                        "). Configuration may be factory defaulted!", true);
+                }
+
+                slot1Config.withKP(kP).withKI(kI).withKD(kD).withKV(kF);
+
+                boolean success1 = applyConfigWithRetry(() -> motor.getConfigurator().apply(slot1Config, slotIdx));
+                if (!success1) {
+                    edu.wpi.first.wpilibj.DriverStation.reportError(
+                        "TalonFXMotor: Failed to apply slot 1 PID after retries", false);
+                }
                 break;
 
             case 2:
-                var slot2Config = new Slot2Configs()
-                        .withKP(kP)
-                        .withKI(kI)
-                        .withKD(kD)
-                        .withKV(kF);
-                applyConfigWithRetry(() -> motor.getConfigurator().apply(slot2Config, slotIdx));
+                var slot2Config = new Slot2Configs();
+
+                // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
+                StatusCode refreshStatus2 = motor.getConfigurator().refresh(slot2Config);
+                if (!refreshStatus2.isOK()) {
+                    edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                        "TalonFXMotor: Failed to refresh slot 2 PID config (Status: " + refreshStatus2 +
+                        "). Configuration may be factory defaulted!", true);
+                }
+
+                slot2Config.withKP(kP).withKI(kI).withKD(kD).withKV(kF);
+
+                boolean success2 = applyConfigWithRetry(() -> motor.getConfigurator().apply(slot2Config, slotIdx));
+                if (!success2) {
+                    edu.wpi.first.wpilibj.DriverStation.reportError(
+                        "TalonFXMotor: Failed to apply slot 2 PID after retries", false);
+                }
                 break;
 
             default:
@@ -226,61 +295,97 @@ public class TalonFXMotor implements BaseMotor {
     }
 
     /**
-     * Configures motion magic parameters for the TalonFX motor.
-     * Motion Magic is a control mode that provides smooth position control using a
-     * trapezoidal motion profile.
+     * Configures Motion Magic motion profiling parameters.
      *
-     * @param cruiseVelocity The cruise velocity in sensor units per second
-     * @param acceleration   The acceleration in sensor units per second per second
-     * @param jerk           The jerk (rate of acceleration change) in sensor units
-     *                       per second per second per second
+     * <p>Motion Magic generates smooth trapezoidal motion profiles for position control.
+     *
+     * @param cruiseVelocityRPS Maximum velocity during motion in rotations per second
+     * @param accelerationRPSPerSec Acceleration rate in rotations per second²
+     * @param jerkRPSPerSecPerSec Jerk (rate of acceleration change) in rotations per second³
      */
     @Override
-    public void configureMotionMagic(double cruiseVelocity, double acceleration, double jerk) {
-        var config = new MotionMagicConfigs()
-                .withMotionMagicCruiseVelocity(cruiseVelocity)
-                .withMotionMagicAcceleration(acceleration)
-                .withMotionMagicJerk(jerk);
-        applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
+    public void configureMotionMagic(double cruiseVelocityRPS, double accelerationRPSPerSec, double jerkRPSPerSecPerSec) {
+        var config = new MotionMagicConfigs();
+
+        // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
+        StatusCode refreshStatus = motor.getConfigurator().refresh(config);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "TalonFXMotor: Failed to refresh Motion Magic config (Status: " + refreshStatus +
+                "). Configuration may be factory defaulted!", true);
+        }
+
+        config.withMotionMagicCruiseVelocity(cruiseVelocityRPS)
+                .withMotionMagicAcceleration(accelerationRPSPerSec)
+                .withMotionMagicJerk(jerkRPSPerSecPerSec);
+
+        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "TalonFXMotor: Failed to apply Motion Magic config after retries", false);
+        }
     }
 
     /**
-     * Configures current limits for the TalonFX motor.
-     * 
-     * @param stallLimit The stator current limit (in amperes) when motor is stalled
-     * @param freeLimit  The supply current limit (in amperes) when motor is running
-     *                   freely
-     * @param limitRPM   The RPM threshold for current limiting (not used in current
-     *                   implementation)
+     * Configures current limiting to protect the motor and battery.
+     *
+     * @param stallLimitAmps Stator current limit when motor is under heavy load (amperes)
+     * @param freeLimitAmps Supply current limit when motor is spinning freely (amperes)
+     * @param limitRpmThreshold RPM threshold below which stall limit applies (not used by TalonFX)
      */
     @Override
-    public void configureCurrentLimits(double stallLimit, double freeLimit, double limitRPM) {
-        var config = new CurrentLimitsConfigs()
-                .withStatorCurrentLimit(stallLimit)
+    public void configureCurrentLimits(double stallLimitAmps, double freeLimitAmps, double limitRpmThreshold) {
+        var config = new CurrentLimitsConfigs();
+
+        // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
+        StatusCode refreshStatus = motor.getConfigurator().refresh(config);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "TalonFXMotor: Failed to refresh current limits config (Status: " + refreshStatus +
+                "). Configuration may be factory defaulted!", true);
+        }
+
+        config.withStatorCurrentLimit(stallLimitAmps)
                 .withStatorCurrentLimitEnable(true)
-                .withSupplyCurrentLimit(freeLimit)
+                .withSupplyCurrentLimit(freeLimitAmps)
                 .withSupplyCurrentLimitEnable(true);
-        applyConfigWithRetry(()->motor.getConfigurator().apply(config));
+
+        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "TalonFXMotor: Failed to apply current limits after retries", false);
+        }
     }
 
     /**
-     * Configures software limits for the TalonFX motor.
-     * Software limits prevent the motor from moving beyond specified forward and
-     * reverse positions.
+     * Configures software position limits to prevent mechanism damage.
      *
-     * @param forwardLimit The maximum forward position the motor can move to
-     * @param reverseLimit The minimum reverse position the motor can move to
-     * @param enable       Boolean flag to enable/disable both forward and reverse
-     *                     soft limits
+     * @param forwardLimitRotations Forward soft limit position in rotations from zero
+     * @param reverseLimitRotations Reverse soft limit position in rotations from zero
+     * @param enable True to enable soft limits, false to disable
      */
     @Override
-    public void configureSoftLimits(double forwardLimit, double reverseLimit, boolean enable) {
-        var config = new SoftwareLimitSwitchConfigs()
-                .withForwardSoftLimitThreshold(forwardLimit)
-                .withReverseSoftLimitThreshold(reverseLimit)
+    public void configureSoftLimits(double forwardLimitRotations, double reverseLimitRotations, boolean enable) {
+        var config = new SoftwareLimitSwitchConfigs();
+
+        // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
+        StatusCode refreshStatus = motor.getConfigurator().refresh(config);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "TalonFXMotor: Failed to refresh soft limits config (Status: " + refreshStatus +
+                "). Configuration may be factory defaulted!", true);
+        }
+
+        config.withForwardSoftLimitThreshold(forwardLimitRotations)
+                .withReverseSoftLimitThreshold(reverseLimitRotations)
                 .withForwardSoftLimitEnable(enable)
                 .withReverseSoftLimitEnable(enable);
-        applyConfigWithRetry(()->motor.getConfigurator().apply(config));
+
+        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "TalonFXMotor: Failed to apply soft limits after retries", false);
+        }
     }
 
     /**
@@ -292,10 +397,24 @@ public class TalonFXMotor implements BaseMotor {
      */
     @Override
     public void enableSoftLimits(boolean enable) {
-        var config = new SoftwareLimitSwitchConfigs()
-                .withForwardSoftLimitEnable(enable)
+        var config = new SoftwareLimitSwitchConfigs();
+
+        // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
+        StatusCode refreshStatus = motor.getConfigurator().refresh(config);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "TalonFXMotor: Failed to refresh soft limits enable config (Status: " + refreshStatus +
+                "). Configuration may be factory defaulted!", true);
+        }
+
+        config.withForwardSoftLimitEnable(enable)
                 .withReverseSoftLimitEnable(enable);
-        applyConfigWithRetry(()->motor.getConfigurator().apply(config));
+
+        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "TalonFXMotor: Failed to apply soft limits enable after retries", false);
+        }
     }
 
     /**
@@ -306,9 +425,23 @@ public class TalonFXMotor implements BaseMotor {
      */
     @Override
     public void setInverted(boolean inverted) {
-        var config = new MotorOutputConfigs()
-                .withInverted(inverted ? InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive);
-        applyConfigWithRetry(()->motor.getConfigurator().apply(config));
+        var config = new MotorOutputConfigs();
+
+        // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
+        StatusCode refreshStatus = motor.getConfigurator().refresh(config);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "TalonFXMotor: Failed to refresh motor output config (Status: " + refreshStatus +
+                "). Configuration may be factory defaulted!", true);
+        }
+
+        config.withInverted(inverted ? InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive);
+
+        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "TalonFXMotor: Failed to apply motor inversion after retries", false);
+        }
     }
 
     /**
@@ -320,9 +453,23 @@ public class TalonFXMotor implements BaseMotor {
      */
     @Override
     public void setBrakeMode(boolean brake) {
-        var config = new MotorOutputConfigs()
-                .withNeutralMode(brake ? NeutralModeValue.Brake : NeutralModeValue.Coast);
-        applyConfigWithRetry(()->motor.getConfigurator().apply(config));
+        var config = new MotorOutputConfigs();
+
+        // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
+        StatusCode refreshStatus = motor.getConfigurator().refresh(config);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "TalonFXMotor: Failed to refresh brake mode config (Status: " + refreshStatus +
+                "). Configuration may be factory defaulted!", true);
+        }
+
+        config.withNeutralMode(brake ? NeutralModeValue.Brake : NeutralModeValue.Coast);
+
+        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "TalonFXMotor: Failed to apply brake mode after retries", false);
+        }
     }
 
     /**
@@ -361,10 +508,24 @@ public class TalonFXMotor implements BaseMotor {
      */
     @Override
     public void enableVoltageCompensation(double voltage) {
-        var config = new VoltageConfigs()
-                .withPeakForwardVoltage(voltage)
-                .withPeakReverseVoltage(-voltage);
-        applyConfigWithRetry(()->motor.getConfigurator().apply(config));
+        // NOTE: This method is deprecated and does NOT provide proper voltage compensation in Phoenix 6.
+        // Setting PeakForwardVoltage/PeakReverseVoltage just caps the voltage output,
+        // it does NOT compensate for battery droop like WPILib voltage compensation does.
+        //
+        // CORRECT APPROACH for Phoenix 6:
+        // - Use voltage-based control modes (VoltageOut, PositionVoltage, VelocityVoltage, MotionMagicVoltage)
+        // - FOC control modes (MotionMagicFOCTorque, PositionFOCTorque, VelocityFOCTorque) also use voltage
+        // - These explicitly request a voltage output and handle compensation internally
+        // - Duty cycle based controls (DutyCycleOut, DutyCycleFOC) can exceed the peak voltage cap
+        //
+        // This method is retained for interface compliance but logs a warning.
+
+        edu.wpi.first.wpilibj.DriverStation.reportWarning(
+            "TalonFXMotor.enableVoltageCompensation() does NOT work as expected in Phoenix 6. " +
+            "Use voltage-based control modes (VoltageOut, PositionVoltage, VelocityVoltage, MotionMagicVoltage) " +
+            "instead of duty cycle control modes. See Phoenix 6 documentation.", false);
+
+        // DO NOT apply configuration - this would incorrectly cap voltage
     }
 
     /**
@@ -470,8 +631,17 @@ public class TalonFXMotor implements BaseMotor {
     @Override
     public void configureHardLimits(boolean enableForward, boolean enableReverse, double forwardValue,
             double reverseValue) {
-        var limitSwitchConfigs = new HardwareLimitSwitchConfigs()
-                .withForwardLimitEnable(enableForward)
+        var limitSwitchConfigs = new HardwareLimitSwitchConfigs();
+
+        // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
+        StatusCode refreshStatus = motor.getConfigurator().refresh(limitSwitchConfigs);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "TalonFXMotor: Failed to refresh hard limits config (Status: " + refreshStatus +
+                "). Configuration may be factory defaulted!", true);
+        }
+
+        limitSwitchConfigs.withForwardLimitEnable(enableForward)
                 .withForwardLimitAutosetPositionEnable(enableForward)
                 .withForwardLimitAutosetPositionValue(forwardValue)
                 .withForwardLimitType(ForwardLimitTypeValue.NormallyOpen)
@@ -480,7 +650,11 @@ public class TalonFXMotor implements BaseMotor {
                 .withReverseLimitAutosetPositionValue(reverseValue)
                 .withReverseLimitType(ReverseLimitTypeValue.NormallyOpen);
 
-        applyConfigWithRetry(()->motor.getConfigurator().apply(limitSwitchConfigs));
+        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(limitSwitchConfigs));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "TalonFXMotor: Failed to apply hard limits after retries", false);
+        }
 
         // For simulation/feedback
         motor.getForwardLimit().setUpdateFrequency(50);
@@ -493,32 +667,51 @@ public class TalonFXMotor implements BaseMotor {
     }
 
     /**
-     * Applies a configuration with retries using a functional interface.
+     * Applies a configuration with automatic retries.
      *
-     * @param applyAction The action to apply the configuration.
-     * @return true if the configuration was applied successfully, false otherwise.
+     * <p>This method attempts to apply a configuration multiple times if initial attempts fail.
+     * Motor controllers sometimes reject configurations during startup or high CAN bus traffic.
+     *
+     * @param applyAction The configuration action to apply
+     * @return True if configuration was applied successfully, false after all retries exhausted
      */
     public boolean applyConfigWithRetry(ConfigApplyAction applyAction) {
         for (int i = 0; i < maxRetries; i++) {
             StatusCode status = applyAction.apply();
 
             if (status.isOK()) {
-                System.out.println("TalonFXS configuration applied successfully!");
-                return true; // Configuration successful
-            } else {
-                System.err.println("Failed to apply configuration. Status: " + status);
-                System.err.println("Retrying... Attempt " + (i + 1) + " of " + maxRetries);
-                // Add a small delay before retrying
-                try {
-                    Thread.sleep(100); // 100 milliseconds delay
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt(); // Restore the interrupted status
-                    return false; // Exit if the thread is interrupted
+                if (i > 0) {
+                    // Only log if we had to retry
+                    edu.wpi.first.wpilibj.DataLogManager.log(
+                        "TalonFX configuration succeeded on attempt " + (i + 1));
                 }
+                return true; // Configuration successful
+            } else if (i < maxRetries - 1) {
+                // Not the last attempt - log retry
+                edu.wpi.first.wpilibj.DataLogManager.log(
+                    "TalonFX configuration failed (Status: " + status + "), retrying... (" +
+                    (i + 1) + "/" + maxRetries + ")");
+                // No Thread.sleep - retry immediately
             }
         }
 
-        System.err.println("Failed to apply configuration after " + maxRetries + " retries.");
+        // All retries exhausted - report warning to driver station
+        edu.wpi.first.wpilibj.DriverStation.reportWarning(
+            "TalonFX configuration failed after " + maxRetries + " attempts", false);
         return false; // Configuration failed after retries
+    }
+
+    @Override
+    public boolean supportsControlMode(ControlMode mode) {
+        // TalonFXMotor supports all modes, but CURRENT only works with Kraken
+        if (mode == ControlMode.CURRENT && !isKraken) {
+            return false;
+        }
+        return true;
+    }
+
+    @Override
+    public String getMotorType() {
+        return isKraken ? "TalonFXMotor (Kraken X60)" : "TalonFXMotor (Falcon 500)";
     }
 }

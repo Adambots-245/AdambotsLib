@@ -5,8 +5,14 @@
 package com.adambots.lib.subsystems;
 
 import java.io.File;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.DoubleSupplier;
+import java.util.function.Supplier;
 
 import static edu.wpi.first.units.Units.Meter;
+
+import org.photonvision.targeting.PhotonPipelineResult;
 
 import com.adambots.lib.Constants;
 import com.adambots.lib.Constants.AutoConstants;
@@ -14,7 +20,9 @@ import com.adambots.lib.Constants.DriveConstants;
 import com.adambots.lib.Constants.ModuleConstants;
 import com.adambots.lib.utils.Utils;
 import com.adambots.lib.vision.PhotonVision;
+import com.adambots.lib.vision.PhotonVision.Cameras;
 import com.pathplanner.lib.auto.AutoBuilder;
+import com.pathplanner.lib.commands.PathPlannerAuto;
 import com.pathplanner.lib.commands.PathfindingCommand;
 import com.pathplanner.lib.config.PIDConstants;
 import com.pathplanner.lib.config.RobotConfig;
@@ -31,11 +39,14 @@ import edu.wpi.first.math.trajectory.Trajectory;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import edu.wpi.first.wpilibj2.command.button.Trigger;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Config;
 import swervelib.SwerveDrive;
 import swervelib.SwerveDriveTest;
 import swervelib.imu.SwerveIMU;
+import swervelib.math.SwerveMath;
 import swervelib.math.SwerveMath;
 import swervelib.parser.SwerveControllerConfiguration;
 import swervelib.parser.SwerveDriveConfiguration;
@@ -43,6 +54,83 @@ import swervelib.parser.SwerveParser;
 import swervelib.telemetry.SwerveDriveTelemetry;
 import swervelib.telemetry.SwerveDriveTelemetry.TelemetryVerbosity;
 
+/**
+ * YAGSL-based swerve drive subsystem for holonomic drivetrain control.
+ *
+ * <p>This subsystem uses YAGSL (Yet Another Generic Swerve Library) to manage
+ * all swerve module hardware and kinematics. Swerve modules are configured via
+ * JSON files in /deploy/swerve/kraken/ - NO custom SwerveModule class is needed.
+ *
+ * <p><strong>Features:</strong>
+ * <ul>
+ *   <li>PhotonVision integration for vision-corrected odometry</li>
+ *   <li>PathPlanner integration for autonomous path following</li>
+ *   <li>Command factory methods for all drive operations</li>
+ *   <li>Trigger methods for state-based command composition</li>
+ * </ul>
+ *
+ * <p><strong>Configuration:</strong>
+ * <ul>
+ *   <li>Swerve modules: /deploy/swerve/kraken/modules/*.json</li>
+ *   <li>Drive config: /deploy/swerve/kraken/swervedrive.json</li>
+ *   <li>PID properties: /deploy/swerve/kraken/modules/pidfproperties.json</li>
+ * </ul>
+ *
+ * <p><strong>Command Factories:</strong>
+ * This subsystem provides command factory methods grouped by category:
+ * <ul>
+ *   <li><strong>Vision-based commands:</strong> aimAtAprilTagCommand, alignAndStrafeCommand,
+ *       driveToNearestPoseWithVisionCommand, etc.</li>
+ *   <li><strong>Vision control commands:</strong> enableVisionCommand, disableVisionCommand,
+ *       useHumanPlayerCamerasCommand, useReefCamerasCommand</li>
+ *   <li><strong>PathPlanner commands:</strong> driveToPoseCommand, getAutonomousCommand</li>
+ *   <li><strong>Manual drive commands:</strong> driveCommand (multiple overloads),
+ *       driveFieldOrientedCommand, centerModulesCommand</li>
+ *   <li><strong>Distance-based commands:</strong> driveToDistanceCommand,
+ *       driveToDistanceFieldOrientedCommand, driveForwardDistanceCommand</li>
+ *   <li><strong>SysId commands:</strong> sysIdDriveMotorCommand, sysIdAngleMotorCommand</li>
+ * </ul>
+ *
+ * <p><strong>Triggers:</strong>
+ * State exposure triggers for command composition:
+ * <ul>
+ *   <li>atPoseTrigger() - Check proximity to target pose</li>
+ *   <li>inRegionTrigger() - Check if robot is within field region</li>
+ *   <li>isStationaryTrigger() - Check if robot velocity is below threshold</li>
+ *   <li>isMovingFastTrigger() - Check if robot velocity exceeds threshold</li>
+ *   <li>isAlignedWithTagTrigger() - Check alignment with AprilTag</li>
+ *   <li>hasVisionTargetTrigger() - Check if any AprilTags visible</li>
+ *   <li>isInRangeOfTagTrigger() - Check distance range to AprilTag</li>
+ *   <li>isFacingHeadingTrigger() - Check if robot is facing target heading</li>
+ * </ul>
+ *
+ * <p><strong>Example Usage:</strong>
+ * <pre>{@code
+ * // Manual drive with controller
+ * swerve.setDefaultCommand(
+ *   swerve.driveCommand(
+ *     () -> -controller.getLeftY(),
+ *     () -> -controller.getLeftX(),
+ *     () -> -controller.getRightX()
+ *   )
+ * );
+ *
+ * // Autonomous path following
+ * Command autoCommand = swerve.getAutonomousCommand("MyAutoPath");
+ *
+ * // Vision-based alignment
+ * Command aimCommand = swerve.aimAtAprilTagCommand(4, 2.0);
+ *
+ * // State-based command binding
+ * swerve.hasVisionTargetTrigger()
+ *   .whileTrue(swerve.aimAtAprilTagCommand(7, 2.0));
+ * }</pre>
+ *
+ * @see <a href="https://docs.yagsl.com/">YAGSL Documentation</a>
+ * @see <a href="https://github.com/BroncBotz3481/YAGSL">YAGSL GitHub Repository</a>
+ * @see PhotonVision
+ * @see com.pathplanner.lib.auto.AutoBuilder
+ */
 public class SwerveSubsystem extends SubsystemBase {
 
   private final SwerveDrive swerveDrive;
@@ -50,13 +138,14 @@ public class SwerveSubsystem extends SubsystemBase {
   private final boolean visionDriveTest = true;
   private PhotonVision vision;
 
+  // State tracking for commands
+  private Pose2d startPose;
+
   /**
    * Creates a new SwerveSubsystem. Adapted from YAGSL-Example
    * Talk to Mr.B before making major changes to this file.
    */
   public SwerveSubsystem(File directory) {
-    // goalPose.set(new Pose2d(new Translation2d(0,0), new Rotation2d(0)));
-
     // The 2 value below will be defined in the JSON configuration file. However,
     // alternatively, we can do it here.
     // Use the same values when defining the JSON file
@@ -312,8 +401,6 @@ public class SwerveSubsystem extends SubsystemBase {
   public void periodic() {
     // This method will be called once per scheduler run
 
-    // System.out.println("HHHHHHHHHHH");
-
     // When vision is enabled we must manually update odometry in SwerveDrive
     if (visionDriveTest) {
       swerveDrive.updateOdometry();
@@ -541,6 +628,567 @@ public class SwerveSubsystem extends SubsystemBase {
   public void addFakeVisionReading() {
     swerveDrive.addVisionMeasurement(new Pose2d(3, 3, Rotation2d.fromDegrees(65)), Timer.getFPGATimestamp());
   }
+
+  // ==================== TRIGGER METHODS ====================
+
+  /**
+   * Trigger that is true when robot is within tolerance of target pose.
+   *
+   * @param targetPose Target pose to check against
+   * @param positionToleranceMeters Position tolerance in meters
+   * @param rotationToleranceDegrees Rotation tolerance in degrees
+   * @return Trigger for pose proximity
+   */
+  public Trigger atPoseTrigger(Pose2d targetPose, double positionToleranceMeters, double rotationToleranceDegrees) {
+    return new Trigger(() -> {
+      Pose2d current = getPose();
+      double distance = current.getTranslation().getDistance(targetPose.getTranslation());
+      double rotationError = Math.abs(
+          current.getRotation().minus(targetPose.getRotation()).getDegrees()
+      );
+      return distance <= positionToleranceMeters && rotationError <= rotationToleranceDegrees;
+    });
+  }
+
+  /**
+   * Trigger that is true when robot is within rectangular field region.
+   *
+   * @param minX Minimum X coordinate (meters)
+   * @param maxX Maximum X coordinate (meters)
+   * @param minY Minimum Y coordinate (meters)
+   * @param maxY Maximum Y coordinate (meters)
+   * @return Trigger for region containment
+   */
+  public Trigger inRegionTrigger(double minX, double maxX, double minY, double maxY) {
+    return new Trigger(() -> {
+      Pose2d pose = getPose();
+      double x = pose.getX();
+      double y = pose.getY();
+      return x >= minX && x <= maxX && y >= minY && y <= maxY;
+    });
+  }
+
+  /**
+   * Trigger that is true when robot is stationary.
+   *
+   * @param velocityThreshold Velocity threshold in m/s
+   * @return Trigger for stationary state
+   */
+  public Trigger isStationaryTrigger(double velocityThreshold) {
+    return new Trigger(() -> {
+      ChassisSpeeds speeds = getRobotVelocity();
+      double velocity = Math.hypot(speeds.vxMetersPerSecond, speeds.vyMetersPerSecond);
+      return velocity < velocityThreshold;
+    });
+  }
+
+  /**
+   * Trigger that is true when robot exceeds velocity threshold.
+   *
+   * @param velocityThreshold Velocity threshold in m/s
+   * @return Trigger for high-speed state
+   */
+  public Trigger isMovingFastTrigger(double velocityThreshold) {
+    return new Trigger(() -> {
+      ChassisSpeeds speeds = getRobotVelocity();
+      double velocity = Math.hypot(speeds.vxMetersPerSecond, speeds.vyMetersPerSecond);
+      return velocity >= velocityThreshold;
+    });
+  }
+
+  /**
+   * Trigger that is true when aligned with AprilTag within tolerance.
+   *
+   * @param tagID AprilTag ID to align with
+   * @param toleranceDegrees Angular tolerance in degrees
+   * @return Trigger for tag alignment
+   */
+  public Trigger isAlignedWithTagTrigger(int tagID, double toleranceDegrees) {
+    return new Trigger(() -> {
+      if (!vision.hasTarget()) return false;
+      double error = Math.abs(getAprilTagYaw(tagID).minus(getHeading()).getDegrees());
+      return error <= toleranceDegrees;
+    });
+  }
+
+  /**
+   * Trigger that is true when any AprilTag is visible.
+   *
+   * @return Trigger for vision target detection
+   */
+  public Trigger hasVisionTargetTrigger() {
+    return new Trigger(() -> vision.hasTarget());
+  }
+
+  /**
+   * Trigger that is true when within distance range of AprilTag.
+   *
+   * @param tagID AprilTag ID to check
+   * @param minDistance Minimum distance in meters
+   * @param maxDistance Maximum distance in meters
+   * @return Trigger for distance range
+   */
+  public Trigger isInRangeOfTagTrigger(int tagID, double minDistance, double maxDistance) {
+    return new Trigger(() -> {
+      double distance = vision.getDistanceFromAprilTag(tagID);
+      return distance >= minDistance && distance <= maxDistance;
+    });
+  }
+
+  /**
+   * Trigger that is true when robot is facing target heading.
+   *
+   * @param targetHeading Target heading as Rotation2d
+   * @param toleranceDegrees Tolerance in degrees
+   * @return Trigger for heading alignment
+   */
+  public Trigger isFacingHeadingTrigger(Rotation2d targetHeading, double toleranceDegrees) {
+    return new Trigger(() -> {
+      double error = Math.abs(getHeading().minus(targetHeading).getDegrees());
+      return error <= toleranceDegrees;
+    });
+  }
+
+  // ==================== COMMAND FACTORIES ====================
+
+  // Vision-Based Commands
+
+  /**
+   * Command to aim robot at specific AprilTag.
+   * Uses heading PID to rotate until aligned within tolerance.
+   *
+   * @param tagId AprilTag ID to aim at
+   * @param tolerance Angular tolerance in degrees
+   * @return Command that aims at tag
+   */
+  public Command aimAtAprilTagCommand(int tagId, double tolerance) {
+    return Commands.run(() -> {
+      ChassisSpeeds speeds = ChassisSpeeds.fromFieldRelativeSpeeds(0, 0,
+          swerveDrive.swerveController.headingCalculate(
+              getHeading().getRadians(),
+              getAprilTagYaw(tagId).getRadians()),
+          getHeading());
+      drive(speeds);
+    }, this).until(() ->
+        Math.abs(getAprilTagYaw(tagId).minus(getHeading()).getDegrees()) < tolerance
+    ).withName("AimAtTag(" + tagId + ")");
+  }
+
+  /**
+   * Command to log the distance from a specific AprilTag.
+   *
+   * @param tagID AprilTag ID to measure distance to
+   * @return Command that logs distance
+   */
+  public Command getDistanceFromAprilTagCommand(int tagID) {
+    return Commands.runOnce(() ->
+        edu.wpi.first.wpilibj.DataLogManager.log("AprilTag " + tagID + " distance - X: " +
+            vision.getTransformToAprilTag(tagID).getX() +
+            " Y: " + vision.getTransformToAprilTag(tagID).getY())
+    ).withName("GetDistanceFromTag(" + tagID + ")");
+  }
+
+  /**
+   * Command to align with AprilTag then strafe sideways relative to tag.
+   *
+   * @param tagId              The AprilTag to align with
+   * @param strafeDistance     Distance to strafe in meters (positive = left, negative = right)
+   * @param strafeSpeed        Speed to strafe at in meters per second
+   * @param alignmentTolerance Tolerance in degrees for alignment
+   * @return Command that aligns then strafes
+   */
+  public Command alignAndStrafeCommand(int tagId, double strafeDistance, double strafeSpeed,
+                                       double alignmentTolerance) {
+    return Commands.sequence(
+        // First align with the AprilTag
+        aimAtAprilTagCommand(tagId, alignmentTolerance),
+
+        // Then strafe the specified distance
+        Commands.sequence(
+            // Record start position
+            Commands.runOnce(() -> {
+              startPose = swerveDrive.getPose();
+            }),
+
+            // Drive sideways
+            Commands.run(() -> {
+              // Sign of strafeDistance determines direction (positive = left)
+              double speedY = Math.copySign(strafeSpeed, strafeDistance);
+              drive(
+                  new Translation2d(0, speedY), // Only Y movement
+                  0, // No rotation
+                  true // Field relative
+              );
+            }, this)
+                .until(() -> {
+                  // Calculate distance traveled sideways
+                  double distanceTraveled = Math.abs(
+                      swerveDrive.getPose().getTranslation().getY() -
+                          startPose.getTranslation().getY());
+                  return distanceTraveled >= Math.abs(strafeDistance);
+                }),
+
+            // Stop moving
+            Commands.runOnce(() -> drive(new ChassisSpeeds(0, 0, 0)))
+        )
+    ).withName("AlignAndStrafe(" + tagId + ")");
+  }
+
+  /**
+   * Command to aim robot at the best target from a specific camera.
+   *
+   * @param camera PhotonVision camera to use
+   * @return Command that aims at best target from camera
+   */
+  public Command aimAtTargetCommand(Cameras camera) {
+    return Commands.run(() -> {
+      Optional<PhotonPipelineResult> resultO = camera.getBestResult();
+      if (resultO.isPresent()) {
+        var result = resultO.get();
+        if (result.hasTargets()) {
+          drive(getTargetSpeeds(0, 0,
+              Rotation2d.fromDegrees(result.getBestTarget().getYaw())));
+        }
+      }
+    }, this).withName("AimAtTarget(" + camera.name() + ")");
+  }
+
+  /**
+   * Command to drive to the nearest pose from a list, continuously updating with vision.
+   *
+   * @param targetPoses List of poses to potentially drive to
+   * @return Command that drives to nearest pose with vision updates
+   */
+  public Command driveToNearestPoseWithVisionCommand(List<Pose2d> targetPoses) {
+    return Commands.run(() -> {
+      // Get current robot pose
+      Pose2d currentPose = swerveDrive.getPose();
+
+      // Find nearest target pose
+      Pose2d nearestPose = findNearestPose(targetPoses);
+
+      // Get visible AprilTags and their poses
+      boolean hasVisibleTags = false;
+      for (Cameras camera : Cameras.values()) {
+        var result = camera.getLatestResult();
+        if (result.isPresent() && result.get().hasTargets()) {
+          hasVisibleTags = true;
+          // Vision updates are handled by periodic() in SwerveSubsystem
+
+          // If pose changed significantly, recalculate path
+          if (poseChangedSignificantly(currentPose, swerveDrive.getPose())) {
+            CommandScheduler.getInstance().schedule(driveToPoseCommand(nearestPose));
+          }
+        }
+      }
+
+      // If no tags visible, continue with last known path
+      if (!hasVisibleTags) {
+        CommandScheduler.getInstance().schedule(driveToPoseCommand(nearestPose));
+      }
+    }, this)
+        .until(() -> hasReachedPose(findNearestPose(targetPoses), 0.05, 5.0))
+        .withName("DriveToNearestPoseWithVision");
+  }
+
+  // Vision Control Commands
+
+  /**
+   * Command to enable vision updates for pose estimation.
+   *
+   * @return Command that enables all cameras
+   */
+  public Command enableVisionCommand() {
+    return Commands.runOnce(() -> vision.enableAllCameras(), this)
+        .withName("EnableVision");
+  }
+
+  /**
+   * Command to disable vision updates (odometry only).
+   *
+   * @return Command that disables all cameras
+   */
+  public Command disableVisionCommand() {
+    return Commands.runOnce(() -> vision.disableAllCameras(), this)
+        .withName("DisableVision");
+  }
+
+  /**
+   * Command to switch to human player station cameras only.
+   * Disables reef cameras (LEFT/RIGHT), enables CENTER camera.
+   *
+   * @return Command that switches camera mode
+   */
+  public Command useHumanPlayerCamerasCommand() {
+    return Commands.runOnce(() -> vision.useHumanPlayerCamerasOnly(), this)
+        .withName("UseHumanPlayerCameras");
+  }
+
+  /**
+   * Command to switch to reef cameras only.
+   * Enables reef cameras (LEFT/RIGHT), disables CENTER camera.
+   *
+   * @return Command that switches camera mode
+   */
+  public Command useReefCamerasCommand() {
+    return Commands.runOnce(() -> vision.useAllCameras(), this)
+        .withName("UseReefCameras");
+  }
+
+  /**
+   * Command to disable front cameras (LEFT_CAM and RIGHT_CAM).
+   * This is equivalent to useHumanPlayerCamerasCommand().
+   *
+   * @return Command that disables front cameras
+   */
+  public Command disableFrontCamerasCommand() {
+    return Commands.runOnce(() -> vision.useHumanPlayerCamerasOnly(), this)
+        .withName("DisableFrontCameras");
+  }
+
+  /**
+   * Command to enable front cameras (LEFT_CAM and RIGHT_CAM).
+   *
+   * @return Command that enables front cameras
+   */
+  public Command enableFrontCamerasCommand() {
+    return Commands.runOnce(() -> vision.useAllCameras(), this)
+        .withName("EnableFrontCameras");
+  }
+
+  /**
+   * Command to add fake vision reading for testing.
+   *
+   * @return Command that adds test vision pose
+   */
+  public Command addFakeVisionReadingCommand() {
+    return Commands.runOnce(() -> addFakeVisionReading(), this)
+        .withName("AddFakeVisionReading");
+  }
+
+  // PathPlanner Commands
+
+  /**
+   * Command to drive to a specific pose using PathPlanner pathfinding.
+   *
+   * @param pose Target pose to drive to
+   * @return PathPlanner pathfinding command
+   */
+  public Command driveToPoseCommand(Pose2d pose) {
+    return AutoBuilder.pathfindToPose(
+        pose,
+        new com.pathplanner.lib.path.PathConstraints(
+            swerveDrive.getMaximumChassisVelocity(),
+            4.0,
+            swerveDrive.getMaximumChassisAngularVelocity(),
+            edu.wpi.first.math.util.Units.degreesToRadians(720)
+        )
+    ).withName("DriveToPose");
+  }
+
+  /**
+   * Command to run a PathPlanner autonomous path.
+   *
+   * @param pathName Name of the PathPlanner path
+   * @return PathPlanner auto command
+   */
+  public Command getAutonomousCommand(String pathName) {
+    return new PathPlannerAuto(pathName)
+        .withName("Auto(" + pathName + ")");
+  }
+
+  // Manual Drive Commands
+
+  /**
+   * Command for manual teleop drive using joystick inputs for translation and rotation.
+   *
+   * @param translationX X translation supplier (cubed for smoother control)
+   * @param translationY Y translation supplier (cubed for smoother control)
+   * @param angularRotationX Angular velocity supplier (cubed for smoother control)
+   * @return Teleop drive command
+   */
+  public Command driveCommand(DoubleSupplier translationX, DoubleSupplier translationY,
+                               DoubleSupplier angularRotationX) {
+    return Commands.run(() -> {
+      swerveDrive.drive(SwerveMath.scaleTranslation(new Translation2d(
+              translationX.getAsDouble() * swerveDrive.getMaximumChassisVelocity(),
+              translationY.getAsDouble() * swerveDrive.getMaximumChassisVelocity()), 0.8),
+          Math.pow(angularRotationX.getAsDouble(), 3) * swerveDrive.getMaximumChassisAngularVelocity(),
+          true,
+          false);
+    }, this).withName("TeleopDrive");
+  }
+
+  /**
+   * Command for manual drive using joystick inputs for translation and heading setpoint.
+   *
+   * @param translationX X translation supplier
+   * @param translationY Y translation supplier
+   * @param headingX Heading X joystick value
+   * @param headingY Heading Y joystick value
+   * @return Teleop drive command with heading control
+   */
+  public Command driveCommand(DoubleSupplier translationX, DoubleSupplier translationY,
+                               DoubleSupplier headingX, DoubleSupplier headingY) {
+    return Commands.run(() -> {
+      Translation2d scaledInputs = SwerveMath.scaleTranslation(
+          new Translation2d(translationX.getAsDouble(), translationY.getAsDouble()), 0.8);
+
+      driveFieldOriented(
+          swerveDrive.swerveController.getTargetSpeeds(
+              scaledInputs.getX(), scaledInputs.getY(),
+              headingX.getAsDouble(),
+              headingY.getAsDouble(),
+              swerveDrive.getOdometryHeading().getRadians(),
+              swerveDrive.getMaximumChassisVelocity()));
+    }, this).withName("TeleopDriveHeading");
+  }
+
+  /**
+   * Command to drive using field-oriented chassis speeds.
+   *
+   * @param velocity Supplier of field-relative chassis speeds
+   * @return Field-oriented drive command
+   */
+  public Command driveFieldOrientedCommand(Supplier<ChassisSpeeds> velocity) {
+    return Commands.run(() -> swerveDrive.driveFieldOriented(velocity.get()), this)
+        .withName("DriveFieldOriented");
+  }
+
+  /**
+   * Command to center all swerve modules (point straight ahead).
+   *
+   * @return Command that centers modules
+   */
+  public Command centerModulesCommand() {
+    return Commands.run(() ->
+        java.util.Arrays.asList(swerveDrive.getModules())
+            .forEach(it -> it.setAngle(0.0))
+    , this).withName("CenterModules");
+  }
+
+  // Distance-Based Drive Commands
+
+  /**
+   * Command to drive forward a specific distance at a given speed.
+   * Uses robot-relative coordinates.
+   *
+   * @param distanceInMeters Distance to drive in meters
+   * @param speedInMetersPerSecond Speed in meters per second
+   * @return Command that drives the specified distance
+   */
+  public Command driveToDistanceCommand(double distanceInMeters, double speedInMetersPerSecond) {
+    return Commands.sequence(
+        Commands.runOnce(() -> startPose = swerveDrive.getPose()),
+        Commands.run(() -> drive(new ChassisSpeeds(speedInMetersPerSecond, 0, 0)), this)
+            .until(() -> swerveDrive.getPose().getTranslation()
+                .getDistance(startPose.getTranslation()) > distanceInMeters),
+        Commands.runOnce(() -> drive(new ChassisSpeeds(0, 0, 0)))
+    ).withName("DriveDistance(" + distanceInMeters + "m)");
+  }
+
+  /**
+   * Command to drive a specific distance using field-relative heading.
+   *
+   * @param distanceInMeters Distance to drive in meters
+   * @param speedInMetersPerSecond Speed in meters per second
+   * @return Command that drives field-oriented distance
+   */
+  public Command driveToDistanceFieldOrientedCommand(double distanceInMeters, double speedInMetersPerSecond) {
+    return Commands.sequence(
+        Commands.runOnce(() -> startPose = swerveDrive.getPose()),
+
+        Commands.run(() -> {
+          Rotation2d heading = getHeading();
+          double speed = Math.abs(speedInMetersPerSecond);
+          int direction = (speedInMetersPerSecond >= 0) ? 1 : -1;
+
+          double xVel = direction * speed * Math.cos(heading.getRadians());
+          double yVel = direction * speed * Math.sin(heading.getRadians());
+
+          driveFieldOriented(new ChassisSpeeds(xVel, yVel, 0));
+        }, this)
+            .until(() -> swerveDrive.getPose().getTranslation()
+                .getDistance(startPose.getTranslation()) >= distanceInMeters),
+
+        Commands.runOnce(() -> drive(new Translation2d(), 0, true))
+    ).withName("DriveDistanceFieldOriented(" + distanceInMeters + "m)");
+  }
+
+  /**
+   * Command to drive forward a specific distance (alternative implementation).
+   *
+   * @param distanceInMeters Distance to drive in meters
+   * @param speedInMetersPerSecond Speed in meters per second
+   * @return Command that drives forward
+   */
+  public Command driveForwardDistanceCommand(double distanceInMeters, double speedInMetersPerSecond) {
+    return Commands.sequence(
+        Commands.runOnce(() -> startPose = swerveDrive.getPose()),
+        Commands.run(() -> drive(
+            ChassisSpeeds.fromFieldRelativeSpeeds(
+                new ChassisSpeeds(speedInMetersPerSecond, 0, 0),
+                swerveDrive.getOdometryHeading())
+        ), this)
+            .until(() -> swerveDrive.getPose().getTranslation()
+                .getDistance(startPose.getTranslation()) > distanceInMeters),
+        Commands.runOnce(() -> drive(new ChassisSpeeds(0, 0, 0)))
+    ).withName("DriveForward(" + distanceInMeters + "m)");
+  }
+
+  // Helper Methods (private)
+
+  /**
+   * Find the nearest pose from a list of target poses.
+   *
+   * @param targetPoses List of poses to search
+   * @return Nearest pose to current robot position
+   */
+  private Pose2d findNearestPose(List<Pose2d> targetPoses) {
+    Pose2d currentPose = getPose();
+    return targetPoses.stream()
+        .min((p1, p2) -> Double.compare(
+            currentPose.getTranslation().getDistance(p1.getTranslation()),
+            currentPose.getTranslation().getDistance(p2.getTranslation())))
+        .orElse(targetPoses.get(0));
+  }
+
+  /**
+   * Check if pose has changed enough to warrant path recalculation.
+   *
+   * @param oldPose Previous pose
+   * @param newPose Current pose
+   * @return true if pose changed significantly
+   */
+  private boolean poseChangedSignificantly(Pose2d oldPose, Pose2d newPose) {
+    double poseDifference = oldPose.getTranslation()
+        .getDistance(newPose.getTranslation());
+    double rotationDifference = Math.abs(
+        oldPose.getRotation().minus(newPose.getRotation()).getDegrees());
+
+    return poseDifference > 0.1 || rotationDifference > 5.0; // Adjust these thresholds
+  }
+
+  /**
+   * Check if robot has reached target pose within tolerance.
+   *
+   * @param targetPose Target pose
+   * @param positionTolerance Position tolerance in meters
+   * @param rotationTolerance Rotation tolerance in degrees
+   * @return true if within tolerance
+   */
+  private boolean hasReachedPose(Pose2d targetPose, double positionTolerance, double rotationTolerance) {
+    Pose2d currentPose = getPose();
+
+    double poseError = currentPose.getTranslation()
+        .getDistance(targetPose.getTranslation());
+    double rotationError = Math.abs(
+        currentPose.getRotation().minus(targetPose.getRotation()).getDegrees());
+
+    return poseError < positionTolerance && rotationError < rotationTolerance;
+  }
+
+  // ==================== SYSID COMMANDS ====================
 
   /**
    * Command to characterize the robot drive motors using SysId

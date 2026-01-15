@@ -4,6 +4,8 @@
 
 package com.adambots.lib.sensors;
 
+import com.adambots.lib.utils.Utils;
+
 import edu.wpi.first.wpilibj.AnalogInput;
 
 /**
@@ -21,10 +23,19 @@ public class UltrasonicSensor implements BaseDistanceSensor {
      * @params portNumber The port number on the breakout.
      */
     public UltrasonicSensor(int portNumber){
+        // Validate analog port range (RoboRIO 2 has 4 analog ports: 0-3)
+        if (portNumber < 0 || portNumber > 3) {
+            Utils.reportError("UltrasonicSensor: Invalid analog port " + portNumber +
+                ". RoboRIO 2 has 4 analog ports (0-3). Defaulting to 0.");
+            portNumber = 0;
+        }
+
         rangefinder = new AnalogInput(portNumber);
-        //Legendary comments ngl
-        rangefinder.setOversampleBits(2); // Completely arbitrary
-        rangefinder.setAverageBits(5); // Ditto
+
+        // Configure oversampling and averaging for noise reduction
+        // Values chosen for balance between response time and accuracy
+        rangefinder.setOversampleBits(2);  // 4x oversampling (2^2 = 4 samples)
+        rangefinder.setAverageBits(5);     // Average over 32 samples (2^5 = 32)
     }
 
     /** Returns the distance measured in inches.  */

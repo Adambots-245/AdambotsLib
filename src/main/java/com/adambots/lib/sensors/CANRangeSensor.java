@@ -1,5 +1,6 @@
 package com.adambots.lib.sensors;
 
+import com.adambots.lib.utils.Utils;
 import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.hardware.CANrange;
 import com.ctre.phoenix6.sim.CANrangeSimState;
@@ -20,6 +21,12 @@ public class CANRangeSensor implements BaseDistanceSensor {
      * @param deviceId The device ID of the CANRange sensor.
      */
     public CANRangeSensor(int deviceId, boolean isOnCANivore) {
+        // Validate CAN ID range
+        if (deviceId < 0 || deviceId > 62) {
+            Utils.reportError("CANRangeSensor: Invalid CAN ID " + deviceId +
+                ". Valid range: 0-62. Defaulting to 1.");
+            deviceId = 1;
+        }
 
         if (isOnCANivore) {
             canRangeSensor = new CANrange(deviceId, new CANBus("*"));
