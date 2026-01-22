@@ -396,6 +396,9 @@ public class Buttons {
             operatorController = createController(operatorPort, operatorControllerType);
         }
 
+        // Set initialized flag before trigger initialization so getJoystick() works
+        initialized = true;
+
         // Initialize triggers based on controller types
         initializeXboxTriggers();
         initializePS5Triggers();
@@ -407,8 +410,6 @@ public class Buttons {
             t.setDaemon(true);
             return t;
         });
-
-        initialized = true;
     }
 
     /**
