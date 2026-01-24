@@ -27,11 +27,11 @@
         {
           "name": "AdambotsLib-java-2026.1.0.jar",
           "url": "AdambotsLib-java-2026.1.0.jar",
-          "size": 11049739,
-          "sha512": "138ba40728b52a9f00087417e93bc8e9a23b976a62e926f324c26d37ff1cd65253b5228e22c5f343adb0cfdef02c6bbeac4ceef2a487df2da528bca500aae1a4",
-          "sha256": "bb9109c6778a2d938b662004320feeee1d829d7c8fc513526a82f794ef450245",
-          "sha1": "7fa80d255a911422c3bd024f4530c8cfadb33cf9",
-          "md5": "353d80fcc4f31987530eb7cd707cf9da"
+          "size": 11082620,
+          "sha512": "0db3520afabe6e39c2797479ddb5d426eade15c1797c9f894abac08b93117fe35790c78bd39c5138230583ed7e10608631c1f1405006b356347d624c3d837c8a",
+          "sha256": "b8383d3525c8a595c70345aec2b4f35ac3de45b4bdafc0cb4d1eefc53aa82555",
+          "sha1": "753b0169a6ee20ae1a8e54b3792ef682d87d2e41",
+          "md5": "fd9937e56daee578eb31fa429ff2a8ae"
         }
       ]
     },
@@ -189,7 +189,7 @@
           "group": "swervelib",
           "module": "YAGSL-java",
           "version": {
-            "requires": "2026.1.12"
+            "requires": "2026.1.20"
           }
         },
         {
@@ -228,20 +228,6 @@
           }
         },
         {
-          "group": "com.ctre.phoenix",
-          "module": "api-java",
-          "version": {
-            "requires": "5.36.0"
-          }
-        },
-        {
-          "group": "com.ctre.phoenix",
-          "module": "wpiapi-java",
-          "version": {
-            "requires": "5.36.0"
-          }
-        },
-        {
           "group": "org.ironmaple",
           "module": "maplesim-java",
           "version": {
@@ -261,17 +247,31 @@
           "version": {
             "requires": "26.1.0"
           }
+        },
+        {
+          "group": "com.ctre.phoenix",
+          "module": "api-java",
+          "version": {
+            "requires": "5.36.0"
+          }
+        },
+        {
+          "group": "com.ctre.phoenix",
+          "module": "wpiapi-java",
+          "version": {
+            "requires": "5.36.0"
+          }
         }
       ],
       "files": [
         {
           "name": "AdambotsLib-java-2026.1.0.jar",
           "url": "AdambotsLib-java-2026.1.0.jar",
-          "size": 11049739,
-          "sha512": "138ba40728b52a9f00087417e93bc8e9a23b976a62e926f324c26d37ff1cd65253b5228e22c5f343adb0cfdef02c6bbeac4ceef2a487df2da528bca500aae1a4",
-          "sha256": "bb9109c6778a2d938b662004320feeee1d829d7c8fc513526a82f794ef450245",
-          "sha1": "7fa80d255a911422c3bd024f4530c8cfadb33cf9",
-          "md5": "353d80fcc4f31987530eb7cd707cf9da"
+          "size": 11082620,
+          "sha512": "0db3520afabe6e39c2797479ddb5d426eade15c1797c9f894abac08b93117fe35790c78bd39c5138230583ed7e10608631c1f1405006b356347d624c3d837c8a",
+          "sha256": "b8383d3525c8a595c70345aec2b4f35ac3de45b4bdafc0cb4d1eefc53aa82555",
+          "sha1": "753b0169a6ee20ae1a8e54b3792ef682d87d2e41",
+          "md5": "fd9937e56daee578eb31fa429ff2a8ae"
         }
       ]
     }
