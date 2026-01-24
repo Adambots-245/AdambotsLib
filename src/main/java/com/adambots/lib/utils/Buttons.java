@@ -439,6 +439,13 @@ public class Buttons {
         CommandXboxController xbox = getXboxController();
 
         if (xbox == null) {
+            // Log warning for debugging - helps diagnose controller initialization issues
+            if (driverType == ControllerType.XBOX || operatorType == ControllerType.XBOX) {
+                edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                    "Buttons: Xbox controller type configured but controller is null. " +
+                    "driverType=" + driverType + ", operatorType=" + operatorType +
+                    ", driverController=" + driverController + ", initialized=" + initialized, false);
+            }
             // Initialize all Xbox triggers to "never" to prevent NullPointerException
             XboxBackButton = NEVER_TRIGGER;
             XboxStartButton = NEVER_TRIGGER;
