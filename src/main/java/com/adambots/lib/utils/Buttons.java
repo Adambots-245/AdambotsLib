@@ -428,12 +428,44 @@ public class Buttons {
         };
     }
 
+    /** A trigger that never activates - used as fallback when controller unavailable. */
+    private static final Trigger NEVER_TRIGGER = new Trigger(() -> false);
+
     /**
-     * Initializes Xbox controller triggers if an Xbox controller is present.
+     * Initializes Xbox controller triggers.
+     * If no Xbox controller is configured, initializes to "never trigger" to prevent NPE.
      */
     private static void initializeXboxTriggers() {
         CommandXboxController xbox = getXboxController();
-        if (xbox == null) return;
+
+        if (xbox == null) {
+            // Initialize all Xbox triggers to "never" to prevent NullPointerException
+            XboxBackButton = NEVER_TRIGGER;
+            XboxStartButton = NEVER_TRIGGER;
+            XboxXButton = NEVER_TRIGGER;
+            XboxYButton = NEVER_TRIGGER;
+            XboxBButton = NEVER_TRIGGER;
+            XboxAButton = NEVER_TRIGGER;
+            XboxLeftBumper = NEVER_TRIGGER;
+            XboxRightBumper = NEVER_TRIGGER;
+            XboxLeftStickButton = NEVER_TRIGGER;
+            XboxRightStickButton = NEVER_TRIGGER;
+            XboxLeftTriggerButton = NEVER_TRIGGER;
+            XboxRightTriggerButton = NEVER_TRIGGER;
+            XboxRightStickUp = NEVER_TRIGGER;
+            XboxRightStickDown = NEVER_TRIGGER;
+            XboxLeftStickUp = NEVER_TRIGGER;
+            XboxLeftStickDown = NEVER_TRIGGER;
+            XboxDPadN = NEVER_TRIGGER;
+            XboxDPadNE = NEVER_TRIGGER;
+            XboxDPadE = NEVER_TRIGGER;
+            XboxDPadSE = NEVER_TRIGGER;
+            XboxDPadS = NEVER_TRIGGER;
+            XboxDPadSW = NEVER_TRIGGER;
+            XboxDPadW = NEVER_TRIGGER;
+            XboxDPadNW = NEVER_TRIGGER;
+            return;
+        }
 
         // Buttons
         XboxBackButton = xbox.back();
