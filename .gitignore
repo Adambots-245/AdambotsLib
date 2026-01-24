@@ -12,7 +12,7 @@
 
 # Package Files #
 *.jar
-!docs/maven/com/adambots/AdambotsLib/*/*.jar
+!docs/maven/**/*.jar
 *.war
 *.nar
 *.ear
