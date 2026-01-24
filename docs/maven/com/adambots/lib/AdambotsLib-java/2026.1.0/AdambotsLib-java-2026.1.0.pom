@@ -17,67 +17,67 @@
     <dependency>
       <groupId>edu.wpi.first.wpilibj</groupId>
       <artifactId>wpilibj-java</artifactId>
-      <version>2026.1.1</version>
+      <version>2026.2.1</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>edu.wpi.first.wpimath</groupId>
       <artifactId>wpimath-java</artifactId>
-      <version>2026.1.1</version>
+      <version>2026.2.1</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>edu.wpi.first.ntcore</groupId>
       <artifactId>ntcore-java</artifactId>
-      <version>2026.1.1</version>
+      <version>2026.2.1</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>edu.wpi.first.cscore</groupId>
       <artifactId>cscore-java</artifactId>
-      <version>2026.1.1</version>
+      <version>2026.2.1</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>edu.wpi.first.cameraserver</groupId>
       <artifactId>cameraserver-java</artifactId>
-      <version>2026.1.1</version>
+      <version>2026.2.1</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>edu.wpi.first.hal</groupId>
       <artifactId>hal-java</artifactId>
-      <version>2026.1.1</version>
+      <version>2026.2.1</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>edu.wpi.first.wpinet</groupId>
       <artifactId>wpinet-java</artifactId>
-      <version>2026.1.1</version>
+      <version>2026.2.1</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>edu.wpi.first.wpiutil</groupId>
       <artifactId>wpiutil-java</artifactId>
-      <version>2026.1.1</version>
+      <version>2026.2.1</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>edu.wpi.first.apriltag</groupId>
       <artifactId>apriltag-java</artifactId>
-      <version>2026.1.1</version>
+      <version>2026.2.1</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>edu.wpi.first.wpiunits</groupId>
       <artifactId>wpiunits-java</artifactId>
-      <version>2026.1.1</version>
+      <version>2026.2.1</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>edu.wpi.first.epilogue</groupId>
       <artifactId>epilogue-runtime-java</artifactId>
-      <version>2026.1.1</version>
+      <version>2026.2.1</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
@@ -119,7 +119,7 @@
     <dependency>
       <groupId>edu.wpi.first.wpilibNewCommands</groupId>
       <artifactId>wpilibNewCommands-java</artifactId>
-      <version>2026.1.1</version>
+      <version>2026.2.1</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>

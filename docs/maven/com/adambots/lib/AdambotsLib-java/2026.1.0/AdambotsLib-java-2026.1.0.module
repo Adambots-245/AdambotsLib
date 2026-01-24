@@ -27,11 +27,11 @@
         {
           "name": "AdambotsLib-java-2026.1.0.jar",
           "url": "AdambotsLib-java-2026.1.0.jar",
-          "size": 11044866,
-          "sha512": "975dd6cda96eb0157848aee813620397289cb1da3fb868e936fb4d9a81f89669aa3e67ef0a48d1a3acb2669d5c00ba6d73d19f48697f9702a6da99fbf02d7ea3",
-          "sha256": "ee80c831197053c14d3776249a538b314e4306c8b64e2d8e2b913d48aae9889f",
-          "sha1": "da57ed0eb80f4272d91bcf38e6fe2a7e9909e597",
-          "md5": "01c0a944b47a28e93acb462cd927a31b"
+          "size": 11049739,
+          "sha512": "138ba40728b52a9f00087417e93bc8e9a23b976a62e926f324c26d37ff1cd65253b5228e22c5f343adb0cfdef02c6bbeac4ceef2a487df2da528bca500aae1a4",
+          "sha256": "bb9109c6778a2d938b662004320feeee1d829d7c8fc513526a82f794ef450245",
+          "sha1": "7fa80d255a911422c3bd024f4530c8cfadb33cf9",
+          "md5": "353d80fcc4f31987530eb7cd707cf9da"
         }
       ]
     },
@@ -49,77 +49,77 @@
           "group": "edu.wpi.first.wpilibj",
           "module": "wpilibj-java",
           "version": {
-            "requires": "2026.1.1"
+            "requires": "2026.2.1"
           }
         },
         {
           "group": "edu.wpi.first.wpimath",
           "module": "wpimath-java",
           "version": {
-            "requires": "2026.1.1"
+            "requires": "2026.2.1"
           }
         },
         {
           "group": "edu.wpi.first.ntcore",
           "module": "ntcore-java",
           "version": {
-            "requires": "2026.1.1"
+            "requires": "2026.2.1"
           }
         },
         {
           "group": "edu.wpi.first.cscore",
           "module": "cscore-java",
           "version": {
-            "requires": "2026.1.1"
+            "requires": "2026.2.1"
           }
         },
         {
           "group": "edu.wpi.first.cameraserver",
           "module": "cameraserver-java",
           "version": {
-            "requires": "2026.1.1"
+            "requires": "2026.2.1"
           }
         },
         {
           "group": "edu.wpi.first.hal",
           "module": "hal-java",
           "version": {
-            "requires": "2026.1.1"
+            "requires": "2026.2.1"
           }
         },
         {
           "group": "edu.wpi.first.wpinet",
           "module": "wpinet-java",
           "version": {
-            "requires": "2026.1.1"
+            "requires": "2026.2.1"
           }
         },
         {
           "group": "edu.wpi.first.wpiutil",
           "module": "wpiutil-java",
           "version": {
-            "requires": "2026.1.1"
+            "requires": "2026.2.1"
           }
         },
         {
           "group": "edu.wpi.first.apriltag",
           "module": "apriltag-java",
           "version": {
-            "requires": "2026.1.1"
+            "requires": "2026.2.1"
           }
         },
         {
           "group": "edu.wpi.first.wpiunits",
           "module": "wpiunits-java",
           "version": {
-            "requires": "2026.1.1"
+            "requires": "2026.2.1"
           }
         },
         {
           "group": "edu.wpi.first.epilogue",
           "module": "epilogue-runtime-java",
           "version": {
-            "requires": "2026.1.1"
+            "requires": "2026.2.1"
           }
         },
         {
@@ -168,7 +168,7 @@
           "group": "edu.wpi.first.wpilibNewCommands",
           "module": "wpilibNewCommands-java",
           "version": {
-            "requires": "2026.1.1"
+            "requires": "2026.2.1"
           }
         },
         {
@@ -267,11 +267,11 @@
         {
           "name": "AdambotsLib-java-2026.1.0.jar",
           "url": "AdambotsLib-java-2026.1.0.jar",
-          "size": 11044866,
-          "sha512": "975dd6cda96eb0157848aee813620397289cb1da3fb868e936fb4d9a81f89669aa3e67ef0a48d1a3acb2669d5c00ba6d73d19f48697f9702a6da99fbf02d7ea3",
-          "sha256": "ee80c831197053c14d3776249a538b314e4306c8b64e2d8e2b913d48aae9889f",
-          "sha1": "da57ed0eb80f4272d91bcf38e6fe2a7e9909e597",
-          "md5": "01c0a944b47a28e93acb462cd927a31b"
+          "size": 11049739,
+          "sha512": "138ba40728b52a9f00087417e93bc8e9a23b976a62e926f324c26d37ff1cd65253b5228e22c5f343adb0cfdef02c6bbeac4ceef2a487df2da528bca500aae1a4",
+          "sha256": "bb9109c6778a2d938b662004320feeee1d829d7c8fc513526a82f794ef450245",
+          "sha1": "7fa80d255a911422c3bd024f4530c8cfadb33cf9",
+          "md5": "353d80fcc4f31987530eb7cd707cf9da"
         }
       ]
     }
