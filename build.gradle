@@ -145,6 +145,18 @@ publishing {
             name = 'local'
             url = "${buildDir}/maven"
         }
+        maven {
+            name = 'docs'
+            url = "${projectDir}/docs/maven"
+        }
+    }
+}
+
+// Task to publish to docs folder for GitHub Pages
+task publishToGitHubPages {
+    dependsOn 'publishMavenPublicationToDocsRepository'
+    doLast {
+        println "Published to docs/maven - commit and push to update GitHub Pages"
     }
 }
 
