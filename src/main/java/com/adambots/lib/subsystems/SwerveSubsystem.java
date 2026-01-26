@@ -20,7 +20,8 @@ import com.adambots.lib.Constants.DriveConstants;
 import com.adambots.lib.Constants.ModuleConstants;
 import com.adambots.lib.utils.Utils;
 import com.adambots.lib.vision.PhotonVision;
-import com.adambots.lib.vision.PhotonVision.Cameras;
+import com.adambots.lib.vision.VisionCamera;
+import com.adambots.lib.vision.config.VisionSystemConfig;
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.commands.PathPlannerAuto;
 import com.pathplanner.lib.commands.PathfindingCommand;
@@ -79,10 +80,9 @@ import swervelib.telemetry.SwerveDriveTelemetry.TelemetryVerbosity;
  * <p><strong>Command Factories:</strong>
  * This subsystem provides command factory methods grouped by category:
  * <ul>
- *   <li><strong>Vision-based commands:</strong> aimAtAprilTagCommand, alignAndStrafeCommand,
+ *   <li><strong>Vision-based commands:</strong> aimAtTargetCommand, alignAndStrafeCommand,
  *       driveToNearestPoseWithVisionCommand, etc.</li>
- *   <li><strong>Vision control commands:</strong> enableVisionCommand, disableVisionCommand,
- *       useHumanPlayerCamerasCommand, useReefCamerasCommand</li>
+ *   <li><strong>Vision control commands:</strong> enableVisionCommand, disableVisionCommand</li>
  *   <li><strong>PathPlanner commands:</strong> driveToPoseCommand, getAutonomousCommand</li>
  *   <li><strong>Manual drive commands:</strong> driveCommand (multiple overloads),
  *       driveFieldOrientedCommand, centerModulesCommand</li>
@@ -251,8 +251,7 @@ public class SwerveSubsystem extends SubsystemBase {
     // swerveDrive.pushOffsetsToEncoders();
 
     if (visionDriveTest) {
-      setupPhotonVision();
-
+      // Note: Vision must now be configured externally using setupPhotonVision(VisionSystemConfig)
       // Stop the odometry thread if we are using vision that way we can synchronize
       // updates better.
       swerveDrive.stopOdometryThread();
@@ -276,10 +275,41 @@ public class SwerveSubsystem extends SubsystemBase {
   }
 
   /**
-   * Setup the photon vision class.
+   * Setup the photon vision class with a custom configuration.
+   *
+   * <p>This method allows full customization of cameras, standard deviations,
+   * and filtering without modifying AdambotsLib source code.
+   *
+   * <p><strong>Usage Example:</strong>
+   * <pre>{@code
+   * // In your robot project's Constants file
+   * public static final int[] REEF_TAGS = {6, 7, 8, 9, 10, 11, 17, 18, 19, 20, 21, 22};
+   * public static final int[] HP_TAGS = {1, 2, 4, 5, 12, 13, 14, 15};
+   *
+   * public static final VisionSystemConfig VISION_CONFIG = VisionConfigBuilder.create()
+   *     .addCamera("Left")
+   *         .positionInches(15, 11.75, 8)
+   *         .rotationDegrees(0, 0, -30)
+   *         .purpose(CameraPurpose.ODOMETRY)
+   *         .allowedTags(REEF_TAGS)
+   *         .done()
+   *     .addCamera("Right")
+   *         .positionInches(15, -11.75, 8)
+   *         .rotationDegrees(0, 0, 30)
+   *         .purpose(CameraPurpose.ODOMETRY)
+   *         .allowedTags(REEF_TAGS)
+   *         .done()
+   *     .ambiguityThreshold(0.25)
+   *     .build();
+   *
+   * // In RobotContainer
+   * swerve.setupPhotonVision(VisionConstants.VISION_CONFIG);
+   * }</pre>
+   *
+   * @param config The vision system configuration
    */
-  public void setupPhotonVision() {
-    vision = new PhotonVision(swerveDrive::getPose, swerveDrive.field);
+  public void setupPhotonVision(VisionSystemConfig config) {
+    vision = new PhotonVision(config, swerveDrive::getPose, swerveDrive.field);
   }
 
   private void setupPathPlanner() {
@@ -835,12 +865,12 @@ public class SwerveSubsystem extends SubsystemBase {
   }
 
   /**
-   * Command to aim robot at the best target from a specific camera.
+   * Command to aim robot at the best target from a specific VisionCamera.
    *
-   * @param camera PhotonVision camera to use
+   * @param camera VisionCamera to use
    * @return Command that aims at best target from camera
    */
-  public Command aimAtTargetCommand(Cameras camera) {
+  public Command aimAtTargetCommand(VisionCamera camera) {
     return Commands.run(() -> {
       Optional<PhotonPipelineResult> resultO = camera.getBestResult();
       if (resultO.isPresent()) {
@@ -850,7 +880,29 @@ public class SwerveSubsystem extends SubsystemBase {
               Rotation2d.fromDegrees(result.getBestTarget().getYaw())));
         }
       }
-    }, this).withName("AimAtTarget(" + camera.name() + ")");
+    }, this).withName("AimAtTarget(" + camera.getName() + ")");
+  }
+
+  /**
+   * Command to aim robot at the best target from a camera by name.
+   *
+   * @param cameraName Name of the camera to use
+   * @return Command that aims at best target from camera
+   */
+  public Command aimAtTargetCommand(String cameraName) {
+    return Commands.run(() -> {
+      VisionCamera camera = vision.getCamera(cameraName);
+      if (camera == null) return;
+
+      Optional<PhotonPipelineResult> resultO = camera.getBestResult();
+      if (resultO.isPresent()) {
+        var result = resultO.get();
+        if (result.hasTargets()) {
+          drive(getTargetSpeeds(0, 0,
+              Rotation2d.fromDegrees(result.getBestTarget().getYaw())));
+        }
+      }
+    }, this).withName("AimAtTarget(" + cameraName + ")");
   }
 
   /**
@@ -869,7 +921,8 @@ public class SwerveSubsystem extends SubsystemBase {
 
       // Get visible AprilTags and their poses
       boolean hasVisibleTags = false;
-      for (Cameras camera : Cameras.values()) {
+      for (VisionCamera camera : vision.getCameras()) {
+        if (!camera.isEnabled()) continue;
         var result = camera.getLatestResult();
         if (result.isPresent() && result.get().hasTargets()) {
           hasVisibleTags = true;
@@ -911,49 +964,6 @@ public class SwerveSubsystem extends SubsystemBase {
   public Command disableVisionCommand() {
     return Commands.runOnce(() -> vision.disableAllCameras(), this)
         .withName("DisableVision");
-  }
-
-  /**
-   * Command to switch to human player station cameras only.
-   * Disables reef cameras (LEFT/RIGHT), enables CENTER camera.
-   *
-   * @return Command that switches camera mode
-   */
-  public Command useHumanPlayerCamerasCommand() {
-    return Commands.runOnce(() -> vision.useHumanPlayerCamerasOnly(), this)
-        .withName("UseHumanPlayerCameras");
-  }
-
-  /**
-   * Command to switch to reef cameras only.
-   * Enables reef cameras (LEFT/RIGHT), disables CENTER camera.
-   *
-   * @return Command that switches camera mode
-   */
-  public Command useReefCamerasCommand() {
-    return Commands.runOnce(() -> vision.useAllCameras(), this)
-        .withName("UseReefCameras");
-  }
-
-  /**
-   * Command to disable front cameras (LEFT_CAM and RIGHT_CAM).
-   * This is equivalent to useHumanPlayerCamerasCommand().
-   *
-   * @return Command that disables front cameras
-   */
-  public Command disableFrontCamerasCommand() {
-    return Commands.runOnce(() -> vision.useHumanPlayerCamerasOnly(), this)
-        .withName("DisableFrontCameras");
-  }
-
-  /**
-   * Command to enable front cameras (LEFT_CAM and RIGHT_CAM).
-   *
-   * @return Command that enables front cameras
-   */
-  public Command enableFrontCamerasCommand() {
-    return Commands.runOnce(() -> vision.useAllCameras(), this)
-        .withName("EnableFrontCameras");
   }
 
   /**

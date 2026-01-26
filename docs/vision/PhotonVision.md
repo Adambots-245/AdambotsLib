@@ -5,6 +5,7 @@ PhotonVision integration for AprilTag-based vision pose estimation with multi-ca
 ## Table of Contents
 
 - [Overview](#overview)
+- [Configuration (Recommended)](#configuration-recommended)
 - [Quick Start](#quick-start)
 - [Features](#features)
 - [Camera Management](#camera-management)
@@ -33,22 +34,95 @@ This class is designed to integrate seamlessly with YAGSL's swerve drive and WPI
 
 ---
 
-## Quick Start
+## Configuration (Recommended)
 
-### 1. Create PhotonVision Instance
+**NEW:** The recommended way to set up PhotonVision is using the configurable camera system. This allows full customization without modifying AdambotsLib source code.
+
+### Step 1: Define Your Configuration
+
+In your robot project's Constants file:
 
 ```java
-public class SwerveSubsystem extends SubsystemBase {
-    private final PhotonVision vision;
+public static final class VisionConstants {
+    // Game-specific tag groups
+    public static final int[] REEF_TAGS = {6, 7, 8, 9, 10, 11, 17, 18, 19, 20, 21, 22};
+    public static final int[] HP_TAGS = {1, 2, 4, 5, 12, 13, 14, 15};
 
-    public SwerveSubsystem() {
-        // Initialize vision with pose supplier and field
-        vision = new PhotonVision(this::getPose, swerveDrive.field);
-    }
+    public static final VisionSystemConfig CONFIG = VisionConfigBuilder.create()
+        .addCamera("Left")
+            .positionInches(15, 11.75, 8)
+            .rotationDegrees(0, 0, -30)
+            .purpose(CameraPurpose.ODOMETRY)
+            .allowedTags(REEF_TAGS)
+            .done()
+        .addCamera("Right")
+            .positionInches(15, -11.75, 8)
+            .rotationDegrees(0, 0, 30)
+            .purpose(CameraPurpose.ODOMETRY)
+            .allowedTags(REEF_TAGS)
+            .done()
+        .addCamera("Middle")
+            .positionInches(8, 0, 41)
+            .rotationDegrees(0, -43, 177)
+            .purpose(CameraPurpose.ALIGNMENT)
+            .allowedTags(HP_TAGS)
+            .done()
+        .ambiguityThreshold(0.25)
+        .build();
 }
 ```
 
-### 2. Update Pose Estimation
+### Step 2: Initialize Vision
+
+```java
+// In RobotContainer.java
+swerve.setupPhotonVision(VisionConstants.CONFIG);
+```
+
+### Step 3: Control Cameras at Runtime
+
+```java
+// Enable/disable by purpose
+vision.enableCamerasWithPurpose(CameraPurpose.ODOMETRY);
+vision.disableCamerasWithPurpose(CameraPurpose.ALIGNMENT);
+
+// Enable/disable by name
+vision.enableCamera("Left");
+vision.disableCamera("Middle");
+
+// Get cameras by purpose
+List<VisionCamera> odometryCameras = vision.getCamerasWithPurpose(CameraPurpose.ODOMETRY);
+```
+
+For complete configuration documentation, see **[VisionConfiguration.md](VisionConfiguration.md)**.
+
+---
+
+## Quick Start
+
+### 1. Create Vision Configuration
+
+```java
+// In your Constants file
+public static final VisionSystemConfig VISION_CONFIG = VisionConfigBuilder.create()
+    .addCamera("Left")
+        .positionInches(15, 11.75, 8)
+        .rotationDegrees(0, 0, -30)
+        .purpose(CameraPurpose.ODOMETRY)
+        .allowedTags(6, 7, 8, 9, 10, 11)
+        .done()
+    .ambiguityThreshold(0.25)
+    .build();
+```
+
+### 2. Initialize Vision in SwerveSubsystem
+
+```java
+// In RobotContainer
+swerve.setupPhotonVision(VisionConstants.VISION_CONFIG);
+```
+
+### 3. Update Pose Estimation
 
 ```java
 @Override
@@ -61,7 +135,7 @@ public void periodic() {
 }
 ```
 
-### 3. Use Vision Methods
+### 4. Use Vision Methods
 
 ```java
 // Get distance to tag
@@ -83,35 +157,44 @@ int closestTag = vision.getClosestVisibleTag();
 
 ### Multi-Camera Support
 
-PhotonVision supports multiple cameras defined in the `Cameras` enum:
+PhotonVision supports multiple cameras configured via `VisionConfigBuilder`:
 
-- **LEFT_CAM** - Front left camera for reef tags
-- **RIGHT_CAM** - Front right camera for reef tags
-- **CENTER_CAM** - Back camera for human player station tags
+```java
+VisionConfigBuilder.create()
+    .addCamera("Left")
+        .positionInches(15, 11.75, 8)
+        .rotationDegrees(0, 0, -30)
+        .purpose(CameraPurpose.ODOMETRY)
+        .allowedTags(REEF_TAGS)
+        .done()
+    .addCamera("Right")
+        .positionInches(15, -11.75, 8)
+        .rotationDegrees(0, 0, 30)
+        .purpose(CameraPurpose.ODOMETRY)
+        .allowedTags(REEF_TAGS)
+        .done()
+    .build();
+```
 
 Each camera has:
 - Independent pose estimation
 - Configurable standard deviations
-- AprilTag filtering
+- AprilTag filtering via `allowedTags()`
+- Purpose-based filtering (ODOMETRY, ALIGNMENT, BOTH)
 - Ambiguity-based quality scoring
 
 ### Camera Filtering
 
-Cameras can be configured to only process specific AprilTag IDs:
+Cameras can be configured to only process specific AprilTag IDs using `allowedTags()`:
 
 ```java
-// Cameras enum with tag filtering
-LEFT_CAM("Left",
-    rotation, translation,
-    singleTagStdDevs, multiTagStdDevs,
-    getReefTagIDs()  // Only process reef tags
-);
+.addCamera("Left")
+    .allowedTags(6, 7, 8, 9, 10, 11)  // Only process reef tags
+    .done()
 
-CENTER_CAM("Middle",
-    rotation, translation,
-    singleTagStdDevs, multiTagStdDevs,
-    getHumanPlayerTagIDs()  // Only process human player tags
-);
+.addCamera("Middle")
+    .allowedTags(1, 2, 4, 5, 12, 13, 14, 15)  // Only process HP tags
+    .done()
 ```
 
 ### Vision-Corrected Odometry
@@ -135,20 +218,22 @@ Full PhotonVision simulation integration:
 
 ## Camera Management
 
-### Switch Camera Modes
+### Enable/Disable Cameras
 
 ```java
-// Use only human player camera (CENTER_CAM)
-vision.useHumanPlayerCamerasOnly();
-
-// Use all cameras (LEFT_CAM, RIGHT_CAM)
-vision.useAllCameras();
-
 // Disable all vision
 vision.disableAllCameras();
 
 // Re-enable vision
 vision.enableAllCameras();
+
+// Enable/disable by name
+vision.enableCamera("Left");
+vision.disableCamera("Middle");
+
+// Enable/disable by purpose
+vision.enableCamerasWithPurpose(CameraPurpose.ODOMETRY);
+vision.disableCamerasWithPurpose(CameraPurpose.ALIGNMENT);
 ```
 
 ### Check Camera State
@@ -157,18 +242,20 @@ vision.enableAllCameras();
 // Check if vision is disabled
 boolean disabled = vision.areAllCamerasDisabled();
 
-// Check if using human player cameras only
-boolean humanPlayerMode = vision.isUsingHumanPlayerCamerasOnly();
+// Get cameras by purpose
+List<VisionCamera> odometryCameras = vision.getCamerasWithPurpose(CameraPurpose.ODOMETRY);
+
+// Get specific camera
+VisionCamera leftCam = vision.getCamera("Left");
 ```
 
-### When to Switch Camera Modes
+### Camera Purpose Guide
 
-| Location | Camera Mode | Reason |
-|----------|-------------|--------|
-| **Reef (scoring)** | `useAllCameras()` | Front cameras see reef tags (6-11, 17-22) |
-| **Human Player Station** | `useHumanPlayerCamerasOnly()` | Back camera sees HP tags (1-2, 4-5, 12-15) |
-| **Vision unreliable** | `disableAllCameras()` | Temporarily disable vision, use wheel odometry |
-| **Normal operation** | `useAllCameras()` | Use all available cameras |
+| Purpose | Use Case |
+|---------|----------|
+| `CameraPurpose.ODOMETRY` | Cameras for pose estimation |
+| `CameraPurpose.ALIGNMENT` | Cameras for targeting/alignment only |
+| `CameraPurpose.BOTH` | Cameras for both purposes |
 
 ---
 

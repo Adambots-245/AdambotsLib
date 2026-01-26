@@ -6,6 +6,26 @@ AprilTag vision integration for accurate robot localization and target tracking.
 
 The vision package provides comprehensive PhotonVision integration for FRC robots, enabling vision-corrected odometry and intelligent target tracking with AprilTags.
 
+## Configuration Guide
+
+**NEW:** The vision system is now fully configurable for year-to-year reuse. See **[VisionConfiguration.md](VisionConfiguration.md)** for the complete guide.
+
+```java
+// Quick example - define in your Constants file
+VisionSystemConfig config = VisionConfigBuilder.create()
+    .addCamera("Left")
+        .positionInches(15, 11.75, 8)
+        .rotationDegrees(0, 0, -30)
+        .purpose(CameraPurpose.ODOMETRY)
+        .allowedTags(REEF_TAGS)
+        .done()
+    .ambiguityThreshold(0.25)
+    .build();
+
+// Initialize in RobotContainer
+swerve.setupPhotonVision(config);
+```
+
 ## Available Classes
 
 ### PhotonVision Integration
@@ -18,6 +38,15 @@ The vision package provides comprehensive PhotonVision integration for FRC robot
   - Closest tag detection
   - Tag visibility checking
   - Simulation support
+
+### Configuration Classes
+
+- **[VisionConfiguration](VisionConfiguration.md)** - Configuration guide and API reference
+  - `VisionSystemConfig` - System-wide configuration
+  - `VisionCameraConfig` - Per-camera configuration
+  - `VisionStdDevs` - Standard deviation presets
+  - `VisionConfigBuilder` - Fluent configuration builder
+  - `VisionCamera` - Configurable camera class
 
 ---
 
