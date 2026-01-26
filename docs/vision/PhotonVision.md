@@ -45,27 +45,27 @@ In your robot project's Constants file:
 ```java
 public static final class VisionConstants {
     // Game-specific tag groups
-    public static final int[] REEF_TAGS = {6, 7, 8, 9, 10, 11, 17, 18, 19, 20, 21, 22};
-    public static final int[] HP_TAGS = {1, 2, 4, 5, 12, 13, 14, 15};
+    public static final int[] SCORING_TAGS = {6, 7, 8, 9, 10, 11, 17, 18, 19, 20, 21, 22};
+    public static final int[] ALIGNMENT_TAGS = {1, 2, 4, 5, 12, 13, 14, 15};
 
     public static final VisionSystemConfig CONFIG = VisionConfigBuilder.create()
         .addCamera("Left")
             .positionInches(15, 11.75, 8)
             .rotationDegrees(0, 0, -30)
             .purpose(CameraPurpose.ODOMETRY)
-            .allowedTags(REEF_TAGS)
+            .allowedTags(SCORING_TAGS)
             .done()
         .addCamera("Right")
             .positionInches(15, -11.75, 8)
             .rotationDegrees(0, 0, 30)
             .purpose(CameraPurpose.ODOMETRY)
-            .allowedTags(REEF_TAGS)
+            .allowedTags(SCORING_TAGS)
             .done()
         .addCamera("Middle")
             .positionInches(8, 0, 41)
             .rotationDegrees(0, -43, 177)
             .purpose(CameraPurpose.ALIGNMENT)
-            .allowedTags(HP_TAGS)
+            .allowedTags(ALIGNMENT_TAGS)
             .done()
         .ambiguityThreshold(0.25)
         .build();
@@ -165,13 +165,13 @@ VisionConfigBuilder.create()
         .positionInches(15, 11.75, 8)
         .rotationDegrees(0, 0, -30)
         .purpose(CameraPurpose.ODOMETRY)
-        .allowedTags(REEF_TAGS)
+        .allowedTags(SCORING_TAGS)
         .done()
     .addCamera("Right")
         .positionInches(15, -11.75, 8)
         .rotationDegrees(0, 0, 30)
         .purpose(CameraPurpose.ODOMETRY)
-        .allowedTags(REEF_TAGS)
+        .allowedTags(SCORING_TAGS)
         .done()
     .build();
 ```
@@ -189,7 +189,7 @@ Cameras can be configured to only process specific AprilTag IDs using `allowedTa
 
 ```java
 .addCamera("Left")
-    .allowedTags(6, 7, 8, 9, 10, 11)  // Only process reef tags
+    .allowedTags(6, 7, 8, 9, 10, 11)  // Only process scoring area tags
     .done()
 
 .addCamera("Middle")
@@ -293,14 +293,11 @@ double turretSpeed = turretPID.calculate(yaw.getRadians(), 0);
 // Check if specific tag is visible (any camera)
 boolean canSee = vision.isTagVisible(7);
 
-// Check if tag visible in specific camera
-boolean inLeftCam = vision.isTagVisibleInCamera(7, Cameras.LEFT_CAM);
-
 // Check if any of multiple tags visible
 int visibleTag = vision.hasID(new int[]{6, 7, 8});  // Returns first found, or -1
 
 // Get all detected tags
-List<Integer> allTags = PhotonVision.getAllDetectedTags();
+List<Integer> allTags = PhotonVision.getAllDetectedTagIds();
 ```
 
 ### Closest Tag Methods
@@ -320,14 +317,14 @@ boolean hasTarget = vision.hasTarget();
 
 ```java
 // Get best target from specific camera
-PhotonTrackedTarget bestTarget = vision.getBestTargetFromCamera(Cameras.LEFT_CAM);
+PhotonTrackedTarget bestTarget = vision.getBestTargetFromCamera("Left");
 if (bestTarget != null) {
     int tagID = bestTarget.getFiducialId();
     double ambiguity = bestTarget.getPoseAmbiguity();
 }
 
 // Get specific target from camera
-PhotonTrackedTarget target = vision.getTargetFromId(7, Cameras.LEFT_CAM);
+PhotonTrackedTarget target = vision.getTargetFromId(7, "Left");
 ```
 
 ### Static Field Methods
@@ -335,10 +332,6 @@ PhotonTrackedTarget target = vision.getTargetFromId(7, Cameras.LEFT_CAM);
 ```java
 // Get pose of AprilTag on field
 Pose2d tagPose = PhotonVision.getAprilTagPose(7, new Transform2d());
-
-// Get tag IDs for specific field zones
-int[] reefTags = PhotonVision.getReefTagIDs();  // {6,7,8,9,10,11,17,18,19,20,21,22}
-int[] hpTags = PhotonVision.getHumanPlayerTagIDs();  // {1,2,4,5,12,13,14,15}
 ```
 
 ---
@@ -408,23 +401,27 @@ public Command approachClosestTag(double targetDistance) {
 }
 ```
 
-### Example 3: Camera Mode Switching
+### Example 3: Camera Purpose-Based Switching
 
 ```java
 public class RobotContainer {
     private final SwerveSubsystem swerve;
 
     private void configureButtonBindings() {
-        // Switch to human player mode when backing up
+        // Enable only alignment cameras when at scoring position
         Buttons.XboxBack.onTrue(
-            Commands.runOnce(() -> swerve.vision.useHumanPlayerCamerasOnly())
-                .withName("SwitchToHPCameras")
+            Commands.runOnce(() -> {
+                swerve.vision.disableCamerasWithPurpose(CameraPurpose.ODOMETRY);
+                swerve.vision.enableCamerasWithPurpose(CameraPurpose.ALIGNMENT);
+            }).withName("SwitchToAlignmentCameras")
         );
 
-        // Switch back to reef cameras when driving forward
+        // Enable only odometry cameras for general driving
         Buttons.XboxStart.onTrue(
-            Commands.runOnce(() -> swerve.vision.useAllCameras())
-                .withName("SwitchToReefCameras")
+            Commands.runOnce(() -> {
+                swerve.vision.enableCamerasWithPurpose(CameraPurpose.ODOMETRY);
+                swerve.vision.disableCamerasWithPurpose(CameraPurpose.ALIGNMENT);
+            }).withName("SwitchToOdometryCameras")
         );
 
         // Emergency disable vision
@@ -444,13 +441,16 @@ public class IntakeSubsystem extends SubsystemBase {
     private final PhotonVision vision;
     private final StateMachine<State, Void> sm;
 
-    public Command autoExtendAtReef() {
+    // Define your game-specific tag IDs
+    private static final int[] SCORING_TAGS = {6, 7, 8, 9, 10, 11};
+
+    public Command autoExtendAtScoringArea() {
         return Commands.runOnce(() -> {
-            // Check if we see any reef tags
-            int reefTag = vision.hasID(PhotonVision.getReefTagIDs());
-            if (reefTag != -1) {
+            // Check if we see any scoring tags
+            int scoringTag = vision.hasID(SCORING_TAGS);
+            if (scoringTag != -1) {
                 // Check if close enough
-                double distance = vision.getDistanceFromAprilTag(reefTag);
+                double distance = vision.getDistanceFromAprilTag(scoringTag);
                 if (distance < 3.0) {  // Within 3 meters
                     sm.to(State.EXTENDED).request();
                 }
@@ -462,9 +462,9 @@ public class IntakeSubsystem extends SubsystemBase {
     public void periodic() {
         sm.periodic();
 
-        // Auto-stow if we can't see any reef tags
-        int reefTag = vision.hasID(PhotonVision.getReefTagIDs());
-        if (reefTag == -1 && sm.getCurrentState() == State.EXTENDED) {
+        // Auto-stow if we can't see any scoring tags
+        int scoringTag = vision.hasID(SCORING_TAGS);
+        if (scoringTag == -1 && sm.getCurrentState() == State.EXTENDED) {
             sm.to(State.STOWED).request();
         }
     }
@@ -640,19 +640,19 @@ if (vision.isTagVisible(7)) {
 }
 ```
 
-#### `isTagVisibleInCamera(int tagID, Cameras camera)`
+#### `isTagVisibleInCamera(int tagID, String cameraName)`
 
 Check if a specific AprilTag is visible in a specific camera.
 
 **Parameters:**
 - `tagID` - AprilTag ID to check
-- `camera` - Camera to check (`Cameras.LEFT_CAM`, etc.)
+- `cameraName` - Name of the camera to check
 
 **Returns:** `true` if visible in specified camera
 
 **Example:**
 ```java
-if (vision.isTagVisibleInCamera(7, Cameras.LEFT_CAM)) {
+if (vision.isTagVisibleInCamera(7, "Left")) {
     // Tag 7 visible in left camera
 }
 ```
@@ -668,10 +668,13 @@ Check if any of the specified AprilTag IDs are visible.
 
 **Example:**
 ```java
-// Check for any reef tags
-int visibleReefTag = vision.hasID(PhotonVision.getReefTagIDs());
-if (visibleReefTag != -1) {
-    // Found reef tag
+// Define your game-specific tag groups in Constants
+int[] SCORING_TAGS = {6, 7, 8, 9, 10, 11};
+
+// Check for any scoring tags
+int visibleTag = vision.hasID(SCORING_TAGS);
+if (visibleTag != -1) {
+    // Found scoring tag
 }
 ```
 
@@ -688,7 +691,7 @@ if (vision.hasTarget()) {
 }
 ```
 
-#### `getAllDetectedTags()` (static)
+#### `getAllDetectedTagIds()` (static)
 
 Get a list of all currently detected AprilTag IDs across all cameras.
 
@@ -696,7 +699,7 @@ Get a list of all currently detected AprilTag IDs across all cameras.
 
 **Example:**
 ```java
-List<Integer> tags = PhotonVision.getAllDetectedTags();
+List<Integer> tags = PhotonVision.getAllDetectedTagIds();
 for (int tagID : tags) {
     System.out.println("Seeing tag: " + tagID);
 }
@@ -724,30 +727,6 @@ if (closestTag != -1) {
 
 ### Camera Management Methods
 
-#### `useHumanPlayerCamerasOnly()`
-
-Switch to using only the human player camera (CENTER_CAM).
-Disables front cameras (LEFT_CAM, RIGHT_CAM) from pose estimation.
-
-**Use when:** Robot is at human player station
-
-**Example:**
-```java
-vision.useHumanPlayerCamerasOnly();
-```
-
-#### `useAllCameras()`
-
-Switch to using all cameras for pose estimation.
-Enables front cameras and disables back camera.
-
-**Use when:** Robot is on the field (reef, normal driving)
-
-**Example:**
-```java
-vision.useAllCameras();
-```
-
 #### `disableAllCameras()`
 
 Disable all cameras from contributing to pose estimation.
@@ -761,11 +740,38 @@ vision.disableAllCameras();
 
 #### `enableAllCameras()`
 
-Enable all cameras (respects current filtering mode).
+Enable all cameras for pose estimation.
 
 **Example:**
 ```java
 vision.enableAllCameras();
+```
+
+#### `enableCamera(String name)` / `disableCamera(String name)`
+
+Enable or disable a specific camera by name.
+
+**Parameters:**
+- `name` - The camera name as defined in VisionConfigBuilder
+
+**Example:**
+```java
+vision.enableCamera("Left");
+vision.disableCamera("Middle");
+```
+
+#### `enableCamerasWithPurpose(CameraPurpose purpose)` / `disableCamerasWithPurpose(CameraPurpose purpose)`
+
+Enable or disable cameras by their configured purpose.
+
+**Parameters:**
+- `purpose` - `CameraPurpose.ODOMETRY`, `CameraPurpose.ALIGNMENT`, or `CameraPurpose.BOTH`
+
+**Example:**
+```java
+// Enable odometry cameras, disable alignment cameras
+vision.enableCamerasWithPurpose(CameraPurpose.ODOMETRY);
+vision.disableCamerasWithPurpose(CameraPurpose.ALIGNMENT);
 ```
 
 #### `areAllCamerasDisabled()`
@@ -781,16 +787,28 @@ if (vision.areAllCamerasDisabled()) {
 }
 ```
 
-#### `isUsingHumanPlayerCamerasOnly()`
+#### `getCamerasWithPurpose(CameraPurpose purpose)`
 
-Check if only human player cameras are active.
+Get a list of cameras configured for a specific purpose.
 
-**Returns:** `true` if only CENTER_CAM is used
+**Returns:** `List<VisionCamera>` matching the purpose
 
 **Example:**
 ```java
-if (vision.isUsingHumanPlayerCamerasOnly()) {
-    SmartDashboard.putString("Camera Mode", "HP Station");
+List<VisionCamera> odometryCameras = vision.getCamerasWithPurpose(CameraPurpose.ODOMETRY);
+```
+
+#### `getCameras()`
+
+Get a list of all configured cameras.
+
+**Returns:** `List<VisionCamera>` of all cameras
+
+**Example:**
+```java
+List<VisionCamera> allCameras = vision.getCameras();
+for (VisionCamera cam : allCameras) {
+    System.out.println("Camera: " + cam.getName() + " enabled: " + cam.isEnabled());
 }
 ```
 
@@ -798,36 +816,36 @@ if (vision.isUsingHumanPlayerCamerasOnly()) {
 
 ### Target Tracking Methods
 
-#### `getTargetFromId(int id, Cameras camera)`
+#### `getTargetFromId(int id, String cameraName)`
 
 Get the tracked target for a specific tag from a specific camera.
 
 **Parameters:**
 - `id` - AprilTag ID
-- `camera` - Camera to check
+- `cameraName` - Name of the camera to check
 
 **Returns:** `PhotonTrackedTarget` or `null` if not found
 
 **Example:**
 ```java
-PhotonTrackedTarget target = vision.getTargetFromId(7, Cameras.LEFT_CAM);
+PhotonTrackedTarget target = vision.getTargetFromId(7, "Left");
 if (target != null) {
     double ambiguity = target.getPoseAmbiguity();
 }
 ```
 
-#### `getBestTargetFromCamera(Cameras camera)`
+#### `getBestTargetFromCamera(String cameraName)`
 
 Get the target with the lowest ambiguity from a specific camera.
 
 **Parameters:**
-- `camera` - Camera to check
+- `cameraName` - Name of the camera to check
 
 **Returns:** `PhotonTrackedTarget` with lowest ambiguity, or `null`
 
 **Example:**
 ```java
-PhotonTrackedTarget best = vision.getBestTargetFromCamera(Cameras.LEFT_CAM);
+PhotonTrackedTarget best = vision.getBestTargetFromCamera("Left");
 ```
 
 ---
@@ -854,30 +872,6 @@ Pose2d tagPose = PhotonVision.getAprilTagPose(7, new Transform2d());
 // Get pose 1m in front of tag
 Transform2d offset = new Transform2d(new Translation2d(1.0, 0), new Rotation2d());
 Pose2d approachPose = PhotonVision.getAprilTagPose(7, offset);
-```
-
-#### `getHumanPlayerTagIDs()` (static)
-
-Get array of AprilTag IDs for human player stations (both alliances).
-
-**Returns:** `int[]` - {1, 2, 4, 5, 12, 13, 14, 15}
-
-**Example:**
-```java
-int[] hpTags = PhotonVision.getHumanPlayerTagIDs();
-int visibleHP = vision.hasID(hpTags);
-```
-
-#### `getReefTagIDs()` (static)
-
-Get array of AprilTag IDs for reefs (both alliances).
-
-**Returns:** `int[]` - {6, 7, 8, 9, 10, 11, 17, 18, 19, 20, 21, 22}
-
-**Example:**
-```java
-int[] reefTags = PhotonVision.getReefTagIDs();
-int visibleReef = vision.hasID(reefTags);
 ```
 
 ---
@@ -939,17 +933,18 @@ VecBuilder.fill(0.5, 0.5, 1.0)  // Multi tag (less trust in rotation)
 
 ### 3. Camera Mode Switching
 
-Switch camera modes based on robot location:
+Switch camera modes based on robot purpose:
 
 ```java
-// Create trigger for auto-switching
+// Create trigger for auto-switching based on field region
 new Trigger(() -> {
-    int hpTag = vision.hasID(PhotonVision.getHumanPlayerTagIDs());
-    return hpTag != -1;
+    // Check if robot is in a specific field region
+    Pose2d pose = swerve.getPose();
+    return pose.getX() > 13.0; // Near loading zone
 }).onTrue(
-    Commands.runOnce(() -> vision.useHumanPlayerCamerasOnly())
+    Commands.runOnce(() -> vision.enableCamerasWithPurpose(CameraPurpose.ALIGNMENT))
 ).onFalse(
-    Commands.runOnce(() -> vision.useAllCameras())
+    Commands.runOnce(() -> vision.enableCamerasWithPurpose(CameraPurpose.ODOMETRY))
 );
 ```
 
@@ -1001,13 +996,12 @@ if (closestTag != -1) {
 **Check camera state:**
 ```java
 SmartDashboard.putBoolean("Vision Disabled", vision.areAllCamerasDisabled());
-SmartDashboard.putBoolean("HP Mode", vision.isUsingHumanPlayerCamerasOnly());
 SmartDashboard.putBoolean("Has Target", vision.hasTarget());
 ```
 
 **Log detected tags:**
 ```java
-List<Integer> tags = PhotonVision.getAllDetectedTags();
+List<Integer> tags = PhotonVision.getAllDetectedTagIds();
 SmartDashboard.putString("Detected Tags", tags.toString());
 ```
 
@@ -1052,8 +1046,8 @@ if (RobotBase.isSimulation()) {
 **Problem:** Camera seeing tags it shouldn't
 
 **Solutions:**
-1. Use camera filtering: Verify tag IDs in `getReefTagIDs()` and `getHumanPlayerTagIDs()`
-2. Switch camera modes: Use `useHumanPlayerCamerasOnly()` or `useAllCameras()`
+1. Use camera filtering: Configure `allowedTags()` per-camera in VisionConfigBuilder
+2. Switch camera modes: Use `enableCamerasWithPurpose()` or `disableCamerasWithPurpose()`
 3. Adjust camera angles to avoid seeing wrong zones
 4. Check ambiguity filtering - may need to tune thresholds
 

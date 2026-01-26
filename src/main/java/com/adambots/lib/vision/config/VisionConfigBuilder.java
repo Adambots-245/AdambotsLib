@@ -22,8 +22,8 @@ import edu.wpi.first.math.util.Units;
  * <p><strong>Usage Example:</strong>
  * <pre>{@code
  * // Define game-specific tag groups in your Constants file
- * public static final int[] REEF_TAGS = {6, 7, 8, 9, 10, 11, 17, 18, 19, 20, 21, 22};
- * public static final int[] HP_TAGS = {1, 2, 4, 5, 12, 13, 14, 15};
+ * public static final int[] SCORING_TAGS = {6, 7, 8, 9, 10, 11, 17, 18, 19, 20, 21, 22};
+ * public static final int[] INTAKE_TAGS = {1, 2, 4, 5, 12, 13, 14, 15};
  *
  * // Build the vision configuration
  * VisionSystemConfig config = VisionConfigBuilder.create()
@@ -31,7 +31,7 @@ import edu.wpi.first.math.util.Units;
  *         .positionInches(15, 11.75, 8)
  *         .rotationDegrees(0, 0, -30)
  *         .purpose(CameraPurpose.ODOMETRY)
- *         .allowedTags(REEF_TAGS)
+ *         .allowedTags(SCORING_TAGS)
  *         .singleTagStdDevs(0.5, 0.5, 0.5)
  *         .multiTagStdDevs(0.5, 0.5, 1.0)
  *         .done()
@@ -39,13 +39,13 @@ import edu.wpi.first.math.util.Units;
  *         .positionInches(15, -11.75, 8)
  *         .rotationDegrees(0, 0, 30)
  *         .purpose(CameraPurpose.ODOMETRY)
- *         .allowedTags(REEF_TAGS)
+ *         .allowedTags(SCORING_TAGS)
  *         .done()
  *     .addCamera("Middle")
  *         .positionInches(8, 0, 41)
  *         .rotationDegrees(0, -43, 177)
  *         .purpose(CameraPurpose.ALIGNMENT)
- *         .allowedTags(HP_TAGS)
+ *         .allowedTags(INTAKE_TAGS)
  *         .done()
  *     .ambiguityThreshold(0.25)
  *     .maxPoseJump(10.0)

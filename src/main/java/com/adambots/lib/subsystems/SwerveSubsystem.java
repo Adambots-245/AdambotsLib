@@ -283,21 +283,21 @@ public class SwerveSubsystem extends SubsystemBase {
    * <p><strong>Usage Example:</strong>
    * <pre>{@code
    * // In your robot project's Constants file
-   * public static final int[] REEF_TAGS = {6, 7, 8, 9, 10, 11, 17, 18, 19, 20, 21, 22};
-   * public static final int[] HP_TAGS = {1, 2, 4, 5, 12, 13, 14, 15};
+   * public static final int[] SCORING_TAGS = {6, 7, 8, 9, 10, 11, 17, 18, 19, 20, 21, 22};
+   * public static final int[] INTAKE_TAGS = {1, 2, 4, 5, 12, 13, 14, 15};
    *
    * public static final VisionSystemConfig VISION_CONFIG = VisionConfigBuilder.create()
    *     .addCamera("Left")
    *         .positionInches(15, 11.75, 8)
    *         .rotationDegrees(0, 0, -30)
    *         .purpose(CameraPurpose.ODOMETRY)
-   *         .allowedTags(REEF_TAGS)
+   *         .allowedTags(SCORING_TAGS)
    *         .done()
    *     .addCamera("Right")
    *         .positionInches(15, -11.75, 8)
    *         .rotationDegrees(0, 0, 30)
    *         .purpose(CameraPurpose.ODOMETRY)
-   *         .allowedTags(REEF_TAGS)
+   *         .allowedTags(SCORING_TAGS)
    *         .done()
    *     .ambiguityThreshold(0.25)
    *     .build();

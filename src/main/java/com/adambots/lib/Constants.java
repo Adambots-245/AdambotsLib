@@ -67,8 +67,6 @@ public final class Constants {
         public static final boolean kFrontRightDriveMotorReversed = true;
         public static final boolean kRearRightDriveMotorReversed = true;
 
-        public static final double kReefAllignOffset = 0.185;
-
         // Distance between centers of right and left wheels on robot in meters
         public static final double kTrackWidth = 0.61;
         // Distance between front and back wheels on robot in meters
@@ -155,32 +153,26 @@ public final class Constants {
 
         public static final double kMaxWaypointTranslateSpeed = 2;
         public static final double kMinWaypointTranslateSpeed = 0.7;
-        
-        public static final Pose2d S1_POSE2D = new Pose2d(new Translation2d(1.33, 6.76), new Rotation2d(Math.toRadians(44)));
-        public static final Pose2d S2_POSE2D = new Pose2d(new Translation2d(1.40, 5.45), new Rotation2d(Math.toRadians(0)));
-        public static final Pose2d S3_POSE2D = new Pose2d(new Translation2d(1.33, 4.26), new Rotation2d(Math.toRadians(-44)));
 
-        public static final double HumanPlayerCANrangeDist = 5.9;
+        // Game-specific starting poses and distances should be defined in robot project
     }
 
     // Subystem Constants go here
+    // Game-specific intake constants should be defined in robot project
     public final static class IntakeConstants {
-        public static final double kMaxSpeed = -0.14;//Not use\
-        public static final double kMaxPIDTarget = 9;//PID Max Velocity
+        public static final double kMaxSpeed = -0.14;
+        public static final double kMaxPIDTarget = 9; // PID Max Velocity
         public static final double kLowSpeed = .5;
         public static final double kReverseSpeed = 0.1;
-        public static final double kAlgaeSpeed = 0.6;
-        public static final double kDistanceToDetect = 10;//cm
-        public static final double kDistanceToDetectAlgae = 3.5;//in
-        public static final double kTimerThreshold = 0.0; // number of seconds to wait before stopping the intake after detecting a coral
-        public static final double kAlgaeIntakePulseSeconds = 0.2;
-
+        public static final double kDistanceToDetect = 10; // cm
+        public static final double kTimerThreshold = 0.0; // seconds to wait before stopping
     }
 
     public static final class HangConstants{
         public static final double kRobotAngleStopHang = 30;
     }
 
+    // Game-specific elevator and wrist positions should be defined in robot project
     public final static class ElevatorConstants {
 
         // PID Constants
@@ -189,7 +181,7 @@ public final class Constants {
         public static final double kElevatorPositionIncrement = 0.9;
         public static final double kElevatorPositionTolerance = 0.5;
         public static final double kWristPositionTolerance = 2.0;
-        
+
         public static final double kPElevatorController = 1;
         public static final double kIElevatorController = 0.000;
         public static final double kDElevatorController = 0.04;
@@ -198,54 +190,26 @@ public final class Constants {
         public static final double kWristPositionIncrement = 3.7;
         public static final double kPWristController = 0.03;
         public static final double kIWristController = 0.00;
-
         public static final double kDWristController = 0.0001;
 
-        // Elevator Positions
-        public static final double kElevatorIntakePosition = -1;
-        public static final double kElevatorL1Position = 3;
-        public static final double kElevatorL2Position = 28;
-        public static final double kElevatorL3Position = 55;
-        public static final double kElevatorL4Position = 92;
-        public static final double kElevatorBargePosition = 75;
-        public static final double kElevatorHighAlgaePosition = 65.3;
-        public static final double kElevatorLowAlgaePosition = 39.5;
-        public static final double kElevatorProcessorPosition = 0;
-
-        public static final double kElevatorMaxHeight = kElevatorL4Position;
+        // Default elevator limits - override in robot project
+        public static final double kElevatorMaxHeight = 100;
         public static final double kElevatorMinHeight = 0;
-        public static final double kElevatorDangerZoneStart = 20;
-        public static final double kElevatorDangerZoneEnd = 40;
 
-        // Wrist Positions
-        public static final double kWristStowedPosition = 218; //55
-        public static final double kWristIntakePosition = 241.5; //239 //80.7
-        public static final double kWristL1Position = 246.8; //66
-        public static final double kWristL2Position = 224; //66
-        public static final double kWristL3Position = 224; //66
-        public static final double kWristL4Position = 226; //74
-        public static final double kWristHighAlgaePosition = 159; //5
-        public static final double kWristLowAlgaePosition = 159; //359
-        public static final double kWristProcessorPosition = 170; //359
-        public static final double kWristGroundIntakePosition = 147; //350
-        public static final double kWristBargePosition = 234; 
-        public static final double kWristHangPosition = 234; //71
-
-
-        public static final double kWristMinAngle = 355;
-        public static final double kWristMaxAngle = 85;
-        public static final double kWristDangerZoneAngle = 58;
+        // Default wrist limits - override in robot project
+        public static final double kWristMinAngle = 0;
+        public static final double kWristMaxAngle = 360;
 
         // Gear Ratio and Other Elevator Constants
         public static final double stateFirstChangeDelay = 0.15;
         public static final double stateChangeDelay = 0.6;
-        public static final double kGearRatio = 10/1.0; //10:1
+        public static final double kGearRatio = 10/1.0; // 10:1
         public static final double kDrumCircumference = 2.0; // inches
         public static final double kInchesPerRotation = kDrumCircumference / kGearRatio;
         public static double kVelocityFeedforward = 0.45;
         public static double kElevatorCruiseVelocity = 400;
         public static double kElevatorAcceleration = 1000.0;
         public static double kElevatorJerk = 4000.0;
-        }
+    }
     // Command Constants go here
 }

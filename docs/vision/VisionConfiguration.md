@@ -32,9 +32,9 @@ The vision configuration system allows teams to fully customize their PhotonVisi
 
 ```java
 public static final class VisionConstants {
-    // 2025 Reefscape example
-    public static final int[] REEF_TAGS = {6, 7, 8, 9, 10, 11, 17, 18, 19, 20, 21, 22};
-    public static final int[] HP_TAGS = {1, 2, 4, 5, 12, 13, 14, 15};
+    // Define game-specific tag groups based on your field layout
+    public static final int[] SCORING_TAGS = {6, 7, 8, 9, 10, 11, 17, 18, 19, 20, 21, 22};
+    public static final int[] INTAKE_TAGS = {1, 2, 4, 5, 12, 13, 14, 15};
 }
 ```
 
@@ -46,7 +46,7 @@ public static final VisionSystemConfig VISION_CONFIG = VisionConfigBuilder.creat
         .positionInches(15, 11.75, 8)      // X, Y, Z from robot center
         .rotationDegrees(0, 0, -30)         // Roll, Pitch, Yaw
         .purpose(CameraPurpose.ODOMETRY)
-        .allowedTags(REEF_TAGS)
+        .allowedTags(SCORING_TAGS)
         .singleTagStdDevs(0.5, 0.5, 0.5)
         .multiTagStdDevs(0.5, 0.5, 1.0)
         .done()
@@ -54,13 +54,13 @@ public static final VisionSystemConfig VISION_CONFIG = VisionConfigBuilder.creat
         .positionInches(15, -11.75, 8)
         .rotationDegrees(0, 0, 30)
         .purpose(CameraPurpose.ODOMETRY)
-        .allowedTags(REEF_TAGS)
+        .allowedTags(SCORING_TAGS)
         .done()
     .addCamera("Middle")
         .positionInches(8, 0, 41)
         .rotationDegrees(0, -43, 177)
         .purpose(CameraPurpose.ALIGNMENT)
-        .allowedTags(HP_TAGS)
+        .allowedTags(ALIGNMENT_TAGS)
         .done()
     .ambiguityThreshold(0.25)
     .maxPoseJump(10.0)
@@ -257,10 +257,10 @@ Cameras that serve both odometry and alignment needs.
 ### Migration Example
 
 ```java
-// 2025 Configuration
-public static final int[] REEF_TAGS = {6, 7, 8, 9, 10, 11, 17, 18, 19, 20, 21, 22};
+// Previous season configuration
+public static final int[] OLD_SCORING_TAGS = {6, 7, 8, 9, 10, 11, 17, 18, 19, 20, 21, 22};
 
-// 2026 Configuration (hypothetical)
+// New season configuration
 public static final int[] SCORING_TAGS = {5, 6, 7, 14, 15, 16};  // New game tags
 public static final int[] INTAKE_TAGS = {1, 2, 3, 11, 12, 13};   // New game tags
 ```

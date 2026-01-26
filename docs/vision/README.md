@@ -17,7 +17,7 @@ VisionSystemConfig config = VisionConfigBuilder.create()
         .positionInches(15, 11.75, 8)
         .rotationDegrees(0, 0, -30)
         .purpose(CameraPurpose.ODOMETRY)
-        .allowedTags(REEF_TAGS)
+        .allowedTags(SCORING_TAGS)
         .done()
     .ambiguityThreshold(0.25)
     .build();
@@ -33,7 +33,7 @@ swerve.setupPhotonVision(config);
 - **[PhotonVision](PhotonVision.md)** - Complete AprilTag vision system
   - Multi-camera support (front, back cameras)
   - Vision-corrected pose estimation
-  - Camera filtering by game zone (reef vs human player)
+  - Camera filtering by purpose (odometry vs alignment)
   - Distance and angle calculations to tags
   - Closest tag detection
   - Tag visibility checking
@@ -61,7 +61,7 @@ swerve.setupPhotonVision(config);
 - You want to know robot position relative to field elements
 
 **Common Use Cases:**
-- Auto-align to scoring positions (reefs, stations)
+- Auto-align to scoring positions
 - Vision-corrected autonomous paths
 - Accurate pose estimation during teleop
 - Auto-approach to game elements
@@ -118,18 +118,20 @@ if (closest != -1) {
 
 // Check if any tags visible
 if (vision.hasTarget()) {
-    List<Integer> tags = PhotonVision.getAllDetectedTags();
+    List<Integer> tags = PhotonVision.getAllDetectedTagIds();
 }
 ```
 
 ### 3. Camera Mode Switching
 
 ```java
-// At human player station
-vision.useHumanPlayerCamerasOnly();
+// Enable only alignment cameras (for scoring/pickup)
+vision.enableCamerasWithPurpose(CameraPurpose.ALIGNMENT);
+vision.disableCamerasWithPurpose(CameraPurpose.ODOMETRY);
 
-// On the field (reef, normal driving)
-vision.useAllCameras();
+// Enable only odometry cameras (for general driving)
+vision.enableCamerasWithPurpose(CameraPurpose.ODOMETRY);
+vision.disableCamerasWithPurpose(CameraPurpose.ALIGNMENT);
 
 // Disable vision temporarily
 vision.disableAllCameras();
@@ -145,9 +147,9 @@ PhotonVision supports multiple cameras with independent configurations:
 
 | Camera | Location | Purpose | Tag Filter |
 |--------|----------|---------|------------|
-| **LEFT_CAM** | Front left | Reef scoring | Tags 6-11, 17-22 |
-| **RIGHT_CAM** | Front right | Reef scoring | Tags 6-11, 17-22 |
-| **CENTER_CAM** | Back/up | Human player | Tags 1-2, 4-5, 12-15 |
+| **LEFT_CAM** | Front left | Odometry | Configurable per game |
+| **RIGHT_CAM** | Front right | Odometry | Configurable per game |
+| **CENTER_CAM** | Back/up | Alignment | Configurable per game |
 
 ### Vision-Corrected Odometry
 
@@ -187,7 +189,7 @@ boolean canSee = vision.isTagVisible(7);
 int visibleTag = vision.hasID(new int[]{6, 7, 8});
 
 // Get all detected tags
-List<Integer> allTags = PhotonVision.getAllDetectedTags();
+List<Integer> allTags = PhotonVision.getAllDetectedTagIds();
 
 // Find closest
 int closest = vision.getClosestVisibleTag();
@@ -235,17 +237,26 @@ public Command approachTag(int tagID, double targetDistance) {
 }
 ```
 
-### Pattern 3: Zone-Based Camera Switching
+### Pattern 3: Purpose-Based Camera Switching
 
 ```java
+// Define your game-specific tag groups in Constants
+int[] ALIGNMENT_TAGS = {1, 2, 4, 5, 12, 13, 14, 15};
+
 // Auto-switch cameras based on detected tags
 new Trigger(() -> {
-    int hpTag = vision.hasID(PhotonVision.getHumanPlayerTagIDs());
-    return hpTag != -1;
+    int alignmentTag = vision.hasID(ALIGNMENT_TAGS);
+    return alignmentTag != -1;
 }).onTrue(
-    Commands.runOnce(() -> vision.useHumanPlayerCamerasOnly())
+    Commands.runOnce(() -> {
+        vision.enableCamerasWithPurpose(CameraPurpose.ALIGNMENT);
+        vision.disableCamerasWithPurpose(CameraPurpose.ODOMETRY);
+    })
 ).onFalse(
-    Commands.runOnce(() -> vision.useAllCameras())
+    Commands.runOnce(() -> {
+        vision.enableCamerasWithPurpose(CameraPurpose.ODOMETRY);
+        vision.disableCamerasWithPurpose(CameraPurpose.ALIGNMENT);
+    })
 );
 ```
 
@@ -255,11 +266,14 @@ new Trigger(() -> {
 public class ArmSubsystem extends SubsystemBase {
     enum State { STOWED, SCORING }
 
+    // Define your game-specific tag groups in Constants
+    private static final int[] SCORING_TAGS = {6, 7, 8, 9, 10, 11};
+
     public void periodic() {
-        // Auto-extend arm when close to reef
-        int reefTag = vision.hasID(PhotonVision.getReefTagIDs());
-        if (reefTag != -1) {
-            double distance = vision.getDistanceFromAprilTag(reefTag);
+        // Auto-extend arm when close to scoring area
+        int scoringTag = vision.hasID(SCORING_TAGS);
+        if (scoringTag != -1) {
+            double distance = vision.getDistanceFromAprilTag(scoringTag);
             if (distance < 2.0 && sm.getCurrentState() == State.STOWED) {
                 sm.to(State.SCORING).request();
             }
@@ -277,21 +291,17 @@ public class ArmSubsystem extends SubsystemBase {
 Each camera needs a transform (position + rotation) relative to robot center:
 
 ```java
-LEFT_CAM("Left",
-    new Rotation3d(
-        0,  // Roll (usually 0)
-        0,  // Pitch (positive = tilted up)
-        Units.degreesToRadians(-30)  // Yaw (positive = rotated left)
-    ),
-    new Translation3d(
-        Units.inchesToMeters(15),   // X: forward from center
-        Units.inchesToMeters(11.75),  // Y: left from center
-        Units.inchesToMeters(8)     // Z: height from floor
-    ),
-    singleTagStdDevs,
-    multiTagStdDevs,
-    getReefTagIDs()  // Tag filtering
-);
+// Use VisionConfigBuilder instead - see VisionConfiguration.md
+VisionConfigBuilder.create()
+    .addCamera("Left")
+        .positionInches(15, 11.75, 8)     // X, Y, Z from robot center
+        .rotationDegrees(0, 0, -30)        // Roll, Pitch, Yaw
+        .purpose(CameraPurpose.ODOMETRY)
+        .allowedTags(SCORING_TAGS)         // Your game-specific tags
+        .singleTagStdDevs(0.5, 0.5, 0.5)
+        .multiTagStdDevs(0.5, 0.5, 1.0)
+        .done()
+    .build();
 ```
 
 **Measurement Tips:**
@@ -372,11 +382,13 @@ if (closestTag != -1) {
 ### 4. Switch Camera Modes Intelligently
 
 ```java
-// At human player station
-vision.useHumanPlayerCamerasOnly();
+// At scoring/alignment position
+vision.enableCamerasWithPurpose(CameraPurpose.ALIGNMENT);
+vision.disableCamerasWithPurpose(CameraPurpose.ODOMETRY);
 
-// On field (reef/driving)
-vision.useAllCameras();
+// General driving
+vision.enableCamerasWithPurpose(CameraPurpose.ODOMETRY);
+vision.disableCamerasWithPurpose(CameraPurpose.ALIGNMENT);
 
 // Vision causing issues
 vision.disableAllCameras();
@@ -386,9 +398,8 @@ vision.disableAllCameras();
 
 ```java
 SmartDashboard.putBoolean("Vision Enabled", !vision.areAllCamerasDisabled());
-SmartDashboard.putBoolean("HP Mode", vision.isUsingHumanPlayerCamerasOnly());
 SmartDashboard.putBoolean("Has Target", vision.hasTarget());
-SmartDashboard.putString("Detected Tags", PhotonVision.getAllDetectedTags().toString());
+SmartDashboard.putString("Detected Tags", PhotonVision.getAllDetectedTagIds().toString());
 
 int closest = vision.getClosestVisibleTag();
 if (closest != -1) {
@@ -457,11 +468,14 @@ public class LEDSubsystem extends SubsystemBase {
 ### With State Machines
 
 ```java
+// Define your game-specific tag groups in Constants
+int[] SCORING_TAGS = {6, 7, 8, 9, 10, 11};
+
 // Trigger state transitions based on vision
 new Trigger(() -> {
-    int reefTag = vision.hasID(PhotonVision.getReefTagIDs());
-    if (reefTag == -1) return false;
-    return vision.getDistanceFromAprilTag(reefTag) < 2.0;
+    int scoringTag = vision.hasID(SCORING_TAGS);
+    if (scoringTag == -1) return false;
+    return vision.getDistanceFromAprilTag(scoringTag) < 2.0;
 }).onTrue(
     intake.extendCommand()
 );

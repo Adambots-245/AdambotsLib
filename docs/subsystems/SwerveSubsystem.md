@@ -567,11 +567,11 @@ Command driveToNearest = swerve.driveToNearestPoseWithVisionCommand(scoringPosit
 
 ---
 
-#### aimAtTargetCommand(Cameras camera)
+#### aimAtTargetCommand(String cameraName)
 Aims at the best detected target from a specific camera.
 
 ```java
-Command aimAtBest = swerve.aimAtTargetCommand(Cameras.CENTER_CAM);
+Command aimAtBest = swerve.aimAtTargetCommand("Center");
 ```
 
 **Use Case:** Quick target acquisition from specific camera perspective.
@@ -601,28 +601,20 @@ Command disableVision = swerve.disableVisionCommand();
 
 ---
 
-#### useHumanPlayerCamerasCommand() / useReefCamerasCommand()
-Switch between camera groups for different game areas.
+#### Camera Purpose Control
+Control cameras by their configured purpose using PhotonVision directly:
 
 ```java
-// When near human player station
-Command useHP = swerve.useHumanPlayerCamerasCommand();
+// Enable/disable cameras by purpose
+swerve.vision.enableCamerasWithPurpose(CameraPurpose.ODOMETRY);
+swerve.vision.disableCamerasWithPurpose(CameraPurpose.ALIGNMENT);
 
-// When near scoring area
-Command useReef = swerve.useReefCamerasCommand();
+// Enable/disable specific cameras by name
+swerve.vision.enableCamera("Left");
+swerve.vision.disableCamera("Middle");
 ```
 
-**Use Case:** 2025 Reefscape - switch camera focus based on field position.
-
----
-
-#### disableFrontCamerasCommand() / enableFrontCamerasCommand()
-Control front-facing cameras (LEFT_CAM and RIGHT_CAM).
-
-```java
-Command disableFront = swerve.disableFrontCamerasCommand();
-Command enableFront = swerve.enableFrontCamerasCommand();
-```
+**Use Case:** Switch camera focus based on robot location or operation mode.
 
 ---
 
@@ -722,13 +714,15 @@ Command driveForward = swerve.driveToDistanceCommand(2.0, 1.5); // 2m at 1.5 m/s
 
 ---
 
-#### driveToDistanceFieldOrientedCommand(double distanceInMeters, Translation2d direction, double speedInMetersPerSecond)
-Drives a specific distance in a field-relative direction.
+#### driveToDistanceFieldOrientedCommand(double distanceInMeters, double speedInMetersPerSecond)
+Drives a specific distance using the robot's current field-relative heading.
 
 ```java
-Translation2d northeast = new Translation2d(1, 1).normalize();
-Command driveNE = swerve.driveToDistanceFieldOrientedCommand(3.0, northeast, 2.0);
+// Drive 3 meters at 2 m/s in the direction the robot is currently facing
+Command driveFieldOriented = swerve.driveToDistanceFieldOrientedCommand(3.0, 2.0);
 ```
+
+**Note:** The direction is determined by the robot's heading at the start of the command. Use negative speed to drive backward.
 
 ---
 
@@ -899,7 +893,7 @@ public class RobotContainer {
 
 ```java
 private void configureBindings() {
-  // A button: Aim at AprilTag 7 (reef)
+  // A button: Aim at AprilTag 7
   new JoystickButton(driver, XboxController.Button.kA.value)
     .whileTrue(swerve.aimAtAprilTagCommand(7, 2.0));
 
@@ -984,11 +978,17 @@ public Command getAutonomousCommand() {
 
 ```java
 private void configureBindings() {
-  // Use human player cameras when near HP station (x > 13m)
-  Trigger nearHumanPlayer = swerve.inRegionTrigger(13, 16.5, 0, 8);
-  nearHumanPlayer
-    .onTrue(swerve.useHumanPlayerCamerasCommand())
-    .onFalse(swerve.useReefCamerasCommand());
+  // Switch camera modes based on field region
+  Trigger nearLoadingZone = swerve.inRegionTrigger(13, 16.5, 0, 8);
+  nearLoadingZone
+    .onTrue(Commands.runOnce(() -> {
+        swerve.vision.disableCamerasWithPurpose(CameraPurpose.ODOMETRY);
+        swerve.vision.enableCamerasWithPurpose(CameraPurpose.ALIGNMENT);
+    }))
+    .onFalse(Commands.runOnce(() -> {
+        swerve.vision.enableCamerasWithPurpose(CameraPurpose.ODOMETRY);
+        swerve.vision.disableCamerasWithPurpose(CameraPurpose.ALIGNMENT);
+    }));
 }
 ```
 
