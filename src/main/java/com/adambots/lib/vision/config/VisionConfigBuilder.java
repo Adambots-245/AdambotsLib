@@ -10,10 +10,11 @@ import java.util.List;
 import com.adambots.lib.vision.config.VisionCameraConfig.CameraPurpose;
 
 import static edu.wpi.first.units.Units.*;
-import edu.wpi.first.units.measure.*;
+
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Translation3d;
-import edu.wpi.first.math.util.Units;
+import edu.wpi.first.units.measure.Angle;
+import edu.wpi.first.units.measure.Distance;
 
 /**
  * Fluent builder for creating VisionSystemConfig objects.
@@ -30,27 +31,27 @@ import edu.wpi.first.math.util.Units;
  * // Build the vision configuration
  * VisionSystemConfig config = VisionConfigBuilder.create()
  *     .addCamera("Left")
- *         .positionInches(15, 11.75, 8)
- *         .rotationDegrees(0, 0, -30)
+ *         .position(Inches.of(15), Inches.of(11.75), Inches.of(8))
+ *         .rotation(Degrees.of(0), Degrees.of(0), Degrees.of(-30))
  *         .purpose(CameraPurpose.ODOMETRY)
  *         .allowedTags(SCORING_TAGS)
- *         .singleTagStdDevs(0.5, 0.5, 0.5)
- *         .multiTagStdDevs(0.5, 0.5, 1.0)
+ *         .singleTagStdDevs(Meters.of(0.5), Meters.of(0.5), Radians.of(0.5))
+ *         .multiTagStdDevs(Meters.of(0.5), Meters.of(0.5), Radians.of(1.0))
  *         .done()
  *     .addCamera("Right")
- *         .positionInches(15, -11.75, 8)
- *         .rotationDegrees(0, 0, 30)
+ *         .position(Inches.of(15), Inches.of(-11.75), Inches.of(8))
+ *         .rotation(Degrees.of(0), Degrees.of(0), Degrees.of(30))
  *         .purpose(CameraPurpose.ODOMETRY)
  *         .allowedTags(SCORING_TAGS)
  *         .done()
  *     .addCamera("Middle")
- *         .positionInches(8, 0, 41)
- *         .rotationDegrees(0, -43, 177)
+ *         .position(Inches.of(8), Inches.of(0), Inches.of(41))
+ *         .rotation(Degrees.of(0), Degrees.of(-43), Degrees.of(177))
  *         .purpose(CameraPurpose.ALIGNMENT)
  *         .allowedTags(INTAKE_TAGS)
  *         .done()
  *     .ambiguityThreshold(0.25)
- *     .maxPoseJump(10.0)
+ *     .maxPoseJump(Meters.of(10.0))
  *     .build();
  * }</pre>
  *
@@ -147,8 +148,8 @@ public class VisionConfigBuilder {
      *
      * <p><strong>Required settings:</strong>
      * <ul>
-     *   <li>Position (via positionMeters or positionInches)</li>
-     *   <li>Rotation (via rotationRadians or rotationDegrees)</li>
+     *   <li>Position (via {@link #position(Distance, Distance, Distance)})</li>
+     *   <li>Rotation (via {@link #rotation(Angle, Angle, Angle)})</li>
      * </ul>
      *
      * <p><strong>Optional settings (with defaults):</strong>
@@ -182,64 +183,28 @@ public class VisionConfigBuilder {
         }
 
         /**
-         * Sets the camera position in meters relative to robot center.
+         * Sets the camera position relative to robot center.
          *
          * @param x Forward from robot center (positive = front)
          * @param y Left from robot center (positive = left)
          * @param z Height from floor
          * @return This builder for chaining
          */
-        public CameraBuilder positionMeters(double x, double y, double z) {
-            this.translation = new Translation3d(x, y, z);
+        public CameraBuilder position(Distance x, Distance y, Distance z) {
+            this.translation = new Translation3d(x.in(Meters), y.in(Meters), z.in(Meters));
             return this;
         }
 
         /**
-         * Sets the camera position in inches relative to robot center.
-         * <p>Values are automatically converted to meters.
-         *
-         * @param x Forward from robot center (positive = front)
-         * @param y Left from robot center (positive = left)
-         * @param z Height from floor
-         * @return This builder for chaining
-         */
-        public CameraBuilder positionInches(double x, double y, double z) {
-            this.translation = new Translation3d(
-                Units.inchesToMeters(x),
-                Units.inchesToMeters(y),
-                Units.inchesToMeters(z)
-            );
-            return this;
-        }
-
-        /**
-         * Sets the camera rotation in radians.
+         * Sets the camera rotation.
          *
          * @param roll Rotation around X axis (side-to-side tilt)
          * @param pitch Rotation around Y axis (up/down angle, positive = tilted up)
          * @param yaw Rotation around Z axis (left/right, positive = rotated left)
          * @return This builder for chaining
          */
-        public CameraBuilder rotationRadians(double roll, double pitch, double yaw) {
-            this.rotation = new Rotation3d(roll, pitch, yaw);
-            return this;
-        }
-
-        /**
-         * Sets the camera rotation in degrees.
-         * <p>Values are automatically converted to radians.
-         *
-         * @param roll Rotation around X axis (side-to-side tilt)
-         * @param pitch Rotation around Y axis (up/down angle, positive = tilted up)
-         * @param yaw Rotation around Z axis (left/right, positive = rotated left)
-         * @return This builder for chaining
-         */
-        public CameraBuilder rotationDegrees(double roll, double pitch, double yaw) {
-            this.rotation = new Rotation3d(
-                Units.degreesToRadians(roll),
-                Units.degreesToRadians(pitch),
-                Units.degreesToRadians(yaw)
-            );
+        public CameraBuilder rotation(Angle roll, Angle pitch, Angle yaw) {
+            this.rotation = new Rotation3d(roll.in(Radians), pitch.in(Radians), yaw.in(Radians));
             return this;
         }
 
@@ -257,12 +222,12 @@ public class VisionConfigBuilder {
         /**
          * Sets the standard deviations for single-tag pose estimates.
          *
-         * @param x X position uncertainty in meters
-         * @param y Y position uncertainty in meters
-         * @param theta Rotation uncertainty in radians
+         * @param x X position uncertainty
+         * @param y Y position uncertainty
+         * @param theta Rotation uncertainty
          * @return This builder for chaining
          */
-        public CameraBuilder singleTagStdDevs(double x, double y, double theta) {
+        public CameraBuilder singleTagStdDevs(Distance x, Distance y, Angle theta) {
             this.singleTagStdDevs = new VisionStdDevs(x, y, theta);
             return this;
         }
@@ -281,12 +246,12 @@ public class VisionConfigBuilder {
         /**
          * Sets the standard deviations for multi-tag pose estimates.
          *
-         * @param x X position uncertainty in meters
-         * @param y Y position uncertainty in meters
-         * @param theta Rotation uncertainty in radians
+         * @param x X position uncertainty
+         * @param y Y position uncertainty
+         * @param theta Rotation uncertainty
          * @return This builder for chaining
          */
-        public CameraBuilder multiTagStdDevs(double x, double y, double theta) {
+        public CameraBuilder multiTagStdDevs(Distance x, Distance y, Angle theta) {
             this.multiTagStdDevs = new VisionStdDevs(x, y, theta);
             return this;
         }
@@ -324,12 +289,12 @@ public class VisionConfigBuilder {
         public VisionConfigBuilder done() {
             if (translation == null) {
                 throw new IllegalStateException(
-                    "Camera '" + name + "' position must be set using positionMeters() or positionInches()"
+                    "Camera '" + name + "' position must be set using position()"
                 );
             }
             if (rotation == null) {
                 throw new IllegalStateException(
-                    "Camera '" + name + "' rotation must be set using rotationRadians() or rotationDegrees()"
+                    "Camera '" + name + "' rotation must be set using rotation()"
                 );
             }
 

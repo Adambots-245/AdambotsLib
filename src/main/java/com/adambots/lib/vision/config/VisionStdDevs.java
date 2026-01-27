@@ -4,10 +4,14 @@
 
 package com.adambots.lib.vision.config;
 
+import static edu.wpi.first.units.Units.*;
+
 import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
+import edu.wpi.first.units.measure.Angle;
+import edu.wpi.first.units.measure.Distance;
 
 /**
  * Configuration record for vision measurement standard deviations.
@@ -17,15 +21,15 @@ import edu.wpi.first.math.numbers.N3;
  *
  * <p><strong>Values:</strong>
  * <ul>
- *   <li>{@code x} - X position uncertainty in meters</li>
- *   <li>{@code y} - Y position uncertainty in meters</li>
- *   <li>{@code theta} - Rotation uncertainty in radians</li>
+ *   <li>{@code x} - X position uncertainty</li>
+ *   <li>{@code y} - Y position uncertainty</li>
+ *   <li>{@code theta} - Rotation uncertainty</li>
  * </ul>
  *
  * <p><strong>Usage Example:</strong>
  * <pre>{@code
  * // Create custom std devs
- * VisionStdDevs custom = new VisionStdDevs(0.3, 0.3, 0.2);
+ * VisionStdDevs custom = new VisionStdDevs(Meters.of(0.3), Meters.of(0.3), Radians.of(0.2));
  *
  * // Use presets
  * VisionStdDevs single = VisionStdDevs.DEFAULT_SINGLE_TAG;
@@ -35,41 +39,46 @@ import edu.wpi.first.math.numbers.N3;
  * Matrix<N3, N1> matrix = custom.toMatrix();
  * }</pre>
  *
- * @param x X position uncertainty in meters
- * @param y Y position uncertainty in meters
- * @param theta Rotation uncertainty in radians
+ * @param x X position uncertainty
+ * @param y Y position uncertainty
+ * @param theta Rotation uncertainty
  */
-public record VisionStdDevs(double x, double y, double theta) {
+public record VisionStdDevs(Distance x, Distance y, Angle theta) {
 
     /**
      * Default standard deviations for single AprilTag pose estimates.
      * <p>Conservative values with moderate trust in vision.
      */
-    public static final VisionStdDevs DEFAULT_SINGLE_TAG = new VisionStdDevs(0.5, 0.5, 0.5);
+    public static final VisionStdDevs DEFAULT_SINGLE_TAG =
+        new VisionStdDevs(Meters.of(0.5), Meters.of(0.5), Radians.of(0.5));
 
     /**
      * Default standard deviations for multi-AprilTag pose estimates.
      * <p>Higher rotation uncertainty because multi-tag averaging can introduce rotation errors.
      */
-    public static final VisionStdDevs DEFAULT_MULTI_TAG = new VisionStdDevs(0.5, 0.5, 1.0);
+    public static final VisionStdDevs DEFAULT_MULTI_TAG =
+        new VisionStdDevs(Meters.of(0.5), Meters.of(0.5), Radians.of(1.0));
 
     /**
      * High confidence standard deviations for very reliable measurements.
      * <p>Use when camera is close to tags and seeing multiple tags clearly.
      */
-    public static final VisionStdDevs HIGH_CONFIDENCE = new VisionStdDevs(0.1, 0.1, 0.1);
+    public static final VisionStdDevs HIGH_CONFIDENCE =
+        new VisionStdDevs(Meters.of(0.1), Meters.of(0.1), Radians.of(0.1));
 
     /**
      * Low confidence standard deviations for less reliable measurements.
      * <p>Use for cameras that are far from tags or have poor visibility.
      */
-    public static final VisionStdDevs LOW_CONFIDENCE = new VisionStdDevs(1.0, 1.0, 1.0);
+    public static final VisionStdDevs LOW_CONFIDENCE =
+        new VisionStdDevs(Meters.of(1.0), Meters.of(1.0), Radians.of(1.0));
 
     /**
      * Very low confidence standard deviations.
      * <p>Use when vision measurements should have minimal impact on pose estimation.
      */
-    public static final VisionStdDevs VERY_LOW_CONFIDENCE = new VisionStdDevs(2.0, 2.0, 2.0);
+    public static final VisionStdDevs VERY_LOW_CONFIDENCE =
+        new VisionStdDevs(Meters.of(2.0), Meters.of(2.0), Radians.of(2.0));
 
     /**
      * Converts this standard deviation configuration to a WPILib Matrix.
@@ -77,7 +86,7 @@ public record VisionStdDevs(double x, double y, double theta) {
      * @return Matrix<N3, N1> suitable for use with pose estimators
      */
     public Matrix<N3, N1> toMatrix() {
-        return VecBuilder.fill(x, y, theta);
+        return VecBuilder.fill(x.in(Meters), y.in(Meters), theta.in(Radians));
     }
 
     /**
@@ -87,17 +96,22 @@ public record VisionStdDevs(double x, double y, double theta) {
      * @return VisionStdDevs with values from the matrix
      */
     public static VisionStdDevs fromMatrix(Matrix<N3, N1> matrix) {
-        return new VisionStdDevs(matrix.get(0, 0), matrix.get(1, 0), matrix.get(2, 0));
+        return new VisionStdDevs(
+            Meters.of(matrix.get(0, 0)),
+            Meters.of(matrix.get(1, 0)),
+            Radians.of(matrix.get(2, 0))
+        );
     }
 
     /**
      * Creates a uniform VisionStdDevs where all components have the same value.
+     * <p>The distance value in meters is also used as the theta value in radians.
      *
-     * @param value The value to use for x, y, and theta
+     * @param value The value to use for x, y (and theta in radians)
      * @return VisionStdDevs with uniform uncertainty
      */
-    public static VisionStdDevs uniform(double value) {
-        return new VisionStdDevs(value, value, value);
+    public static VisionStdDevs uniform(Distance value) {
+        return new VisionStdDevs(value, value, Radians.of(value.in(Meters)));
     }
 
     /**
@@ -108,6 +122,10 @@ public record VisionStdDevs(double x, double y, double theta) {
      * @return New VisionStdDevs with scaled values
      */
     public VisionStdDevs scaled(double factor) {
-        return new VisionStdDevs(x * factor, y * factor, theta * factor);
+        return new VisionStdDevs(
+            Meters.of(x.in(Meters) * factor),
+            Meters.of(y.in(Meters) * factor),
+            Radians.of(theta.in(Radians) * factor)
+        );
     }
 }
