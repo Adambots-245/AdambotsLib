@@ -22,15 +22,35 @@ import edu.wpi.first.math.geometry.Translation3d;
  *   <li>{@link CameraPurpose#BOTH} - Camera used for both purposes</li>
  * </ul>
  *
- * <p><strong>Coordinate System:</strong>
- * Uses WPILib coordinate system:
+ * <p><strong>Coordinate System (Top-Down View):</strong>
+ * <pre>
+ *               FRONT OF ROBOT
+ *                     |
+ *                     | +X
+ *                     |
+ *         +Y &lt;--------+--------&gt; -Y
+ *                     |
+ *            (Robot   |
+ *             Center) |
+ *                     | -X
+ *                BACK OF ROBOT
+ * </pre>
+ *
+ * <p><strong>Height (Side View):</strong>
+ * <pre>
+ *     ^ +Z (height from floor)
+ *     |
+ *     |    [CAM] &lt;-- Camera at Z height
+ *     |      |
+ *     |   [ROBOT]
+ * ----+------------- Floor (Z=0)
+ * </pre>
+ *
+ * <p><strong>Rotation:</strong>
  * <ul>
- *   <li>X: Forward from robot center (positive = front)</li>
- *   <li>Y: Left from robot center (positive = left)</li>
- *   <li>Z: Up from floor (positive = up)</li>
- *   <li>Roll: Rotation around X axis</li>
+ *   <li>Roll: Rotation around X axis (side-to-side tilt)</li>
  *   <li>Pitch: Rotation around Y axis (positive = tilted up)</li>
- *   <li>Yaw: Rotation around Z axis (positive = rotated left)</li>
+ *   <li>Yaw: Rotation around Z axis (positive = rotated left, negative = right)</li>
  * </ul>
  *
  * <p><strong>Usage Example:</strong>

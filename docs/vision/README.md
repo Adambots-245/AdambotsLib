@@ -11,11 +11,13 @@ The vision package provides comprehensive PhotonVision integration for FRC robot
 **NEW:** The vision system is now fully configurable for year-to-year reuse. See **[VisionConfiguration.md](VisionConfiguration.md)** for the complete guide.
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // Quick example - define in your Constants file
 VisionSystemConfig config = VisionConfigBuilder.create()
     .addCamera("Left")
-        .positionInches(15, 11.75, 8)
-        .rotationDegrees(0, 0, -30)
+        .position(Inches.of(15), Inches.of(11.75), Inches.of(8))
+        .rotation(Degrees.of(0), Degrees.of(0), Degrees.of(-30))
         .purpose(CameraPurpose.ODOMETRY)
         .allowedTags(SCORING_TAGS)
         .done()
@@ -291,15 +293,17 @@ public class ArmSubsystem extends SubsystemBase {
 Each camera needs a transform (position + rotation) relative to robot center:
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // Use VisionConfigBuilder instead - see VisionConfiguration.md
 VisionConfigBuilder.create()
     .addCamera("Left")
-        .positionInches(15, 11.75, 8)     // X, Y, Z from robot center
-        .rotationDegrees(0, 0, -30)        // Roll, Pitch, Yaw
+        .position(Inches.of(15), Inches.of(11.75), Inches.of(8))     // X, Y, Z from robot center
+        .rotation(Degrees.of(0), Degrees.of(0), Degrees.of(-30))      // Roll, Pitch, Yaw
         .purpose(CameraPurpose.ODOMETRY)
-        .allowedTags(SCORING_TAGS)         // Your game-specific tags
-        .singleTagStdDevs(0.5, 0.5, 0.5)
-        .multiTagStdDevs(0.5, 0.5, 1.0)
+        .allowedTags(SCORING_TAGS)                                     // Your game-specific tags
+        .singleTagStdDevs(Meters.of(0.5), Meters.of(0.5), Radians.of(0.5))
+        .multiTagStdDevs(Meters.of(0.5), Meters.of(0.5), Radians.of(1.0))
         .done()
     .build();
 ```

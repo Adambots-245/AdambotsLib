@@ -26,6 +26,80 @@ The vision configuration system allows teams to fully customize their PhotonVisi
 
 ---
 
+## Coordinate System
+
+Understanding the coordinate system is critical for accurate camera positioning. AdambotsLib uses the WPILib coordinate system.
+
+### Top-Down View (X/Y Axes)
+
+```
+              FRONT OF ROBOT
+                    ↑
+                    │ +X
+                    │
+        +Y ←────────┼────────→ -Y
+                    │
+           (Robot   │
+            Center) │
+                    ↓ -X
+               BACK OF ROBOT
+
+    Example: Camera at X=15", Y=11.75"
+             is 15" forward, 11.75" left
+```
+
+### Side View (Z Axis / Height)
+
+```
+    ↑ +Z (height from floor)
+    │
+    │    ┌─────────┐ ← Camera at Z=8"
+    │    │  CAM    │
+    │    └────┬────┘
+    │         │
+    │   ┌─────┴─────┐
+    │   │   ROBOT   │
+    │   │   FRAME   │
+────┴───┴───────────┴──── Floor (Z=0)
+```
+
+### Rotation: Yaw (Top View)
+
+```
+    Robot Forward (0°)
+           ↑
+           │
+    ←──────┼──────→
+   +Yaw    │    -Yaw
+   (left)  │   (right)
+
+    Example: Yaw = -30° means camera
+             faces 30° to the RIGHT
+```
+
+### Rotation: Pitch (Side View)
+
+```
+    Camera tilted UP (+pitch)
+              ↗
+             /
+    ────────●──────── Level (0°)
+             \
+              ↘
+    Camera tilted DOWN (-pitch)
+```
+
+### Measurement Tips
+
+1. **Find Robot Center**: Typically the center of rotation (where swerve modules pivot)
+2. **Measure X**: Distance forward/backward from center to camera lens
+3. **Measure Y**: Distance left/right from center to camera lens
+4. **Measure Z**: Height from floor to camera lens
+5. **Measure Yaw**: Angle camera faces relative to robot forward
+6. **Measure Pitch**: Up/down tilt of camera
+
+---
+
 ## Quick Start
 
 ### 1. Define Game-Specific Tags (in your Constants file)
@@ -41,29 +115,31 @@ public static final class VisionConstants {
 ### 2. Build Vision Configuration
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 public static final VisionSystemConfig VISION_CONFIG = VisionConfigBuilder.create()
     .addCamera("Left")
-        .positionInches(15, 11.75, 8)      // X, Y, Z from robot center
-        .rotationDegrees(0, 0, -30)         // Roll, Pitch, Yaw
+        .position(Inches.of(15), Inches.of(11.75), Inches.of(8))      // X, Y, Z from robot center
+        .rotation(Degrees.of(0), Degrees.of(0), Degrees.of(-30))       // Roll, Pitch, Yaw
         .purpose(CameraPurpose.ODOMETRY)
         .allowedTags(SCORING_TAGS)
-        .singleTagStdDevs(0.5, 0.5, 0.5)
-        .multiTagStdDevs(0.5, 0.5, 1.0)
+        .singleTagStdDevs(Meters.of(0.5), Meters.of(0.5), Radians.of(0.5))
+        .multiTagStdDevs(Meters.of(0.5), Meters.of(0.5), Radians.of(1.0))
         .done()
     .addCamera("Right")
-        .positionInches(15, -11.75, 8)
-        .rotationDegrees(0, 0, 30)
+        .position(Inches.of(15), Inches.of(-11.75), Inches.of(8))
+        .rotation(Degrees.of(0), Degrees.of(0), Degrees.of(30))
         .purpose(CameraPurpose.ODOMETRY)
         .allowedTags(SCORING_TAGS)
         .done()
     .addCamera("Middle")
-        .positionInches(8, 0, 41)
-        .rotationDegrees(0, -43, 177)
+        .position(Inches.of(8), Inches.of(0), Inches.of(41))
+        .rotation(Degrees.of(0), Degrees.of(-43), Degrees.of(177))
         .purpose(CameraPurpose.ALIGNMENT)
         .allowedTags(ALIGNMENT_TAGS)
         .done()
     .ambiguityThreshold(0.25)
-    .maxPoseJump(10.0)
+    .maxPoseJump(Meters.of(10.0))
     .build();
 ```
 
@@ -144,17 +220,15 @@ VisionConfigBuilder.create()           // Start building
 
 ```java
 .addCamera("CameraName")
-    .positionMeters(x, y, z)           // Position in meters
-    .positionInches(x, y, z)           // Position in inches (auto-converted)
-    .rotationRadians(roll, pitch, yaw) // Rotation in radians
-    .rotationDegrees(roll, pitch, yaw) // Rotation in degrees (auto-converted)
-    .purpose(CameraPurpose)            // Camera purpose (default: BOTH)
-    .singleTagStdDevs(x, y, theta)     // Single tag std devs
-    .singleTagStdDevs(VisionStdDevs)   // Single tag std devs (preset)
-    .multiTagStdDevs(x, y, theta)      // Multi tag std devs
-    .multiTagStdDevs(VisionStdDevs)    // Multi tag std devs (preset)
-    .allowedTags(int... tagIDs)        // Tag filtering
-    .done()                            // Return to VisionConfigBuilder
+    .position(Distance x, Distance y, Distance z)  // Position (use Inches.of() or Meters.of())
+    .rotation(Angle roll, Angle pitch, Angle yaw)  // Rotation (use Degrees.of() or Radians.of())
+    .purpose(CameraPurpose)                        // Camera purpose (default: BOTH)
+    .singleTagStdDevs(Distance x, Distance y, Angle theta)  // Single tag std devs
+    .singleTagStdDevs(VisionStdDevs)               // Single tag std devs (preset)
+    .multiTagStdDevs(Distance x, Distance y, Angle theta)   // Multi tag std devs
+    .multiTagStdDevs(VisionStdDevs)                // Multi tag std devs (preset)
+    .allowedTags(int... tagIDs)                    // Tag filtering
+    .done()                                        // Return to VisionConfigBuilder
 ```
 
 ---
@@ -274,13 +348,13 @@ public static final int[] INTAKE_TAGS = {1, 2, 3, 11, 12, 13};   // New game tag
 ```java
 VisionSystemConfig config = VisionConfigBuilder.create()
     .addCamera("FrontLeft")
-        .positionInches(12, 10, 8)
-        .rotationDegrees(0, -15, -30)
+        .position(Inches.of(12), Inches.of(10), Inches.of(8))
+        .rotation(Degrees.of(0), Degrees.of(-15), Degrees.of(-30))
         .purpose(CameraPurpose.BOTH)
         .done()
     .addCamera("FrontRight")
-        .positionInches(12, -10, 8)
-        .rotationDegrees(0, -15, 30)
+        .position(Inches.of(12), Inches.of(-10), Inches.of(8))
+        .rotation(Degrees.of(0), Degrees.of(-15), Degrees.of(30))
         .purpose(CameraPurpose.BOTH)
         .done()
     .build();
@@ -292,19 +366,19 @@ VisionSystemConfig config = VisionConfigBuilder.create()
 VisionSystemConfig config = VisionConfigBuilder.create()
     // Wide-angle cameras for odometry
     .addCamera("OdometryLeft")
-        .positionInches(10, 12, 6)
-        .rotationDegrees(0, 0, -45)
+        .position(Inches.of(10), Inches.of(12), Inches.of(6))
+        .rotation(Degrees.of(0), Degrees.of(0), Degrees.of(-45))
         .purpose(CameraPurpose.ODOMETRY)
         .done()
     .addCamera("OdometryRight")
-        .positionInches(10, -12, 6)
-        .rotationDegrees(0, 0, 45)
+        .position(Inches.of(10), Inches.of(-12), Inches.of(6))
+        .rotation(Degrees.of(0), Degrees.of(0), Degrees.of(45))
         .purpose(CameraPurpose.ODOMETRY)
         .done()
     // Narrow camera for scoring alignment
     .addCamera("ScoringCam")
-        .positionInches(14, 0, 24)
-        .rotationDegrees(0, -30, 0)
+        .position(Inches.of(14), Inches.of(0), Inches.of(24))
+        .rotation(Degrees.of(0), Degrees.of(-30), Degrees.of(0))
         .purpose(CameraPurpose.ALIGNMENT)
         .allowedTags(SCORING_TAGS)
         .done()
@@ -330,15 +404,15 @@ List<VisionCamera> odometryCameras = vision.getCamerasWithPurpose(CameraPurpose.
 ```java
 VisionSystemConfig config = VisionConfigBuilder.create()
     .addCamera("HighConfidenceCam")
-        .positionInches(8, 0, 12)
-        .rotationDegrees(0, -20, 0)
+        .position(Inches.of(8), Inches.of(0), Inches.of(12))
+        .rotation(Degrees.of(0), Degrees.of(-20), Degrees.of(0))
         .purpose(CameraPurpose.ODOMETRY)
         .singleTagStdDevs(VisionStdDevs.HIGH_CONFIDENCE)
-        .multiTagStdDevs(new VisionStdDevs(0.05, 0.05, 0.1))
+        .multiTagStdDevs(Meters.of(0.05), Meters.of(0.05), Radians.of(0.1))
         .done()
     .addCamera("LowConfidenceCam")
-        .positionInches(-6, 0, 30)
-        .rotationDegrees(0, -45, 180)
+        .position(Inches.of(-6), Inches.of(0), Inches.of(30))
+        .rotation(Degrees.of(0), Degrees.of(-45), Degrees.of(180))
         .purpose(CameraPurpose.ODOMETRY)
         .singleTagStdDevs(VisionStdDevs.LOW_CONFIDENCE)
         .multiTagStdDevs(VisionStdDevs.DEFAULT_MULTI_TAG)

@@ -185,6 +185,21 @@ public class VisionConfigBuilder {
         /**
          * Sets the camera position relative to robot center.
          *
+         * <p><strong>Coordinate System (Top-Down View):</strong>
+         * <pre>
+         *               FRONT OF ROBOT
+         *                     |
+         *                     | +X
+         *         +Y &lt;--------+--------&gt; -Y
+         *                     |
+         *            (Robot   | -X
+         *             Center)
+         *                BACK OF ROBOT
+         *
+         *     Example: position(Inches.of(15), Inches.of(11.75), Inches.of(8))
+         *              = 15" forward, 11.75" left, 8" high
+         * </pre>
+         *
          * @param x Forward from robot center (positive = front)
          * @param y Left from robot center (positive = left)
          * @param z Height from floor
@@ -197,6 +212,19 @@ public class VisionConfigBuilder {
 
         /**
          * Sets the camera rotation.
+         *
+         * <p><strong>Yaw Direction (Top-Down View):</strong>
+         * <pre>
+         *         Robot Forward (0 deg)
+         *                |
+         *                |
+         *     &lt;----------+----------&gt;
+         *    +Yaw        |        -Yaw
+         *    (left)      |       (right)
+         *
+         *     Example: rotation(Degrees.of(0), Degrees.of(0), Degrees.of(-30))
+         *              = camera faces 30 deg to the RIGHT
+         * </pre>
          *
          * @param roll Rotation around X axis (side-to-side tilt)
          * @param pitch Rotation around Y axis (up/down angle, positive = tilted up)
