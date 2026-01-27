@@ -431,9 +431,11 @@ public class SwerveSubsystem extends SubsystemBase {
   public void periodic() {
     // This method will be called once per scheduler run
 
-    // When vision is enabled we must manually update odometry in SwerveDrive
+    // Always update odometry
+    swerveDrive.updateOdometry();
+
+    // Vision pose estimation only when vision is configured
     if (visionDriveTest && vision != null) {
-      swerveDrive.updateOdometry();
       vision.updatePoseEstimation(swerveDrive);
     }
 
