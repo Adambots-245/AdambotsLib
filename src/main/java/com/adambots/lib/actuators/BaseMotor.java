@@ -212,18 +212,20 @@ public interface BaseMotor extends BaseActuator{
      *
      * <p><strong>Example:</strong>
      * <pre>{@code
+     * import static edu.wpi.first.units.Units.*;
+     *
      * // NEO on drive motor - conservative limits
-     * motor.configureCurrentLimits(40, 60, 5000);
+     * motor.configureCurrentLimits(Amps.of(40), Amps.of(60), 5000);
      *
      * // TalonFX on shooter - allow higher free-spin current
-     * motor.configureCurrentLimits(60, 120, 3000);
+     * motor.configureCurrentLimits(Amps.of(60), Amps.of(120), 3000);
      * }</pre>
      *
-     * @param stallLimitAmps Current limit when motor is under heavy load (amperes)
-     * @param freeLimitAmps Current limit when motor is spinning freely (amperes)
+     * @param stallLimit Current limit when motor is under heavy load
+     * @param freeLimit Current limit when motor is spinning freely
      * @param limitRpmThreshold RPM threshold below which stall limit applies
      */
-    void configureCurrentLimits(double stallLimitAmps, double freeLimitAmps, double limitRpmThreshold);
+    void configureCurrentLimits(Current stallLimit, Current freeLimit, double limitRpmThreshold);
 
     /**
      * Configures software (virtual) position limits to prevent mechanism damage.
@@ -341,12 +343,14 @@ public interface BaseMotor extends BaseActuator{
      *
      * <p><strong>Example:</strong>
      * <pre>{@code
-     * motor.enableVoltageCompensation(12.0);  // Compensate to 12V nominal
+     * import static edu.wpi.first.units.Units.*;
+     *
+     * motor.enableVoltageCompensation(Volts.of(12.0));  // Compensate to 12V nominal
      * }</pre>
      *
-     * @param voltageNominal Nominal voltage to compensate to, typically 12.0 volts
+     * @param nominalVoltage Nominal voltage to compensate to, typically 12V
      */
-    void enableVoltageCompensation(double voltageNominal);
+    void enableVoltageCompensation(Voltage nominalVoltage);
 
     /**
      * Gets the current motor position from the encoder.

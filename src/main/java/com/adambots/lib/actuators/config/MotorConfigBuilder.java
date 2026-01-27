@@ -20,7 +20,7 @@ import edu.wpi.first.units.measure.*;
  *     .currentLimits(40, 60, 5000)
  *     .motionMagic(50.0, 100.0, 200.0)
  *     .brakeMode(true)
- *     .voltageCompensation(12.0)
+ *     .voltageCompensation(Volts.of(12.0))
  *     .apply();
  *
  * // Minimal configuration for a simple mechanism
@@ -126,7 +126,7 @@ public class MotorConfigBuilder {
      * @param limitRpm RPM threshold below which stall limit applies
      * @return This builder for chaining
      */
-    public MotorConfigBuilder currentLimits(int stallAmps, int freeAmps, int limitRpm) {
+    public MotorConfigBuilder currentLimits(double stallAmps, double freeAmps, int limitRpm) {
         this.currentLimitConfig = CurrentLimitConfig.fromAmps(stallAmps, freeAmps, limitRpm);
         return this;
     }
@@ -195,12 +195,12 @@ public class MotorConfigBuilder {
      * <p><strong>REV Motors (NEO, NEO 550):</strong>
      * This method works correctly for REV motors and properly compensates for battery droop.
      *
-     * @param voltage Nominal voltage to compensate to (typically 12.0)
+     * @param voltage Nominal voltage to compensate to (typically 12V)
      * @return This builder for chaining
      */
-    public MotorConfigBuilder voltageCompensation(double voltage) {
+    public MotorConfigBuilder voltageCompensation(Voltage voltage) {
         this.voltageCompensation = true;
-        this.voltageCompensationValue = voltage;
+        this.voltageCompensationValue = voltage.in(Volts);
         return this;
     }
 
@@ -225,8 +225,8 @@ public class MotorConfigBuilder {
         }
         if (currentLimitConfig != null) {
             motor.configureCurrentLimits(
-                currentLimitConfig.stallLimitAmps(),
-                currentLimitConfig.freeLimitAmps(),
+                currentLimitConfig.stallLimit(),
+                currentLimitConfig.freeLimit(),
                 currentLimitConfig.limitRpmThreshold()
             );
         }
@@ -241,7 +241,7 @@ public class MotorConfigBuilder {
             motor.setBrakeMode(brakeMode);
         }
         if (voltageCompensation != null && voltageCompensation) {
-            motor.enableVoltageCompensation(voltageCompensationValue);
+            motor.enableVoltageCompensation(Volts.of(voltageCompensationValue));
         }
     }
 }

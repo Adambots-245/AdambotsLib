@@ -45,7 +45,7 @@ public record CurrentLimitConfig(
      * @param limitRpmThreshold RPM threshold below which stall limit applies
      * @return A new CurrentLimitConfig instance
      */
-    public static CurrentLimitConfig fromAmps(int stallLimitAmps, int freeLimitAmps, int limitRpmThreshold) {
+    public static CurrentLimitConfig fromAmps(double stallLimitAmps, double freeLimitAmps, int limitRpmThreshold) {
         return new CurrentLimitConfig(
             Amps.of(stallLimitAmps),
             Amps.of(freeLimitAmps),

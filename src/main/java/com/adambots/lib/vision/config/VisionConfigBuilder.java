@@ -9,6 +9,8 @@ import java.util.List;
 
 import com.adambots.lib.vision.config.VisionCameraConfig.CameraPurpose;
 
+import static edu.wpi.first.units.Units.*;
+import edu.wpi.first.units.measure.*;
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.util.Units;
@@ -99,15 +101,15 @@ public class VisionConfigBuilder {
     }
 
     /**
-     * Sets the maximum allowed pose jump in meters.
+     * Sets the maximum allowed pose jump.
      * <p>Pose estimates that would move the robot more than this distance
      * in a single frame are filtered as outliers.
      *
-     * @param meters Maximum pose jump in meters
+     * @param distance Maximum pose jump distance
      * @return This builder for chaining
      */
-    public VisionConfigBuilder maxPoseJump(double meters) {
-        this.maxPoseJumpMeters = meters;
+    public VisionConfigBuilder maxPoseJump(Distance distance) {
+        this.maxPoseJumpMeters = distance.in(Meters);
         return this;
     }
 

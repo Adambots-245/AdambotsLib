@@ -332,12 +332,12 @@ public class TalonFXMotor implements BaseMotor {
     /**
      * Configures current limiting to protect the motor and battery.
      *
-     * @param stallLimitAmps Stator current limit when motor is under heavy load (amperes)
-     * @param freeLimitAmps Supply current limit when motor is spinning freely (amperes)
+     * @param stallLimit Stator current limit when motor is under heavy load
+     * @param freeLimit Supply current limit when motor is spinning freely
      * @param limitRpmThreshold RPM threshold below which stall limit applies (not used by TalonFX)
      */
     @Override
-    public void configureCurrentLimits(double stallLimitAmps, double freeLimitAmps, double limitRpmThreshold) {
+    public void configureCurrentLimits(Current stallLimit, Current freeLimit, double limitRpmThreshold) {
         var config = new CurrentLimitsConfigs();
 
         // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
@@ -348,9 +348,9 @@ public class TalonFXMotor implements BaseMotor {
                 "). Configuration may be factory defaulted!", true);
         }
 
-        config.withStatorCurrentLimit(stallLimitAmps)
+        config.withStatorCurrentLimit(stallLimit.in(Amps))
                 .withStatorCurrentLimitEnable(true)
-                .withSupplyCurrentLimit(freeLimitAmps)
+                .withSupplyCurrentLimit(freeLimit.in(Amps))
                 .withSupplyCurrentLimitEnable(true);
 
         boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
@@ -505,12 +505,12 @@ public class TalonFXMotor implements BaseMotor {
      * This helps maintain consistent motor performance regardless of battery
      * voltage fluctuations.
      *
-     * @param voltage The voltage to compensate to (in volts).
+     * @param nominalVoltage The voltage to compensate to.
      *                The motor will scale its output to maintain consistent
      *                behavior at this voltage level.
      */
     @Override
-    public void enableVoltageCompensation(double voltage) {
+    public void enableVoltageCompensation(Voltage nominalVoltage) {
         // NOTE: This method is deprecated and does NOT provide proper voltage compensation in Phoenix 6.
         // Setting PeakForwardVoltage/PeakReverseVoltage just caps the voltage output,
         // it does NOT compensate for battery droop like WPILib voltage compensation does.

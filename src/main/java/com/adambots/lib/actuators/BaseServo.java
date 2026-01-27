@@ -1,5 +1,8 @@
 package com.adambots.lib.actuators;
 
+import static edu.wpi.first.units.Units.*;
+import edu.wpi.first.units.measure.*;
+
 /**
  * Base interface for servo controllers in FRC robotics.
  *
@@ -87,9 +90,9 @@ public interface BaseServo extends BaseActuator{
 
     /**
      * Gets the current being drawn by the servo.
-     * @return The current in amps
+     * @return The current draw
      */
-    double getCurrent();
+    Current getCurrent();
 
     /**
      * For Angular mode: Sets the angle of the servo.
@@ -100,14 +103,16 @@ public interface BaseServo extends BaseActuator{
      *
      * <p><strong>Example:</strong>
      * <pre>{@code
+     * import static edu.wpi.first.units.Units.*;
+     *
      * if (servo.supportsAngleControl()) {
-     *     servo.setAngle(90.0);
+     *     servo.setAngle(Degrees.of(90.0));
      * }
      * }</pre>
      *
-     * @param degrees The angle in degrees (0-355 for Axon Max+, 0-180 for standard servos)
+     * @param angle The target angle (0-355° for Axon Max+, 0-180° for standard servos)
      */
-    default void setAngle(double degrees) {
+    default void setAngle(Angle angle) {
         if (!supportsAngleControl()) {
             edu.wpi.first.wpilibj.DriverStation.reportWarning(
                 getServoType() + ": Angle control not supported in " + getMode() + " mode. Call ignored.", false);
@@ -141,7 +146,7 @@ public interface BaseServo extends BaseActuator{
     /**
      * Checks if this servo supports angle control.
      *
-     * <p>Use this method to determine if {@link #setAngle(double)} is supported
+     * <p>Use this method to determine if {@link #setAngle(Angle)} is supported
      * before calling it to avoid unnecessary warnings.
      *
      * @return True if this servo supports angle control (Angular mode), false otherwise

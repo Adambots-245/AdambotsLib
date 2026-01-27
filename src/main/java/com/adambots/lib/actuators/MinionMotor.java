@@ -19,7 +19,6 @@ import com.ctre.phoenix6.configs.MotorOutputConfigs;
 import com.ctre.phoenix6.configs.HardwareLimitSwitchConfigs;
 import com.ctre.phoenix6.configs.Slot0Configs;
 import com.ctre.phoenix6.configs.TalonFXSConfigurator;
-import com.ctre.phoenix6.configs.VoltageConfigs;
 
 import static edu.wpi.first.units.Units.*;
 import edu.wpi.first.units.measure.*;
@@ -164,7 +163,7 @@ public class MinionMotor implements BaseMotor {
     }
 
     @Override
-    public void configureCurrentLimits(double stallLimitAmps, double freeLimitAmps, double limitRpmThreshold) {
+    public void configureCurrentLimits(Current stallLimit, Current freeLimit, double limitRpmThreshold) {
         CurrentLimitsConfigs configs = new CurrentLimitsConfigs();
 
         // CRITICAL: Check if refresh fails
@@ -174,6 +173,9 @@ public class MinionMotor implements BaseMotor {
                 "MinionMotor: Failed to refresh config before configureCurrentLimits (Status: " + refreshStatus +
                 "). Configuration may be factory defaulted!", true);
         }
+
+        double stallLimitAmps = stallLimit.in(Amps);
+        double freeLimitAmps = freeLimit.in(Amps);
 
         // Set new values - note that Phoenix 6 has different terminology
         configs.StatorCurrentLimit = stallLimitAmps;
@@ -296,7 +298,7 @@ public class MinionMotor implements BaseMotor {
     }
 
     @Override
-    public void enableVoltageCompensation(double voltage) {
+    public void enableVoltageCompensation(Voltage nominalVoltage) {
         // NOTE: This method is deprecated and does NOT provide proper voltage compensation in Phoenix 6.
         // Setting PeakForwardVoltage/PeakReverseVoltage just caps the voltage output,
         // it does NOT compensate for battery droop like WPILib voltage compensation does.

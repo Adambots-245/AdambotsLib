@@ -178,11 +178,11 @@ public class NEOMotor implements BaseMotor {
      *
      * @param stallLimit The stall current limit.
      * @param freeLimit  The free current limit.
-     * @param limitRPM   The RPM limit for current limiting.
+     * @param limitRpmThreshold The RPM limit for current limiting.
      */
     @Override
-    public void configureCurrentLimits(double stallLimitAmps, double freeLimitAmps, double limitRpmThreshold) {
-        config.smartCurrentLimit((int) stallLimitAmps, (int) freeLimitAmps, (int) limitRpmThreshold);
+    public void configureCurrentLimits(Current stallLimit, Current freeLimit, double limitRpmThreshold) {
+        config.smartCurrentLimit((int) stallLimit.in(Amps), (int) freeLimit.in(Amps), (int) limitRpmThreshold);
         // NO PERSIST during runtime - avoid blocking flash writes
         motor.configure(config, ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
     }
@@ -252,11 +252,11 @@ public class NEOMotor implements BaseMotor {
     /**
      * Enables voltage compensation for the motor.
      *
-     * @param voltage The voltage to compensate to.
+     * @param nominalVoltage The voltage to compensate to.
      */
     @Override
-    public void enableVoltageCompensation(double voltage) {
-        config.voltageCompensation(voltage);
+    public void enableVoltageCompensation(Voltage nominalVoltage) {
+        config.voltageCompensation(nominalVoltage.in(Volts));
         // NO PERSIST during runtime - avoid blocking flash writes
         motor.configure(config, ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
     }

@@ -12,6 +12,9 @@ import com.revrobotics.servohub.ServoHub.Bank;
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.simulation.PWMSim;
 
+import static edu.wpi.first.units.Units.*;
+import edu.wpi.first.units.measure.*;
+
 /**
  * A servo class for servos plugged into a REV ServoHub for Continuous Rotation (CR) mode.
  * 
@@ -161,10 +164,10 @@ public class CRHubServo implements BaseServo {
     }
 
     @Override
-    public double getCurrent() {
+    public Current getCurrent() {
         if (isSim) {
-            return 0.0;  // Simulation doesn't provide current feedback
+            return Amps.of(0.0);  // Simulation doesn't provide current feedback
         }
-        return channel.getCurrent();
+        return Amps.of(channel.getCurrent());
     }
 }

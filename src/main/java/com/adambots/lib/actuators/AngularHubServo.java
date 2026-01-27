@@ -5,6 +5,9 @@ import com.revrobotics.servohub.ServoChannel;
 import com.revrobotics.servohub.ServoChannel.ChannelId;
 import com.revrobotics.servohub.ServoHub.Bank;
 
+import static edu.wpi.first.units.Units.*;
+import edu.wpi.first.units.measure.*;
+
 /**
  * A servo class for servos plugged into a REV ServoHub for Angular mode.
  * On Servos like Axon Max+, it is called Servo mode and needs to be set in the Axon Programmer tool.
@@ -106,20 +109,21 @@ public class AngularHubServo implements BaseServo {
     }
 
     @Override
-    public double getCurrent() {
-        return channel.getCurrent();
+    public Current getCurrent() {
+        return Amps.of(channel.getCurrent());
     }
 
     @Override
-    public void setAngle(double degrees) {
+    public void setAngle(Angle angle) {
+        double degrees = angle.in(Degrees);
         // Validate and clamp to valid range
         double originalDegrees = degrees;
         degrees = Math.min(maxAngle, Math.max(0, degrees));
 
         if (degrees != originalDegrees) {
             edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "AngularHubServo: Angle " + originalDegrees + " out of range [0, " +
-                maxAngle + "]. Clamping to " + degrees + ".", false);
+                "AngularHubServo: Angle " + originalDegrees + "° out of range [0°, " +
+                maxAngle + "°]. Clamping to " + degrees + "°.", false);
         }
 
         // Map angle to pulse width

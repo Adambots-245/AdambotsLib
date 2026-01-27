@@ -2,6 +2,9 @@ package com.adambots.lib.actuators;
 
 import edu.wpi.first.wpilibj.Servo;
 
+import static edu.wpi.first.units.Units.*;
+import edu.wpi.first.units.measure.*;
+
 public class DirectServo implements BaseServo {
     private final Servo servo;
     private final ServoMode mode;
@@ -35,10 +38,10 @@ public class DirectServo implements BaseServo {
      * Creates a new DirectServo with custom angle range
      * @param channel The PWM channel this servo is connected to (0-19 on RoboRIO 2)
      * @param mode The servo mode (CONTINUOUS_ROTATION or ANGULAR)
-     * @param minAngle Minimum angle in degrees
-     * @param maxAngle Maximum angle in degrees
+     * @param minAngle Minimum angle
+     * @param maxAngle Maximum angle
      */
-    public DirectServo(int channel, ServoMode mode, double minAngle, double maxAngle) {
+    public DirectServo(int channel, ServoMode mode, Angle minAngle, Angle maxAngle) {
         // Validate PWM channel range (0-19 for RoboRIO 2)
         if (channel < 0 || channel > 19) {
             edu.wpi.first.wpilibj.DriverStation.reportWarning(
@@ -51,18 +54,20 @@ public class DirectServo implements BaseServo {
 
     /**
      * Sets the angle range for the servo
-     * @param minAngle Minimum angle in degrees
-     * @param maxAngle Maximum angle in degrees
+     * @param minAngle Minimum angle
+     * @param maxAngle Maximum angle
      */
-    public void setAngleRange(double minAngle, double maxAngle) {
-        if (maxAngle <= minAngle) {
+    public void setAngleRange(Angle minAngle, Angle maxAngle) {
+        double minDegrees = minAngle.in(Degrees);
+        double maxDegrees = maxAngle.in(Degrees);
+        if (maxDegrees <= minDegrees) {
             edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "DirectServo: maxAngle (" + maxAngle + ") must be greater than minAngle (" +
-                minAngle + "). Ignoring setAngleRange() call.", false);
+                "DirectServo: maxAngle (" + maxDegrees + "°) must be greater than minAngle (" +
+                minDegrees + "°). Ignoring setAngleRange() call.", false);
             return;
         }
-        this.minAngle = minAngle;
-        this.maxAngle = maxAngle;
+        this.minAngle = minDegrees;
+        this.maxAngle = maxDegrees;
         updateCenterAngle();
     }
 
@@ -140,22 +145,23 @@ public class DirectServo implements BaseServo {
     }
 
     @Override
-    public double getCurrent() {
+    public Current getCurrent() {
         // WPILib Servo class doesn't provide current monitoring
-        return 0.0;
+        return Amps.of(0.0);
     }
 
     @Override
-    public void setAngle(double degrees) {
+    public void setAngle(Angle angle) {
         if (mode == ServoMode.ANGULAR) {
+            double degrees = angle.in(Degrees);
             // Validate and clamp to valid range
             double originalDegrees = degrees;
             degrees = Math.min(maxAngle, Math.max(minAngle, degrees));
 
             if (degrees != originalDegrees) {
                 edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                    "DirectServo: Angle " + originalDegrees + " out of range [" +
-                    minAngle + ", " + maxAngle + "]. Clamping to " + degrees + ".", false);
+                    "DirectServo: Angle " + originalDegrees + "° out of range [" +
+                    minAngle + "°, " + maxAngle + "°]. Clamping to " + degrees + "°.", false);
             }
 
             // Map the custom angle range to WPILib's 0-180 range
@@ -163,7 +169,7 @@ public class DirectServo implements BaseServo {
             servo.setAngle(normalizedAngle);
         } else {
             // Use BaseServo's graceful fallback
-            BaseServo.super.setAngle(degrees);
+            BaseServo.super.setAngle(angle);
         }
     }
 
@@ -176,41 +182,41 @@ public class DirectServo implements BaseServo {
     }
 
     /**
-     * Gets the current angle in degrees (only valid in ANGULAR mode)
-     * @return The current angle in the configured range, or 0.0 if in CR mode
+     * Gets the current angle (only valid in ANGULAR mode)
+     * @return The current angle in the configured range, or 0° if in CR mode
      */
-    public double getAngle() {
+    public Angle getAngle() {
         if (mode == ServoMode.ANGULAR) {
             // Convert from WPILib's 0-180 range back to our custom range
             double wpiLibAngle = servo.getAngle();
-            return minAngle + (wpiLibAngle / 180.0) * (maxAngle - minAngle);
+            return Degrees.of(minAngle + (wpiLibAngle / 180.0) * (maxAngle - minAngle));
         }
         edu.wpi.first.wpilibj.DriverStation.reportWarning(
-            "DirectServo: Angle reading not supported in CR mode. Returning 0.0.", false);
-        return 0.0;
+            "DirectServo: Angle reading not supported in CR mode. Returning 0°.", false);
+        return Degrees.of(0.0);
     }
 
     /**
      * Gets the minimum configured angle
-     * @return The minimum angle in degrees
+     * @return The minimum angle
      */
-    public double getMinAngle() {
-        return minAngle;
+    public Angle getMinAngle() {
+        return Degrees.of(minAngle);
     }
 
     /**
      * Gets the maximum configured angle
-     * @return The maximum angle in degrees
+     * @return The maximum angle
      */
-    public double getMaxAngle() {
-        return maxAngle;
+    public Angle getMaxAngle() {
+        return Degrees.of(maxAngle);
     }
 
     /**
      * Gets the center angle
-     * @return The center angle in degrees
+     * @return The center angle
      */
-    public double getCenterAngle() {
-        return centerAngle;
+    public Angle getCenterAngle() {
+        return Degrees.of(centerAngle);
     }
 }
