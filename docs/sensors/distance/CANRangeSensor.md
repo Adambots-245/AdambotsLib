@@ -29,51 +29,26 @@ BaseDistanceSensor sensor = new CANRangeSensor(10, true);
 
 ## Methods
 
-### getDistanceInCentimeters()
+### getDistance()
 
 ```java
-public double getDistanceInCentimeters()
+public Distance getDistance()
 ```
 
-Returns distance in centimeters (converted from meters).
+Returns distance as a WPILib `Distance` type.
 
-**Returns:** Distance in cm
+**Returns:** Distance measurement
 
----
-
-### getDistanceInInches()
-
+**Usage:**
 ```java
-public double getDistanceInInches()
+import static edu.wpi.first.units.Units.*;
+
+Distance distance = sensor.getDistance();
+double cm = distance.in(Centimeters);
+double inches = distance.in(Inches);
+double feet = distance.in(Feet);
+double meters = distance.in(Meters);
 ```
-
-Returns distance in inches (converted from meters).
-
-**Returns:** Distance in inches
-
----
-
-### getDistanceInFeet()
-
-```java
-public double getDistanceInFeet()
-```
-
-Returns distance in feet (converted from meters).
-
-**Returns:** Distance in feet
-
----
-
-### getRawDistance()
-
-```java
-public double getRawDistance()
-```
-
-Returns raw distance in meters.
-
-**Returns:** Distance in meters
 
 ## Simulation Support
 

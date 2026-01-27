@@ -141,16 +141,16 @@ motor.setPID(0, 0.5, 0.0001, 0.1, 0.0);
 ### Motion Magic Configuration
 
 ```java
-void configureMotionMagic(double cruiseVelocityRPS,
-                         double accelerationRPSPerSec,
+void configureMotionMagic(AngularVelocity cruiseVelocity,
+                         AngularAcceleration acceleration,
                          double jerkRPSPerSecPerSec)
 ```
 
-**Description:** Configures Motion Magic trapezoidal motion profiling parameters.
+**Description:** Configures Motion Magic trapezoidal motion profiling parameters using WPILib typed units.
 
 **Parameters:**
-- `cruiseVelocityRPS` - Maximum velocity during motion (rotations per second)
-- `accelerationRPSPerSec` - Acceleration rate (rotations per second²)
+- `cruiseVelocity` - Maximum velocity during motion (AngularVelocity type)
+- `acceleration` - Acceleration rate (AngularAcceleration type)
 - `jerkRPSPerSecPerSec` - Jerk limiting (rotations per second³, 0 to disable)
 
 **Parameter Guidance:**
@@ -160,17 +160,28 @@ void configureMotionMagic(double cruiseVelocityRPS,
 
 **Examples:**
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // Elevator motion profile
-motor.configureMotionMagic(50.0, 150.0, 500.0);
-// 50 RPS cruise, 150 RPS² accel, 500 RPS³ jerk
+motor.configureMotionMagic(
+    RotationsPerSecond.of(50),           // 50 RPS cruise
+    RotationsPerSecondPerSecond.of(150), // 150 RPS² accel
+    500.0                                 // 500 RPS³ jerk
+);
 
 // Fast arm movement
-motor.configureMotionMagic(100.0, 400.0, 0.0);
-// 100 RPS cruise, 400 RPS² accel, no jerk limiting
+motor.configureMotionMagic(
+    RotationsPerSecond.of(100),          // 100 RPS cruise
+    RotationsPerSecondPerSecond.of(400), // 400 RPS² accel
+    0.0                                   // no jerk limiting
+);
 
 // Smooth drivetrain
-motor.configureMotionMagic(80.0, 160.0, 800.0);
-// 80 RPS cruise, 160 RPS² accel, 800 RPS³ jerk
+motor.configureMotionMagic(
+    RotationsPerSecond.of(80),           // 80 RPS cruise
+    RotationsPerSecondPerSecond.of(160), // 160 RPS² accel
+    800.0                                 // 800 RPS³ jerk
+);
 ```
 
 ---
@@ -406,38 +417,57 @@ double getPosition()
 ---
 
 ```java
-double getVelocity()
+AngularVelocity getVelocity()
 ```
 
-**Returns:** Current motor velocity in rotations per second (RPS).
+**Returns:** Current motor velocity as a WPILib `AngularVelocity` type.
 
-**BREAKING CHANGE (v2026.2.0):** All motors now return RPS instead of RPM. NEOMotor previously returned RPM.
+**BREAKING CHANGE (v2026.2.0):** All motors now return typed units instead of raw doubles.
 
-**Conversion:**
+**Usage:**
 ```java
-double rps = motor.getVelocity();
-double rpm = rps * 60.0;  // Convert RPS to RPM if needed
+import static edu.wpi.first.units.Units.*;
+
+AngularVelocity velocity = motor.getVelocity();
+double rps = velocity.in(RotationsPerSecond);  // rotations per second
+double rpm = velocity.in(RPM);                  // revolutions per minute
 ```
 
 ---
 
 ```java
-double getAcceleration()
+AngularAcceleration getAcceleration()
 ```
 
-**Returns:** Current motor acceleration in rotations per second² (0 if not supported).
+**Returns:** Current motor acceleration as a WPILib `AngularAcceleration` type.
 
-**Note:** NEO motors do not support acceleration measurement.
+**Note:** NEO motors do not support acceleration measurement (returns zero).
+
+**Usage:**
+```java
+import static edu.wpi.first.units.Units.*;
+
+AngularAcceleration accel = motor.getAcceleration();
+double rpsPerSec = accel.in(RotationsPerSecondPerSecond);
+```
 
 ---
 
 ### Electrical Monitoring
 
 ```java
-double getCurrentDraw()
+Current getCurrentDraw()
 ```
 
-**Returns:** Current draw in amperes.
+**Returns:** Current draw as a WPILib `Current` type.
+
+**Usage:**
+```java
+import static edu.wpi.first.units.Units.*;
+
+Current current = motor.getCurrentDraw();
+double amps = current.in(Amps);
+```
 
 **Use Cases:**
 - Detect motor stalls

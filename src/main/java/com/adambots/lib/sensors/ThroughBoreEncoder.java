@@ -8,6 +8,8 @@ import com.adambots.lib.utils.Utils;
 
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.DutyCycleEncoder;
+import edu.wpi.first.units.measure.Angle;
+import static edu.wpi.first.units.Units.*;
 
 /**
  * REV Through Bore Encoder implementation using DutyCycle encoding.
@@ -26,16 +28,17 @@ import edu.wpi.first.wpilibj.DutyCycleEncoder;
  *
  * <p><strong>Usage Example:</strong>
  * <pre>{@code
+ * import static edu.wpi.first.units.Units.*;
+ *
  * BaseAbsoluteEncoder armEncoder = new ThroughBoreEncoder(5);  // DIO port 5
  *
- * // Get absolute position (0-1 rotation)
- * double position = armEncoder.getAbsolutePositionDegrees();
- *
- * // Get position in radians
- * double radians = armEncoder.getAbsolutePositionRadians();
+ * // Get absolute position
+ * Angle position = armEncoder.getPosition();
+ * double degrees = position.in(Degrees);
+ * double radians = position.in(Radians);
  *
  * // Get as Rotation2d for use with WPILib kinematics
- * Rotation2d rotation = armEncoder.getAbsolutePositionRotation2D();
+ * Rotation2d rotation = armEncoder.getPositionRotation2d();
  * }</pre>
  *
  * <p><strong>Wiring:</strong>
@@ -64,18 +67,23 @@ public class ThroughBoreEncoder implements BaseAbsoluteEncoder {
         encoder = new DutyCycleEncoder(encoderPort);
     }
 
+    /**
+     * Returns the absolute position of the encoder.
+     *
+     * @return Absolute position (use .in(Degrees) or .in(Radians) to convert)
+     */
     @Override
-    public double getAbsolutePositionDegrees() {
-        return encoder.get() * 360.0;
+    public Angle getPosition() {
+        return Degrees.of(encoder.get() * 360.0);
     }
 
+    /**
+     * Returns the absolute position as a Rotation2d.
+     *
+     * @return Absolute position as Rotation2d
+     */
     @Override
-    public double getAbsolutePositionRadians() {
-        return Math.toRadians(getAbsolutePositionDegrees());
-    }
-
-    @Override
-    public Rotation2d getAbsolutePositionRotation2D() {
-        return new Rotation2d(getAbsolutePositionRadians());
+    public Rotation2d getPositionRotation2d() {
+        return Rotation2d.fromDegrees(encoder.get() * 360.0);
     }
 }

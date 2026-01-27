@@ -148,8 +148,13 @@ public class ShooterSubsystem extends SubsystemBase {
         .debounce(0.25, Debouncer.DebounceType.kFalling);
 
     private boolean isReady() {
+        // Phoenix 6 returns StatusSignal - use getValueAsDouble() for raw value
         double currentSpeed = m_shooterMotor.getVelocity().getValueAsDouble();
         return MathUtil.isNear(m_targetSpeed, currentSpeed, 50.0);
+
+        // Alternative with AdambotsLib motors (uses WPILib typed units):
+        // AngularVelocity velocity = m_motor.getVelocity();
+        // double rps = velocity.in(RotationsPerSecond);
     }
 }
 ```
@@ -424,18 +429,131 @@ public class ShooterSubsystem extends SubsystemBase {
     public final Trigger isReady = new Trigger(() -> m_cachedIsReady);
 
     private boolean calculateIsReady() {
-        // Expensive calculation here
+        // Phoenix 6 motors: use getValueAsDouble() for raw values
         double velocity = m_motor.getVelocity().getValueAsDouble();
         double temperature = m_motor.getDeviceTemp().getValueAsDouble();
         return MathUtil.isNear(velocity, m_targetSpeed, 50.0)
             && temperature < 60.0;
+
+        // AdambotsLib motors: use WPILib typed units
+        // AngularVelocity vel = m_motor.getVelocity();
+        // double rps = vel.in(RotationsPerSecond);
+        // Current current = m_motor.getSupplyCurrent();
+        // double amps = current.in(Amps);
     }
 }
 ```
 
 ---
 
-## 8. Incremental Adoption
+## 8. WPILib Typed Units
+
+### Overview
+
+WPILib provides a type-safe units system that prevents unit conversion errors at compile time. AdambotsLib sensors and motors use these typed units throughout their APIs.
+
+### Common Types
+
+| Type | Import | Common Units |
+|------|--------|--------------|
+| `Angle` | `edu.wpi.first.units.measure.Angle` | `Degrees`, `Radians`, `Rotations` |
+| `Distance` | `edu.wpi.first.units.measure.Distance` | `Meters`, `Centimeters`, `Inches`, `Feet` |
+| `AngularVelocity` | `edu.wpi.first.units.measure.AngularVelocity` | `RotationsPerSecond`, `DegreesPerSecond`, `RadiansPerSecond` |
+| `Current` | `edu.wpi.first.units.measure.Current` | `Amps` |
+| `Voltage` | `edu.wpi.first.units.measure.Voltage` | `Volts` |
+| `Time` | `edu.wpi.first.units.measure.Time` | `Seconds`, `Milliseconds` |
+
+### Using Typed Units
+
+```java
+import static edu.wpi.first.units.Units.*;
+import edu.wpi.first.units.measure.*;
+
+// AdambotsLib sensors return typed units
+BaseGyro gyro = new Gyro(1);
+Angle heading = gyro.getYaw();           // Returns Angle
+double deg = heading.in(Degrees);         // Convert to double
+double rad = heading.in(Radians);         // Or different unit
+
+// AdambotsLib motors return typed units
+BaseMotor motor = new TalonFXMotor(5);
+AngularVelocity velocity = motor.getVelocity();
+double rps = velocity.in(RotationsPerSecond);
+
+Current current = motor.getSupplyCurrent();
+double amps = current.in(Amps);
+```
+
+### When to Keep Typed vs Convert
+
+**Keep typed units when:**
+- Passing values to other WPILib/AdambotsLib methods
+- Storing values that will be used with typed APIs later
+- Performing arithmetic with unit-aware operations
+
+**Convert with `.in()` when:**
+- Comparing with MathUtil.isNear() or other double comparisons
+- Logging to SmartDashboard or AdvantageKit
+- Using in triggers that compare against thresholds
+- Passing to APIs that expect raw doubles
+
+### Best Practices
+
+```java
+import static edu.wpi.first.units.Units.*;
+
+public class ArmSubsystem extends SubsystemBase {
+    private final BaseAbsoluteEncoder encoder;
+    private final BaseMotor motor;
+
+    // ✅ GOOD: Cache as double for trigger comparisons
+    private double cachedPositionDeg;
+
+    @Override
+    public void periodic() {
+        cachedPositionDeg = encoder.getPosition().in(Degrees);
+
+        // Log using doubles for dashboard compatibility
+        SmartDashboard.putNumber("Arm/Position", cachedPositionDeg);
+        SmartDashboard.putNumber("Arm/Velocity",
+            motor.getVelocity().in(RotationsPerSecond));
+    }
+
+    // ✅ GOOD: Use cached double in trigger
+    public final Trigger atSetpoint = new Trigger(() ->
+        MathUtil.isNear(cachedPositionDeg, targetAngle, 2.0)
+    ).debounce(0.1);
+}
+```
+
+### Migration from Vendor APIs
+
+Phoenix 6 and REV APIs return `StatusSignal<Double>` which requires `.getValueAsDouble()`. AdambotsLib wraps these and returns WPILib typed units instead:
+
+```java
+// Phoenix 6 direct
+TalonFX talonFX = new TalonFX(5);
+double velocity = talonFX.getVelocity().getValueAsDouble();
+
+// AdambotsLib (typed units)
+BaseMotor motor = new TalonFXMotor(5);
+AngularVelocity velocity = motor.getVelocity();
+double rps = velocity.in(RotationsPerSecond);
+
+// Same pattern for sensors
+// Phoenix 6 direct
+Pigeon2 pigeon = new Pigeon2(1);
+double yaw = pigeon.getYaw().getValueAsDouble();
+
+// AdambotsLib (typed units)
+BaseGyro gyro = new Gyro(1);
+Angle yaw = gyro.getYaw();
+double degrees = yaw.in(Degrees);
+```
+
+---
+
+## 9. Incremental Adoption
 
 You don't need to adopt everything at once. Start incrementally:
 

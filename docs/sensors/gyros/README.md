@@ -12,18 +12,21 @@ Gyroscopes (gyros) measure robot orientation and rotation for navigation, balanc
 
 ```java
 import com.adambots.lib.sensors.*;
+import static edu.wpi.first.units.Units.*;
 
 // Create gyro on CAN ID 1
 BaseGyro gyro = new Gyro(1);
 
 // Get heading (continuous, no wrapping)
-double heading = gyro.getContinuousYawDeg();
+Angle heading = gyro.getYaw();
+double degrees = heading.in(Degrees);
+double radians = heading.in(Radians);
 
 // Reset to zero
 gyro.resetYaw();
 
 // Get as Rotation2d for kinematics
-Rotation2d rotation = gyro.getContinuousYawRotation2d();
+Rotation2d rotation = gyro.getYawRotation2d();
 ```
 
 ## Interface: BaseGyro
@@ -31,21 +34,31 @@ Rotation2d rotation = gyro.getContinuousYawRotation2d();
 All gyroscope implementations follow the `BaseGyro` interface:
 
 ```java
+import edu.wpi.first.units.measure.Angle;
+
 public interface BaseGyro {
-    // Yaw (heading) - continuous tracking
-    double getContinuousYawDeg();
-    double getContinuousYawRad();
-    Rotation2d getContinuousYawRotation2d();
+    // Yaw (heading) - continuous tracking with typed units
+    Angle getYaw();                    // Returns WPILib Angle type
+    Rotation2d getYawRotation2d();     // For kinematics/odometry
 
-    // Pitch and roll
-    double getPitch();
-    double getRoll();
+    // Pitch and roll with typed units
+    Angle getPitch();
+    Angle getRoll();
 
-    // Reset and offset
+    // Reset and offset with typed units
     void resetYaw();
-    void resetYawToAngle(double offsetDeg);
-    void offsetYawByAngle(double offsetDeg);
+    void resetYawToAngle(Angle angle);
+    void offsetYawByAngle(Angle offset);
 }
+```
+
+**Unit Conversion:**
+```java
+import static edu.wpi.first.units.Units.*;
+
+Angle yaw = gyro.getYaw();
+double degrees = yaw.in(Degrees);  // Convert to degrees
+double radians = yaw.in(Radians);  // Convert to radians
 ```
 
 ## Key Concepts
@@ -63,13 +76,16 @@ public interface BaseGyro {
 - If needed, wrap manually: `angle % 360`
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // Continuous tracking (AdambotsLib default)
 gyro.resetYaw();
 robot.turnRight(450);  // 1.25 rotations
-double yaw = gyro.getContinuousYawDeg();  // Returns 450.0
+Angle yaw = gyro.getYaw();
+double yawDegrees = yaw.in(Degrees);  // Returns 450.0
 
 // Manual wrapping if needed
-double wrapped = yaw % 360;  // Returns 90.0
+double wrapped = yawDegrees % 360;  // Returns 90.0
 ```
 
 ### Yaw, Pitch, and Roll
@@ -95,7 +111,7 @@ public class DriveSubsystem extends SubsystemBase {
                 xSpeed.getAsDouble(),
                 ySpeed.getAsDouble(),
                 rotation.getAsDouble(),
-                m_gyro.getContinuousYawRotation2d()  // Current heading
+                m_gyro.getYawRotation2d()  // Current heading
             );
         });
     }
@@ -109,13 +125,15 @@ public class DriveSubsystem extends SubsystemBase {
 ### Auto Alignment
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 public class ShooterSubsystem extends SubsystemBase {
     private final BaseGyro m_gyro;
     private double m_targetAngle = 0.0;
 
     public final Trigger isAimed = new Trigger(() ->
         MathUtil.isNear(
-            m_gyro.getContinuousYawDeg(),
+            m_gyro.getYaw().in(Degrees),
             m_targetAngle,
             2.0  // Within 2 degrees
         )
@@ -124,7 +142,7 @@ public class ShooterSubsystem extends SubsystemBase {
     public Command aimAt(DoubleSupplier targetAngle) {
         return run(() -> {
             m_targetAngle = targetAngle.getAsDouble();
-            double error = m_targetAngle - m_gyro.getContinuousYawDeg();
+            double error = m_targetAngle - m_gyro.getYaw().in(Degrees);
             m_drive.rotate(calculatePID(error));
         }).until(isAimed);
     }
@@ -134,19 +152,21 @@ public class ShooterSubsystem extends SubsystemBase {
 ### Balance Controller
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 public class BalanceSubsystem extends SubsystemBase {
     private final BaseGyro m_gyro;
     private final DriveSubsystem m_drive;
 
     // Trigger when robot is level
     public final Trigger isBalanced = new Trigger(() ->
-        Math.abs(m_gyro.getPitch()) < 5.0 &&
-        Math.abs(m_gyro.getRoll()) < 5.0
+        Math.abs(m_gyro.getPitch().in(Degrees)) < 5.0 &&
+        Math.abs(m_gyro.getRoll().in(Degrees)) < 5.0
     ).debounce(0.5);
 
     public Command balance() {
         return run(() -> {
-            double pitch = m_gyro.getPitch();
+            double pitch = m_gyro.getPitch().in(Degrees);
             double speed = calculateBalanceSpeed(pitch);
             m_drive.drive(speed, 0, 0);
         }).until(isBalanced);
@@ -166,7 +186,7 @@ public class DriveSubsystem extends SubsystemBase {
     public void periodic() {
         // Update pose estimator with gyro reading
         m_poseEstimator.update(
-            m_gyro.getContinuousYawRotation2d(),
+            m_gyro.getYawRotation2d(),
             m_drive.getModulePositions()
         );
     }
@@ -184,12 +204,12 @@ public class DriveSubsystem extends SubsystemBase {
 ```java
 // Good: Continuous for navigation
 public Rotation2d getHeading() {
-    return m_gyro.getContinuousYawRotation2d();
+    return m_gyro.getYawRotation2d();
 }
 
 // Avoid: Wrapping breaks navigation
 public Rotation2d getHeading() {
-    double wrapped = m_gyro.getContinuousYawDeg() % 360;
+    double wrapped = m_gyro.getYaw().in(Degrees) % 360;
     return Rotation2d.fromDegrees(wrapped);
 }
 ```
@@ -197,6 +217,8 @@ public Rotation2d getHeading() {
 ### 2. Reset Gyro at Match Start
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 @Override
 public void autonomousInit() {
     // Start each mode with known heading
@@ -206,35 +228,39 @@ public void autonomousInit() {
 // Or set to specific angle for auto
 @Override
 public void autonomousInit() {
-    m_gyro.resetYawToAngle(180.0);  // Start facing away from driver
+    m_gyro.resetYawToAngle(Degrees.of(180));  // Start facing away from driver
 }
 ```
 
 ### 3. Use MathUtil.isNear() for Comparisons
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // Good: Tolerant comparison
 public final Trigger isAimed = new Trigger(() ->
-    MathUtil.isNear(m_gyro.getContinuousYawDeg(), targetAngle, 2.0)
+    MathUtil.isNear(m_gyro.getYaw().in(Degrees), targetAngle, 2.0)
 ).debounce(0.1);
 
 // Avoid: Direct equality rarely works
 public final Trigger isAimed = new Trigger(() ->
-    m_gyro.getContinuousYawDeg() == targetAngle  // Almost never true
+    m_gyro.getYaw().in(Degrees) == targetAngle  // Almost never true
 );
 ```
 
 ### 4. Cache Gyro Values in Periodic
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 private double m_cachedYaw;
 private double m_cachedPitch;
 
 @Override
 public void periodic() {
     // Read once per iteration
-    m_cachedYaw = m_gyro.getContinuousYawDeg();
-    m_cachedPitch = m_gyro.getPitch();
+    m_cachedYaw = m_gyro.getYaw().in(Degrees);
+    m_cachedPitch = m_gyro.getPitch().in(Degrees);
 }
 
 // Use cached values in triggers
@@ -245,9 +271,11 @@ public final Trigger isAimed =
 ### 5. Use Debouncing for Triggers
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // Prevent premature trigger activation
 public final Trigger isBalanced = new Trigger(() ->
-    Math.abs(m_gyro.getPitch()) < 5.0
+    Math.abs(m_gyro.getPitch().in(Degrees)) < 5.0
 ).debounce(0.5, Debouncer.DebounceType.kRising);
 ```
 
@@ -317,6 +345,8 @@ if (m_vision.hasValidTarget()) {
 ### Direct Pigeon2 Usage
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // WPILib vendor library
 Pigeon2 pigeon = new Pigeon2(1);
 double yaw = pigeon.getYaw().getValueAsDouble();
@@ -324,20 +354,22 @@ pigeon.reset();
 
 // AdambotsLib
 BaseGyro gyro = new Gyro(1);
-double yaw = gyro.getContinuousYawDeg();
+double yaw = gyro.getYaw().in(Degrees);
 gyro.resetYaw();
 ```
 
 ### ADXRS450 Gyro
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // WPILib (SPI gyro)
 ADXRS450_Gyro gyro = new ADXRS450_Gyro();
 double angle = gyro.getAngle();
 
 // AdambotsLib (upgrade to Pigeon2)
 BaseGyro gyro = new Gyro(1);  // CAN-based
-double angle = gyro.getContinuousYawDeg();
+double angle = gyro.getYaw().in(Degrees);
 ```
 
 ## Performance Considerations

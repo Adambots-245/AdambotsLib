@@ -2,6 +2,9 @@ package com.adambots.lib.actuators.config;
 
 import com.adambots.lib.actuators.BaseMotor;
 
+import static edu.wpi.first.units.Units.*;
+import edu.wpi.first.units.measure.*;
+
 /**
  * Fluent builder for motor configuration.
  *
@@ -105,13 +108,26 @@ public class MotorConfigBuilder {
      *   <li><strong>Mechanism motors:</strong> stallAmps=20-40, freeAmps=40-80</li>
      * </ul>
      *
+     * @param stallLimit Current limit when motor is under heavy load
+     * @param freeLimit Current limit when motor is spinning freely
+     * @param limitRpm RPM threshold below which stall limit applies
+     * @return This builder for chaining
+     */
+    public MotorConfigBuilder currentLimits(Current stallLimit, Current freeLimit, int limitRpm) {
+        this.currentLimitConfig = new CurrentLimitConfig(stallLimit, freeLimit, limitRpm);
+        return this;
+    }
+
+    /**
+     * Configures current limits to protect motor and battery (backwards compatible overload).
+     *
      * @param stallAmps Current limit when motor is under heavy load (amperes)
      * @param freeAmps Current limit when motor is spinning freely (amperes)
      * @param limitRpm RPM threshold below which stall limit applies
      * @return This builder for chaining
      */
     public MotorConfigBuilder currentLimits(int stallAmps, int freeAmps, int limitRpm) {
-        this.currentLimitConfig = new CurrentLimitConfig(stallAmps, freeAmps, limitRpm);
+        this.currentLimitConfig = CurrentLimitConfig.fromAmps(stallAmps, freeAmps, limitRpm);
         return this;
     }
 
@@ -120,10 +136,23 @@ public class MotorConfigBuilder {
      *
      * <p><strong>Parameter Guidance:</strong>
      * <ul>
-     *   <li><strong>cruiseVelRPS:</strong> 70-80% of max speed</li>
-     *   <li><strong>accelRPSPerSec:</strong> 2-4x cruise velocity</li>
+     *   <li><strong>cruiseVelocity:</strong> 70-80% of max speed</li>
+     *   <li><strong>acceleration:</strong> 2-4x cruise velocity</li>
      *   <li><strong>jerkRPSPerSecPerSec:</strong> 5-10x acceleration, or 0 to disable</li>
      * </ul>
+     *
+     * @param cruiseVelocity Maximum velocity
+     * @param acceleration Acceleration rate
+     * @param jerkRPSPerSecPerSec Jerk in rotations per second³ (0 to disable)
+     * @return This builder for chaining
+     */
+    public MotorConfigBuilder motionMagic(AngularVelocity cruiseVelocity, AngularAcceleration acceleration, double jerkRPSPerSecPerSec) {
+        this.motionMagicConfig = new MotionMagicConfig(cruiseVelocity, acceleration, jerkRPSPerSecPerSec);
+        return this;
+    }
+
+    /**
+     * Configures Motion Magic motion profiling for smooth position control (backwards compatible overload).
      *
      * @param cruiseVelRPS Maximum velocity in rotations per second
      * @param accelRPSPerSec Acceleration in rotations per second²
@@ -131,7 +160,7 @@ public class MotorConfigBuilder {
      * @return This builder for chaining
      */
     public MotorConfigBuilder motionMagic(double cruiseVelRPS, double accelRPSPerSec, double jerkRPSPerSecPerSec) {
-        this.motionMagicConfig = new MotionMagicConfig(cruiseVelRPS, accelRPSPerSec, jerkRPSPerSecPerSec);
+        this.motionMagicConfig = MotionMagicConfig.fromRPS(cruiseVelRPS, accelRPSPerSec, jerkRPSPerSecPerSec);
         return this;
     }
 
@@ -203,8 +232,8 @@ public class MotorConfigBuilder {
         }
         if (motionMagicConfig != null) {
             motor.configureMotionMagic(
-                motionMagicConfig.cruiseVelocityRPS(),
-                motionMagicConfig.accelerationRPSPerSec(),
+                motionMagicConfig.cruiseVelocity(),
+                motionMagicConfig.acceleration(),
                 motionMagicConfig.jerkRPSPerSecPerSec()
             );
         }

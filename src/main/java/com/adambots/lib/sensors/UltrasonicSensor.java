@@ -7,6 +7,8 @@ package com.adambots.lib.sensors;
 import com.adambots.lib.utils.Utils;
 
 import edu.wpi.first.wpilibj.AnalogInput;
+import edu.wpi.first.units.measure.Distance;
+import static edu.wpi.first.units.Units.*;
 
 /**
  * Generic UltrasonicSensor sensor to hide actual implementation and perform range finding
@@ -14,11 +16,11 @@ import edu.wpi.first.wpilibj.AnalogInput;
 public class UltrasonicSensor implements BaseDistanceSensor {
     // The handle to access the sensor
     private final AnalogInput rangefinder;
-    
-    // The scaling factor:  distance in inches = volts returned / SCALING_FACTOR
+
+    // The scaling factor:  distance in cm = volts returned * SCALING_FACTOR
     // 5120 mm per 5V or 512 cm per 5V. The 24/23 is a correction factor to adjust the reading
     private final double SCALING_FACTOR = 512/5*24/23;
-    
+
     /** Creates a new ultrasonic sensor hooked up to <code>portNumber</code> on the analog breakout.
      * @params portNumber The port number on the breakout.
      */
@@ -38,20 +40,14 @@ public class UltrasonicSensor implements BaseDistanceSensor {
         rangefinder.setAverageBits(5);     // Average over 32 samples (2^5 = 32)
     }
 
-    /** Returns the distance measured in inches.  */
-    public double getDistanceInCentimeters(){
-        return rangefinder.getAverageVoltage() * SCALING_FACTOR;
-    }
-    
-    /** Returns the distance measured in inches.  */
+    /**
+     * Take a measurement and return the distance.
+     *
+     * @return Distance measurement (use .in(Centimeters), .in(Inches), etc. to convert)
+     */
     @Override
-    public double getDistanceInInches(){
-        return getDistanceInCentimeters() / 2.54;
-    }
-    
-    /** Returns the distance measured in feet.  */
-    @Override
-    public double getDistanceInFeet(){
-        return getDistanceInInches() / 12.0;
+    public Distance getDistance() {
+        double cm = rangefinder.getAverageVoltage() * SCALING_FACTOR;
+        return Centimeters.of(cm);
     }
 }

@@ -21,6 +21,9 @@ import com.ctre.phoenix6.configs.Slot0Configs;
 import com.ctre.phoenix6.configs.TalonFXSConfigurator;
 import com.ctre.phoenix6.configs.VoltageConfigs;
 
+import static edu.wpi.first.units.Units.*;
+import edu.wpi.first.units.measure.*;
+
 /**
  * Implementation of BaseMotor for Minion Motor using TalonFXS motor controller.
  * Note: Applying the configuration is a blocking call and may take some time.
@@ -136,7 +139,7 @@ public class MinionMotor implements BaseMotor {
     }
 
     @Override
-    public void configureMotionMagic(double cruiseVelocityRPS, double accelerationRPSPerSec, double jerkRPSPerSecPerSec) {
+    public void configureMotionMagic(AngularVelocity cruiseVelocity, AngularAcceleration acceleration, double jerkRPSPerSecPerSec) {
         MotionMagicConfigs configs = new MotionMagicConfigs();
 
         // CRITICAL: Check if refresh fails
@@ -148,8 +151,8 @@ public class MinionMotor implements BaseMotor {
         }
 
         // Set new values
-        configs.MotionMagicCruiseVelocity = cruiseVelocityRPS;
-        configs.MotionMagicAcceleration = accelerationRPSPerSec;
+        configs.MotionMagicCruiseVelocity = cruiseVelocity.in(RotationsPerSecond);
+        configs.MotionMagicAcceleration = acceleration.in(RotationsPerSecondPerSecond);
         configs.MotionMagicJerk = jerkRPSPerSecPerSec;
 
         // Apply configuration - check return value
@@ -322,25 +325,25 @@ public class MinionMotor implements BaseMotor {
     }
 
     @Override
-    public double getVelocity() {
+    public AngularVelocity getVelocity() {
         // In Phoenix 6, getVelocity returns rotations per second
         var velocitySignal = motor.getVelocity();
         velocitySignal.refresh();
-        return velocitySignal.getValue().magnitude(); // Value is in RPS
+        return RotationsPerSecond.of(velocitySignal.getValue().magnitude());
     }
 
     @Override
-    public double getAcceleration() {
+    public AngularAcceleration getAcceleration() {
         var accelerationSignal = motor.getAcceleration();
         accelerationSignal.refresh();
-        return accelerationSignal.getValue().magnitude(); // Value is in RPS/s
+        return RotationsPerSecondPerSecond.of(accelerationSignal.getValue().magnitude());
     }
 
     @Override
-    public double getCurrentDraw() {
+    public Current getCurrentDraw() {
         var currentSignal = motor.getStatorCurrent();
         currentSignal.refresh();
-        return currentSignal.getValue().magnitude(); // Value is in amperes
+        return Amps.of(currentSignal.getValue().magnitude());
     }
 
     @Override

@@ -13,6 +13,7 @@ Encoders measure rotational position for arms, turrets, and other mechanisms tha
 
 ```java
 import com.adambots.lib.sensors.*;
+import static edu.wpi.first.units.Units.*;
 
 // REV Through Bore on DIO port 5
 BaseAbsoluteEncoder armEncoder = new ThroughBoreEncoder(5);
@@ -20,11 +21,13 @@ BaseAbsoluteEncoder armEncoder = new ThroughBoreEncoder(5);
 // CTRE CANcoder on CAN ID 2
 BaseAbsoluteEncoder turretEncoder = new CANCoder(2);
 
-// Get position in degrees
-double angleDeg = armEncoder.getAbsolutePositionDegrees();
+// Get position with WPILib units
+Angle position = armEncoder.getPosition();
+double angleDeg = position.in(Degrees);
+double angleRad = position.in(Radians);
 
 // Get as Rotation2d for WPILib
-Rotation2d rotation = armEncoder.getAbsolutePositionRotation2D();
+Rotation2d rotation = armEncoder.getPositionRotation2d();
 ```
 
 ## Interface: BaseAbsoluteEncoder
@@ -32,11 +35,21 @@ Rotation2d rotation = armEncoder.getAbsolutePositionRotation2D();
 All encoder implementations follow the `BaseAbsoluteEncoder` interface:
 
 ```java
+import edu.wpi.first.units.measure.Angle;
+
 public interface BaseAbsoluteEncoder {
-    double getAbsolutePositionDegrees();
-    double getAbsolutePositionRadians();
-    Rotation2d getAbsolutePositionRotation2D();
+    Angle getPosition();
+    Rotation2d getPositionRotation2d();
 }
+```
+
+**Unit Conversion:**
+```java
+import static edu.wpi.first.units.Units.*;
+
+Angle position = encoder.getPosition();
+double degrees = position.in(Degrees);  // 0.0 to 360.0
+double radians = position.in(Radians);  // 0.0 to 2π
 ```
 
 ## Key Concepts
@@ -56,23 +69,24 @@ public interface BaseAbsoluteEncoder {
 
 ### Position Units
 
-All encoders provide multiple unit outputs:
+Encoders return a WPILib `Angle` type that can be converted to any unit:
 
-| Method | Units | Use Case |
-|--------|-------|----------|
-| `getAbsolutePositionDegrees()` | 0-360° | Simple angle calculations |
-| `getAbsolutePositionRadians()` | 0-2π | Trigonometry, physics |
-| `getAbsolutePositionRotation2D()` | Rotation2d | WPILib kinematics |
+| Method | Return Type | Use Case |
+|--------|-------------|----------|
+| `getPosition()` | `Angle` | Position with unit conversion |
+| `getPositionRotation2d()` | `Rotation2d` | WPILib kinematics |
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // Use degrees for simple logic
-double angle = encoder.getAbsolutePositionDegrees();
+double angle = encoder.getPosition().in(Degrees);
 if (angle > 90 && angle < 180) {
     // Arm in safe zone
 }
 
 // Use Rotation2d for WPILib
-Rotation2d rotation = encoder.getAbsolutePositionRotation2D();
+Rotation2d rotation = encoder.getPositionRotation2d();
 SwerveModuleState state = new SwerveModuleState(speed, rotation);
 ```
 
@@ -81,6 +95,8 @@ SwerveModuleState state = new SwerveModuleState(speed, rotation);
 ### Mechanism Position Tracking
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 public class ArmSubsystem extends SubsystemBase {
     private final BaseAbsoluteEncoder m_encoder;
     private final BaseMotor m_motor;
@@ -92,7 +108,7 @@ public class ArmSubsystem extends SubsystemBase {
 
     public final Trigger atSetpoint = new Trigger(() ->
         MathUtil.isNear(
-            m_encoder.getAbsolutePositionDegrees(),
+            m_encoder.getPosition().in(Degrees),
             m_targetAngle,
             2.0
         )
@@ -100,7 +116,7 @@ public class ArmSubsystem extends SubsystemBase {
 
     public Command moveToAngle(double targetDeg) {
         return run(() -> {
-            double current = m_encoder.getAbsolutePositionDegrees();
+            double current = m_encoder.getPosition().in(Degrees);
             double error = targetDeg - current;
             double output = m_pid.calculate(error);
             m_motor.set(output);
@@ -112,6 +128,8 @@ public class ArmSubsystem extends SubsystemBase {
 ### Swerve Module Azimuth
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 public class SwerveModule {
     private final BaseAbsoluteEncoder m_azimuthEncoder;
     private final BaseMotor m_azimuthMotor;
@@ -123,7 +141,7 @@ public class SwerveModule {
     }
 
     public Rotation2d getAngle() {
-        double rawAngle = m_azimuthEncoder.getAbsolutePositionDegrees();
+        double rawAngle = m_azimuthEncoder.getPosition().in(Degrees);
         double adjusted = (rawAngle - m_offset + 360) % 360;
         return Rotation2d.fromDegrees(adjusted);
     }
@@ -140,6 +158,8 @@ public class SwerveModule {
 ### Position-Based State Machine
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 public class ElevatorSubsystem extends SubsystemBase {
     private final BaseAbsoluteEncoder m_encoder;
 
@@ -162,7 +182,7 @@ public class ElevatorSubsystem extends SubsystemBase {
     private Trigger createPositionTrigger(Position pos) {
         return new Trigger(() ->
             MathUtil.isNear(
-                m_encoder.getAbsolutePositionDegrees(),
+                m_encoder.getPosition().in(Degrees),
                 pos.angle,
                 3.0
             )
@@ -174,22 +194,24 @@ public class ElevatorSubsystem extends SubsystemBase {
 ### Soft Limits
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 public class TurretSubsystem extends SubsystemBase {
     private final BaseAbsoluteEncoder m_encoder;
     private static final double MIN_ANGLE = 0.0;
     private static final double MAX_ANGLE = 270.0;
 
     public final Trigger atMinLimit = new Trigger(() ->
-        m_encoder.getAbsolutePositionDegrees() < MIN_ANGLE + 5.0
+        m_encoder.getPosition().in(Degrees) < MIN_ANGLE + 5.0
     );
 
     public final Trigger atMaxLimit = new Trigger(() ->
-        m_encoder.getAbsolutePositionDegrees() > MAX_ANGLE - 5.0
+        m_encoder.getPosition().in(Degrees) > MAX_ANGLE - 5.0
     );
 
     public Command rotate(DoubleSupplier speed) {
         return run(() -> {
-            double current = m_encoder.getAbsolutePositionDegrees();
+            double current = m_encoder.getPosition().in(Degrees);
             double requestedSpeed = speed.getAsDouble();
 
             // Prevent movement past limits
@@ -212,12 +234,12 @@ public class TurretSubsystem extends SubsystemBase {
 ```java
 // Good: Compatible with WPILib kinematics
 public Rotation2d getModuleAngle() {
-    return m_encoder.getAbsolutePositionRotation2D();
+    return m_encoder.getPositionRotation2d();
 }
 
 // Avoid: Extra conversion steps
 public Rotation2d getModuleAngle() {
-    double degrees = m_encoder.getAbsolutePositionDegrees();
+    double degrees = m_encoder.getPosition().in(Degrees);
     return Rotation2d.fromDegrees(degrees);
 }
 ```
@@ -225,12 +247,14 @@ public Rotation2d getModuleAngle() {
 ### 2. Cache Encoder Values
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 private double m_cachedPosition;
 
 @Override
 public void periodic() {
     // Read once per iteration
-    m_cachedPosition = m_encoder.getAbsolutePositionDegrees();
+    m_cachedPosition = m_encoder.getPosition().in(Degrees);
 }
 
 // Use cached value in triggers
@@ -242,11 +266,13 @@ public final Trigger atSetpoint = new Trigger(() ->
 ### 3. Calibrate Encoder Offsets
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // Store offset in constants
 public static final double TURRET_ENCODER_OFFSET = 127.3;
 
 public double getCalibratedAngle() {
-    double raw = m_encoder.getAbsolutePositionDegrees();
+    double raw = m_encoder.getPosition().in(Degrees);
     return (raw - TURRET_ENCODER_OFFSET + 360) % 360;
 }
 ```
@@ -254,10 +280,12 @@ public double getCalibratedAngle() {
 ### 4. Use MathUtil.isNear() for Comparisons
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // Good: Tolerant comparison
 public final Trigger atTarget = new Trigger(() ->
     MathUtil.isNear(
-        m_encoder.getAbsolutePositionDegrees(),
+        m_encoder.getPosition().in(Degrees),
         m_targetAngle,
         2.0
     )
@@ -265,16 +293,18 @@ public final Trigger atTarget = new Trigger(() ->
 
 // Avoid: Direct equality
 public final Trigger atTarget = new Trigger(() ->
-    m_encoder.getAbsolutePositionDegrees() == m_targetAngle
+    m_encoder.getPosition().in(Degrees) == m_targetAngle
 );
 ```
 
 ### 5. Handle Angle Wrapping
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // For continuous mechanisms that can spin 360°+
 public double getShortestPathToTarget(double target) {
-    double current = m_encoder.getAbsolutePositionDegrees();
+    double current = m_encoder.getPosition().in(Degrees);
     double error = target - current;
 
     // Wrap to [-180, 180]
@@ -322,9 +352,11 @@ public double getShortestPathToTarget(double target) {
 ### Finding Encoder Offsets
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // 1. Move mechanism to known "zero" position
 // 2. Read raw encoder value
-double rawValue = m_encoder.getAbsolutePositionDegrees();
+double rawValue = m_encoder.getPosition().in(Degrees);
 System.out.println("Raw encoder at zero: " + rawValue);
 
 // 3. Store this as offset constant
@@ -332,7 +364,7 @@ public static final double ENCODER_OFFSET = 237.5;  // Value from step 2
 
 // 4. Subtract offset when reading
 public double getCalibratedPosition() {
-    return (m_encoder.getAbsolutePositionDegrees() - ENCODER_OFFSET + 360) % 360;
+    return (m_encoder.getPosition().in(Degrees) - ENCODER_OFFSET + 360) % 360;
 }
 ```
 
@@ -371,8 +403,10 @@ public double getCalibratedPosition() {
 2. Or invert in software:
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 public double getPosition() {
-    return 360.0 - m_encoder.getAbsolutePositionDegrees();
+    return 360.0 - m_encoder.getPosition().in(Degrees);
 }
 ```
 

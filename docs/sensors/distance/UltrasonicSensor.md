@@ -24,39 +24,26 @@ BaseDistanceSensor sensor = new UltrasonicSensor(0);  // Analog port 0
 
 ## Methods
 
-### getDistanceInCentimeters()
+### getDistance()
 
 ```java
-public double getDistanceInCentimeters()
+public Distance getDistance()
 ```
 
-Returns distance in centimeters.
+Returns the distance measurement as a WPILib `Distance` type.
 
-**Returns:** Distance in cm
+**Returns:** Distance measurement
 
----
-
-### getDistanceInInches()
-
+**Usage:**
 ```java
-public double getDistanceInInches()
+import static edu.wpi.first.units.Units.*;
+
+Distance distance = sensor.getDistance();
+double cm = distance.in(Centimeters);
+double inches = distance.in(Inches);
+double feet = distance.in(Feet);
+double meters = distance.in(Meters);
 ```
-
-Returns distance in inches.
-
-**Returns:** Distance in inches
-
----
-
-### getDistanceInFeet()
-
-```java
-public double getDistanceInFeet()
-```
-
-Returns distance in feet.
-
-**Returns:** Distance in feet
 
 ## Hardware Details
 

@@ -9,6 +9,9 @@ import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.util.Color;
 
+import static edu.wpi.first.units.Units.*;
+import edu.wpi.first.units.measure.*;
+
 /**
  * All constant values for robot operation - Any ports should be defined in {@link RobotMap} 
  */
@@ -67,12 +70,12 @@ public final class Constants {
         public static final boolean kFrontRightDriveMotorReversed = true;
         public static final boolean kRearRightDriveMotorReversed = true;
 
-        // Distance between centers of right and left wheels on robot in meters
-        public static final double kTrackWidth = 0.61;
-        // Distance between front and back wheels on robot in meters
-        public static final double kWheelBase = 0.61;
-        // Drive base radius in meters. Distance from robot center to furthest module, hypotenuse of kTrackWidth/2 and kWheelBase/2
-        public static final double kDrivebaseRadius = Math.hypot(kTrackWidth/2, kWheelBase/2);
+        // Distance between centers of right and left wheels on robot
+        public static final Distance kTrackWidth = Meters.of(0.61);
+        // Distance between front and back wheels on robot
+        public static final Distance kWheelBase = Meters.of(0.61);
+        // Drive base radius. Distance from robot center to furthest module, hypotenuse of kTrackWidth/2 and kWheelBase/2
+        public static final Distance kDrivebaseRadius = Meters.of(Math.hypot(kTrackWidth.in(Meters)/2, kWheelBase.in(Meters)/2));
 
         public enum ModulePosition {
             FRONT_LEFT,
@@ -80,26 +83,26 @@ public final class Constants {
             REAR_LEFT,
             REAR_RIGHT
         }
-      
+
         // Distance between front and back wheels on robot
         public static final SwerveDriveKinematics kDriveKinematics = new SwerveDriveKinematics(
-            new Translation2d(kWheelBase / 2, kTrackWidth / 2),
-            new Translation2d(kWheelBase / 2, -kTrackWidth / 2),
-            new Translation2d(-kWheelBase / 2, kTrackWidth / 2),
-            new Translation2d(-kWheelBase / 2, -kTrackWidth / 2)
+            new Translation2d(kWheelBase.in(Meters) / 2, kTrackWidth.in(Meters) / 2),
+            new Translation2d(kWheelBase.in(Meters) / 2, -kTrackWidth.in(Meters) / 2),
+            new Translation2d(-kWheelBase.in(Meters) / 2, kTrackWidth.in(Meters) / 2),
+            new Translation2d(-kWheelBase.in(Meters) / 2, -kTrackWidth.in(Meters) / 2)
         );
 
         // Xbox controller joystick deadzone
         public static final double kDeadZone = 0.0;
 
-        //Max speed of the robot in m/s, used in teleop and auton (should be set to real world value)
+        //Max speed of the robot, used in teleop and auton (should be set to real world value)
         //Drive the robot on carpet and measure the speed with a stopwatch
         //When FOC is enabled - 17.1 ft/s × 0.3048 m/ft = 5.21 m/s. When FOC is disabled - 17.7 ft/s × 0.3048 m/ft = 5.40 m/s. [ 1 foot = 0.3048 meters ]
-        // Previous year's value 4.35; 
-        public static final double kMaxSpeedMetersPerSecond = 5.21; 
-        
-        //Rotational speed factor in rad/s of the robot to be used for the teleop drive command
-        public static final double kTeleopRotationalSpeed = 10; 
+        // Previous year's value 4.35;
+        public static final LinearVelocity kMaxSpeed = MetersPerSecond.of(5.21);
+
+        //Rotational speed factor of the robot to be used for the teleop drive command
+        public static final AngularVelocity kTeleopRotationalSpeed = RadiansPerSecond.of(10);
     }
 
     public static final class ModuleConstants {
@@ -113,20 +116,20 @@ public final class Constants {
         public static final double kMK4IL3PlusGearRatio = 1/5.36; // 1:5.36 as per https://www.swervedrivespecialties.com/collections/mk4i-parts/products/kit-adapter-16t-drive-pinion-gear-mk4i?variant=47576386502957
 
         //Define gear ratio as motor revolutions per wheel rotation
-        public static final double kSteeringGearRatio = 150.0/7.0; // 150/7:1 as per https://www.swervedrivespecialties.com/products/mk4i-swerve-module?variant=47316033732909        
+        public static final double kSteeringGearRatio = 150.0/7.0; // 150/7:1 as per https://www.swervedrivespecialties.com/products/mk4i-swerve-module?variant=47316033732909
 
-        public static final int kDriveCurrentLimit = 32; //Current limit in amps of drive motors, higher values mean faster acceleration but lower battery life
-        public static final int kTurningCurrentLimit = 21; //Current limit in amps of turning motors
-        public static final double kNominalVoltage = 12.6; //Nominal battery voltage for motor voltage compensation
+        public static final Current kDriveCurrentLimit = Amps.of(32); //Current limit of drive motors, higher values mean faster acceleration but lower battery life
+        public static final Current kTurningCurrentLimit = Amps.of(21); //Current limit of turning motors
+        public static final Voltage kNominalVoltage = Volts.of(12.6); //Nominal battery voltage for motor voltage compensation
 
-        public static final double kWheelRadiusMeters = 0.0478; //0.047625 //Should be as precise as you can get it
+        public static final Distance kWheelRadius = Meters.of(0.0478); //0.047625 //Should be as precise as you can get it
         public static final double kSwerveModuleFinalGearRatio = kMK4IL2PlusGearRatio; //Google the swerve module model to find this value
 
-        // Convert drive motor rpm to linear wheel speed                  Motor RPM to Wheel RPM -> RPM to rad/s -> Wheel rad/s to linear m/s 
-        public static final double kDriveEncoderVelocityConversionFactor = kSwerveModuleFinalGearRatio * (Math.PI/30) * kWheelRadiusMeters;
+        // Convert drive motor rpm to linear wheel speed                  Motor RPM to Wheel RPM -> RPM to rad/s -> Wheel rad/s to linear m/s
+        public static final double kDriveEncoderVelocityConversionFactor = kSwerveModuleFinalGearRatio * (Math.PI/30) * kWheelRadius.in(Meters);
 
         // Convert drive motor rotations to linear distance             Motor rot to Wheel rot -> Wheel rot to linear meters (circumference)
-        public static final double kDriveEncoderPositionConversionFactor = kSwerveModuleFinalGearRatio * 2*Math.PI * kWheelRadiusMeters;
+        public static final double kDriveEncoderPositionConversionFactor = kSwerveModuleFinalGearRatio * 2*Math.PI * kWheelRadius.in(Meters);
 
         public static final double kPModuleTurningController = 0.7; //PID Values for turning motors
         // public static final double kDModuleTurningController = 0.026;
@@ -164,12 +167,12 @@ public final class Constants {
         public static final double kMaxPIDTarget = 9; // PID Max Velocity
         public static final double kLowSpeed = .5;
         public static final double kReverseSpeed = 0.1;
-        public static final double kDistanceToDetect = 10; // cm
-        public static final double kTimerThreshold = 0.0; // seconds to wait before stopping
+        public static final Distance kDistanceToDetect = Centimeters.of(10);
+        public static final Time kTimerThreshold = Seconds.of(0.0); // time to wait before stopping
     }
 
     public static final class HangConstants{
-        public static final double kRobotAngleStopHang = 30;
+        public static final Angle kRobotAngleStopHang = Degrees.of(30);
     }
 
     // Game-specific elevator and wrist positions should be defined in robot project

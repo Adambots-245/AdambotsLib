@@ -11,6 +11,9 @@ import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
 import com.revrobotics.ResetMode;
 import com.revrobotics.PersistMode;
 
+import static edu.wpi.first.units.Units.*;
+import edu.wpi.first.units.measure.*;
+
 /**
  * Implementation for REV NEO and NEO Vortex motors using SPARK MAX controller
  */
@@ -156,19 +159,16 @@ public class NEOMotor implements BaseMotor {
     /**
      * Configures motion magic settings for motion profiling.
      *
-     * <p><strong>BREAKING CHANGE (v2026.2.0):</strong> Now accepts RPS instead of RPM
-     * for consistency with Phoenix 6 motors.
-     *
-     * @param cruiseVelocityRPS Maximum velocity during motion in rotations per second
-     * @param accelerationRPSPerSec Acceleration rate in rotations per second²
+     * @param cruiseVelocity Maximum velocity during motion
+     * @param acceleration Acceleration rate
      * @param jerkRPSPerSecPerSec Jerk (rate of acceleration change) in rotations per second³
      */
     @Override
-    public void configureMotionMagic(double cruiseVelocityRPS, double accelerationRPSPerSec, double jerkRPSPerSecPerSec) {
-        // Convert RPS to RPM for NEO controller
+    public void configureMotionMagic(AngularVelocity cruiseVelocity, AngularAcceleration acceleration, double jerkRPSPerSecPerSec) {
+        // Convert to RPM for NEO controller
         config.closedLoop.maxMotion
-                .cruiseVelocity(cruiseVelocityRPS * RPS_TO_RPM)
-                .maxAcceleration(accelerationRPSPerSec * RPS_TO_RPM);
+                .cruiseVelocity(cruiseVelocity.in(RPM))
+                .maxAcceleration(acceleration.in(RotationsPerSecondPerSecond) * RPS_TO_RPM);
         // NO PERSIST during runtime - avoid blocking flash writes
         motor.configure(config, ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
     }
@@ -272,17 +272,14 @@ public class NEOMotor implements BaseMotor {
     }
 
     /**
-     * Gets the current velocity of the motor in rotations per second (RPS).
+     * Gets the current velocity of the motor.
      *
-     * <p><strong>BREAKING CHANGE (v2026.2.0):</strong> This method now returns RPS instead of RPM
-     * for consistency with Phoenix 6 motors (TalonFX, Minion).
-     *
-     * @return The current velocity of the motor in rotations per second (RPS).
+     * @return The current velocity of the motor
      */
     @Override
-    public double getVelocity() {
+    public AngularVelocity getVelocity() {
         // Convert RPM to RPS for consistent interface with Phoenix 6 motors
-        return encoder.getVelocity() * RPM_TO_RPS;
+        return RotationsPerSecond.of(encoder.getVelocity() * RPM_TO_RPS);
     }
 
     /**
@@ -290,22 +287,22 @@ public class NEOMotor implements BaseMotor {
      * <p>
      * Note: NEO motors do not directly support acceleration measurement.
      *
-     * @return 0.0 as acceleration is not directly supported.
+     * @return Zero acceleration (not supported)
      */
     @Override
-    public double getAcceleration() {
+    public AngularAcceleration getAcceleration() {
         // NEO does not directly support acceleration measurement
-        return 0.0;
+        return RotationsPerSecondPerSecond.of(0.0);
     }
 
     /**
-     * Gets the current draw of the motor in Amperes.
+     * Gets the current draw of the motor.
      *
-     * @return The current draw of the motor in Amperes.
+     * @return The current draw of the motor
      */
     @Override
-    public double getCurrentDraw() {
-        return motor.getOutputCurrent();
+    public Current getCurrentDraw() {
+        return Amps.of(motor.getOutputCurrent());
     }
 
     /**

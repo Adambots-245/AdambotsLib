@@ -24,39 +24,26 @@ BaseDistanceSensor lidar = new Lidar(6);  // DIO port 6
 
 ## Methods
 
-### getDistanceInCentimeters()
+### getDistance()
 
 ```java
-public double getDistanceInCentimeters()
+public Distance getDistance()
 ```
 
-Returns distance in centimeters based on PWM pulse width.
+Returns distance as a WPILib `Distance` type based on PWM pulse width.
 
-**Returns:** Distance in cm (typically 5-4000cm)
+**Returns:** Distance measurement (typically 5-4000cm range)
 
----
-
-### getDistanceInInches()
-
+**Usage:**
 ```java
-public double getDistanceInInches()
+import static edu.wpi.first.units.Units.*;
+
+Distance distance = lidar.getDistance();
+double cm = distance.in(Centimeters);
+double inches = distance.in(Inches);
+double feet = distance.in(Feet);
+double meters = distance.in(Meters);
 ```
-
-Returns distance in inches.
-
-**Returns:** Distance in inches
-
----
-
-### getDistanceInFeet()
-
-```java
-public double getDistanceInFeet()
-```
-
-Returns distance in feet.
-
-**Returns:** Distance in feet
 
 ## Hardware Details
 

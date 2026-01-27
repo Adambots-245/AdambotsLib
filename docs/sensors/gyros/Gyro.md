@@ -24,48 +24,33 @@ BaseGyro gyro = new Gyro(1);  // CAN ID 1
 
 ## Methods
 
-### getContinuousYawDeg()
+### getYaw()
 
 ```java
-public double getContinuousYawDeg()
+public Angle getYaw()
 ```
 
-Returns the continuous yaw angle in degrees. Does not wrap at 360° - continues beyond for multi-rotation tracking.
+Returns the continuous yaw angle. Does not wrap at 360° - continues beyond for multi-rotation tracking.
 
-**Returns:** Continuous yaw in degrees
+**Returns:** Continuous yaw as WPILib `Angle` type
 
 **Convention:** Counter-clockwise is positive
 
 **Example:**
 ```java
-double heading = gyro.getContinuousYawDeg();
-// After 1.5 CW rotations: -540.0
+import static edu.wpi.first.units.Units.*;
+
+Angle heading = gyro.getYaw();
+double degrees = heading.in(Degrees);  // After 1.5 CW rotations: -540.0
+double radians = heading.in(Radians);
 ```
 
 ---
 
-### getContinuousYawRad()
+### getYawRotation2d()
 
 ```java
-public double getContinuousYawRad()
-```
-
-Returns the continuous yaw angle in radians.
-
-**Returns:** Continuous yaw in radians
-
-**Example:**
-```java
-double heading = gyro.getContinuousYawRad();
-// Use for calculations requiring radians
-```
-
----
-
-### getContinuousYawRotation2d()
-
-```java
-public Rotation2d getContinuousYawRotation2d()
+public Rotation2d getYawRotation2d()
 ```
 
 Returns the continuous yaw as a WPILib Rotation2d object.
@@ -76,7 +61,7 @@ Returns the continuous yaw as a WPILib Rotation2d object.
 ```java
 // For swerve drive odometry
 m_poseEstimator.update(
-    gyro.getContinuousYawRotation2d(),
+    gyro.getYawRotation2d(),
     modulePositions
 );
 ```
@@ -104,18 +89,20 @@ public void autonomousInit() {
 ### resetYawToAngle()
 
 ```java
-public void resetYawToAngle(double offsetDeg)
+public void resetYawToAngle(Angle angle)
 ```
 
 Sets the yaw to a specific angle without physically moving the robot.
 
 **Parameters:**
-- `offsetDeg` - Angle to set as current heading (degrees)
+- `angle` - Angle to set as current heading (WPILib Angle type)
 
 **Example:**
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // Start auto facing away from driver station
-gyro.resetYawToAngle(180.0);
+gyro.resetYawToAngle(Degrees.of(180));
 ```
 
 ---
@@ -123,18 +110,20 @@ gyro.resetYawToAngle(180.0);
 ### offsetYawByAngle()
 
 ```java
-public void offsetYawByAngle(double offsetDeg)
+public void offsetYawByAngle(Angle offset)
 ```
 
 Offsets the current yaw by adding the specified angle. Maintains continuous tracking (does not wrap).
 
 **Parameters:**
-- `offsetDeg` - Angle to add to current heading (degrees)
+- `offset` - Angle to add to current heading (WPILib Angle type)
 
 **Example:**
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // Correct for 5° drift detected by vision
-gyro.offsetYawByAngle(5.0);
+gyro.offsetYawByAngle(Degrees.of(5));
 ```
 
 ---
@@ -142,19 +131,21 @@ gyro.offsetYawByAngle(5.0);
 ### getPitch()
 
 ```java
-public double getPitch()
+public Angle getPitch()
 ```
 
-Returns the measured pitch (forward/backward tilt) in degrees.
+Returns the measured pitch (forward/backward tilt).
 
-**Returns:** Pitch angle in degrees
+**Returns:** Pitch as WPILib `Angle` type
 
 **Note:** Pitch and roll swap when robot rotates 90°
 
 **Example:**
 ```java
+import static edu.wpi.first.units.Units.*;
+
 public final Trigger isPitched = new Trigger(() ->
-    Math.abs(gyro.getPitch()) > 15.0
+    Math.abs(gyro.getPitch().in(Degrees)) > 15.0
 );
 ```
 
@@ -163,20 +154,22 @@ public final Trigger isPitched = new Trigger(() ->
 ### getRoll()
 
 ```java
-public double getRoll()
+public Angle getRoll()
 ```
 
-Returns the measured roll (side-to-side tilt) in degrees.
+Returns the measured roll (side-to-side tilt).
 
-**Returns:** Roll angle in degrees
+**Returns:** Roll as WPILib `Angle` type
 
 **Note:** Pitch and roll swap when robot rotates 90°
 
 **Example:**
 ```java
+import static edu.wpi.first.units.Units.*;
+
 public Command balance() {
     return run(() -> {
-        double pitch = gyro.getPitch();
+        double pitch = gyro.getPitch().in(Degrees);
         double correction = balancePID.calculate(pitch, 0.0);
         m_drive.drive(correction, 0, 0);
     });
@@ -238,7 +231,7 @@ public class DriveSubsystem extends SubsystemBase {
                 xSpeed.getAsDouble(),
                 ySpeed.getAsDouble(),
                 rotation.getAsDouble(),
-                m_gyro.getContinuousYawRotation2d()
+                m_gyro.getYawRotation2d()
             );
 
             m_drive.drive(fieldSpeeds);
@@ -250,6 +243,8 @@ public class DriveSubsystem extends SubsystemBase {
 ### Auto Rotation
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 public class AutoRotate extends Command {
     private final DriveSubsystem m_drive;
     private final BaseGyro m_gyro;
@@ -266,7 +261,7 @@ public class AutoRotate extends Command {
 
     @Override
     public void execute() {
-        double current = m_gyro.getContinuousYawDeg();
+        double current = m_gyro.getYaw().in(Degrees);
         double output = m_pid.calculate(current, m_targetAngle);
         m_drive.drive(0, 0, output);
     }
@@ -274,7 +269,7 @@ public class AutoRotate extends Command {
     @Override
     public boolean isFinished() {
         return MathUtil.isNear(
-            m_gyro.getContinuousYawDeg(),
+            m_gyro.getYaw().in(Degrees),
             m_targetAngle,
             2.0
         );
@@ -285,6 +280,8 @@ public class AutoRotate extends Command {
 ### Vision Correction
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 public class DriveSubsystem extends SubsystemBase {
     private final BaseGyro m_gyro;
     private final VisionSubsystem m_vision;
@@ -294,11 +291,11 @@ public class DriveSubsystem extends SubsystemBase {
         // Periodically correct gyro drift with vision
         if (m_vision.hasTarget() && m_vision.isConfident()) {
             double visionAngle = m_vision.getRobotAngle();
-            double gyroAngle = m_gyro.getContinuousYawDeg();
+            double gyroAngle = m_gyro.getYaw().in(Degrees);
 
             // If difference is large, trust vision
             if (Math.abs(visionAngle - gyroAngle) > 5.0) {
-                m_gyro.resetYawToAngle(visionAngle);
+                m_gyro.resetYawToAngle(Degrees.of(visionAngle));
                 Logger.recordOutput("Gyro/Corrected", true);
             }
         }
@@ -309,6 +306,8 @@ public class DriveSubsystem extends SubsystemBase {
 ### Balance Controller
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 public class BalanceCommand extends Command {
     private final DriveSubsystem m_drive;
     private final BaseGyro m_gyro;
@@ -323,7 +322,7 @@ public class BalanceCommand extends Command {
 
     @Override
     public void execute() {
-        double pitch = m_gyro.getPitch();
+        double pitch = m_gyro.getPitch().in(Degrees);
         double correction = m_pid.calculate(pitch, 0.0);
 
         // Drive forward/back to balance
@@ -333,7 +332,7 @@ public class BalanceCommand extends Command {
     @Override
     public boolean isFinished() {
         // Balanced when pitch is near zero
-        return Math.abs(m_gyro.getPitch()) < 2.5;
+        return Math.abs(m_gyro.getPitch().in(Degrees)) < 2.5;
     }
 }
 ```
@@ -363,9 +362,11 @@ public class BalanceCommand extends Command {
 4. Consider using vision for absolute heading
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // Correct with vision
 if (m_vision.canSeeTarget()) {
-    gyro.resetYawToAngle(m_vision.getRobotHeading());
+    gyro.resetYawToAngle(Degrees.of(m_vision.getRobotHeading()));
 }
 ```
 
@@ -399,10 +400,12 @@ public double getForwardTilt() {
 4. Consider using last-known-good value
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 private double m_lastValidYaw = 0;
 
-public double getYaw() {
-    double yaw = m_gyro.getContinuousYawDeg();
+public double getYawDegrees() {
+    double yaw = m_gyro.getYaw().in(Degrees);
     if (!Double.isNaN(yaw)) {
         m_lastValidYaw = yaw;
         return yaw;

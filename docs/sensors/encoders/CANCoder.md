@@ -24,39 +24,31 @@ BaseAbsoluteEncoder encoder = new CANCoder(2);  // CAN ID 2
 
 ## Methods
 
-### getAbsolutePositionDegrees()
+### getPosition()
 
 ```java
-public double getAbsolutePositionDegrees()
+public Angle getPosition()
 ```
 
-Returns absolute position in degrees (0-360°).
+Returns absolute position as a WPILib `Angle` type (0-360°).
 
-**Returns:** Position in degrees
+**Returns:** Position as Angle
 
 **Example:**
 ```java
-double angle = encoder.getAbsolutePositionDegrees();
+import static edu.wpi.first.units.Units.*;
+
+Angle position = encoder.getPosition();
+double degrees = position.in(Degrees);  // 0.0 to 360.0
+double radians = position.in(Radians);  // 0.0 to 2π
 ```
 
 ---
 
-### getAbsolutePositionRadians()
+### getPositionRotation2d()
 
 ```java
-public double getAbsolutePositionRadians()
-```
-
-Returns absolute position in radians (0-2π).
-
-**Returns:** Position in radians
-
----
-
-### getAbsolutePositionRotation2D()
-
-```java
-public Rotation2d getAbsolutePositionRotation2D()
+public Rotation2d getPositionRotation2d()
 ```
 
 Returns absolute position as Rotation2d for WPILib integration.
@@ -67,7 +59,7 @@ Returns absolute position as Rotation2d for WPILib integration.
 ```java
 SwerveModulePosition position = new SwerveModulePosition(
     driveDistance,
-    encoder.getAbsolutePositionRotation2D()
+    encoder.getPositionRotation2d()
 );
 ```
 

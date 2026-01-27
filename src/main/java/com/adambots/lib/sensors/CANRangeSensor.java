@@ -5,10 +5,22 @@ import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.hardware.CANrange;
 import com.ctre.phoenix6.sim.CANrangeSimState;
 import edu.wpi.first.wpilibj.RobotBase;
+import edu.wpi.first.units.measure.Distance;
+import static edu.wpi.first.units.Units.*;
 
 /**
  * Class to represent the CANRange sensor that measures distance from an object.
  * Implements the BaseDistanceSensor interface.
+ *
+ * <p><strong>Usage Example:</strong>
+ * <pre>{@code
+ * import static edu.wpi.first.units.Units.*;
+ *
+ * CANRangeSensor sensor = new CANRangeSensor(1, true);
+ * Distance distance = sensor.getDistance();
+ * double cm = distance.in(Centimeters);
+ * double meters = distance.in(Meters);
+ * }</pre>
  */
 public class CANRangeSensor implements BaseDistanceSensor {
 
@@ -19,6 +31,7 @@ public class CANRangeSensor implements BaseDistanceSensor {
     /**
      * Constructor for CANRangeSensor.
      * @param deviceId The device ID of the CANRange sensor.
+     * @param isOnCANivore Whether the sensor is on a CANivore bus.
      */
     public CANRangeSensor(int deviceId, boolean isOnCANivore) {
         // Validate CAN ID range
@@ -33,38 +46,35 @@ public class CANRangeSensor implements BaseDistanceSensor {
         } else {
             canRangeSensor = new CANrange(deviceId);
         }
-            isSim = RobotBase.isSimulation();
+        isSim = RobotBase.isSimulation();
 
-            if (isSim) {
-                simState = canRangeSensor.getSimState();
-                // Set default simulation values
-                simState.setDistance(0.0);  // Start at 0 meters
+        if (isSim) {
+            simState = canRangeSensor.getSimState();
+            // Set default simulation values
+            simState.setDistance(0.0);  // Start at 0 meters
         }
     }
 
+    /**
+     * Gets the current distance measurement.
+     *
+     * @return Distance measurement (use .in(Centimeters), .in(Meters), etc. to convert)
+     */
     @Override
-    public double getDistanceInCentimeters() {
-        return canRangeSensor.getDistance().getValueAsDouble() * 100.0; // Convert meters to centimeters
-    }
-
-    @Override
-    public double getDistanceInInches() {
-        return canRangeSensor.getDistance().getValueAsDouble() * 39.37; // Convert meters to inches
-    }
-
-    @Override
-    public double getDistanceInFeet() {
-        return canRangeSensor.getDistance().getValueAsDouble() * 3.281; // Convert meters to feet
+    public Distance getDistance() {
+        // CANrange returns distance in meters
+        double meters = canRangeSensor.getDistance().getValueAsDouble();
+        return Meters.of(meters);
     }
 
     /**
      * Sets the simulated distance for testing.
      * Only works in simulation mode.
-     * @param distanceInMeters The distance to simulate in meters
+     * @param distance The distance to simulate
      */
-    public void setSimulatedDistance(double distanceInMeters) {
+    public void setSimulatedDistance(Distance distance) {
         if (isSim) {
-            simState.setDistance(distanceInMeters);
+            simState.setDistance(distance.in(Meters));
         }
     }
 
@@ -75,13 +85,13 @@ public class CANRangeSensor implements BaseDistanceSensor {
     public boolean isSim() {
         return isSim;
     }
-    
+
     /**
      * Gets the raw distance in meters.
      * Useful for testing.
      * @return Distance in meters
      */
-    public double getRawDistance() {
+    public double getRawDistanceMeters() {
         return canRangeSensor.getDistance().getValueAsDouble();
     }
 }

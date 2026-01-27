@@ -11,6 +11,8 @@ import com.adambots.lib.utils.Utils;
 
 import edu.wpi.first.wpilibj.Counter;
 import edu.wpi.first.wpilibj.DigitalInput;
+import edu.wpi.first.units.measure.Distance;
+import static edu.wpi.first.units.Units.*;
 
 /**
  * LIDAR distance sensor wrapper for FRC robotics.
@@ -23,9 +25,12 @@ import edu.wpi.first.wpilibj.DigitalInput;
  *
  * <p><strong>Usage Example:</strong>
  * <pre>{@code
+ * import static edu.wpi.first.units.Units.*;
+ *
  * Lidar sensor = new Lidar(0);  // DIO port 0
- * double distanceCm = sensor.getDistanceInCentimeters();
- * double distanceIn = sensor.getDistanceInInches();
+ * Distance distance = sensor.getDistance();
+ * double cm = distance.in(Centimeters);
+ * double inches = distance.in(Inches);
  * }</pre>
  *
  * @see BaseDistanceSensor
@@ -60,9 +65,9 @@ public class Lidar implements BaseDistanceSensor {
 	    counter.setSemiPeriodMode(true);
 	    counter.reset();
     }
-    
+
 	/**
-	 * Gets the current distance measurement in centimeters.
+	 * Gets the current distance measurement.
 	 *
 	 * <p>The measurement is calculated from the PWM pulse width, where the sensor
 	 * outputs 10 microseconds per centimeter of distance. Returns 0 if no valid
@@ -71,41 +76,13 @@ public class Lidar implements BaseDistanceSensor {
 	 * <p><strong>Technical Details:</strong> Converts the counter period (seconds)
 	 * to microseconds, then divides by 10 to get centimeters.
 	 *
-	 * @return Distance in centimeters (typically 0-500 cm range)
+	 * @return Distance measurement (use .in(Centimeters), .in(Inches), etc. to convert)
 	 */
 	@Override
-	public double getDistanceInCentimeters() {
-		double cm;
-
+	public Distance getDistance() {
 		// getPeriod returns time in seconds. The hardware resolution is microseconds.
 		// The LIDAR-Lite unit sends a high signal for 10 microseconds per cm of distance.
-		cm = (counter.getPeriod() * 1000000.0 / 10.0);
-		return cm;
+		double cm = (counter.getPeriod() * 1000000.0 / 10.0);
+		return Centimeters.of(cm);
 	}
-
-	/**
-	 * Gets the current distance measurement in inches.
-	 *
-	 * <p>Convenience method that converts the centimeter measurement to inches.
-     *
-	 * @return Distance in inches (centimeters / 2.54)
-	 */
-	@Override
-	public double getDistanceInInches() {
-		return getDistanceInCentimeters() / 2.54;
-    }
-
-	/**
-	 * Gets the current distance measurement in feet.
-	 *
-	 * <p>Convenience method that converts the inch measurement to feet.
-	 *
-	 * @return Distance in feet (inches / 12.0)
-	 */
-	@Override
-	public double getDistanceInFeet() {
-		return getDistanceInInches() / 12.0;
-	}
-
-	
 }

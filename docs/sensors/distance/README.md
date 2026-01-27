@@ -14,6 +14,7 @@ Distance sensors measure range to objects for positioning, collision avoidance, 
 
 ```java
 import com.adambots.lib.sensors.*;
+import static edu.wpi.first.units.Units.*;
 
 // Ultrasonic on analog port 0
 BaseDistanceSensor ultrasonic = new UltrasonicSensor(0);
@@ -24,20 +25,32 @@ BaseDistanceSensor lidar = new Lidar(6);
 // CANrange on CAN ID 10
 BaseDistanceSensor canRange = new CANRangeSensor(10, false);
 
-// Get distance
-double distanceCM = ultrasonic.getDistanceInCentimeters();
-double distanceInches = lidar.getDistanceInInches();
-double distanceFeet = canRange.getDistanceInFeet();
+// Get distance with WPILib units
+Distance distance = ultrasonic.getDistance();
+double distanceCM = distance.in(Centimeters);
+double distanceInches = lidar.getDistance().in(Inches);
+double distanceFeet = canRange.getDistance().in(Feet);
 ```
 
 ## Interface: BaseDistanceSensor
 
 ```java
+import edu.wpi.first.units.measure.Distance;
+
 public interface BaseDistanceSensor {
-    double getDistanceInCentimeters();
-    double getDistanceInInches();
-    double getDistanceInFeet();
+    Distance getDistance();
 }
+```
+
+**Unit Conversion:**
+```java
+import static edu.wpi.first.units.Units.*;
+
+Distance distance = sensor.getDistance();
+double cm = distance.in(Centimeters);      // Convert to centimeters
+double inches = distance.in(Inches);        // Convert to inches
+double feet = distance.in(Feet);            // Convert to feet
+double meters = distance.in(Meters);        // Convert to meters
 ```
 
 ## Common Patterns
@@ -45,11 +58,13 @@ public interface BaseDistanceSensor {
 ### Collision Avoidance
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 public class DriveSubsystem extends SubsystemBase {
     private final BaseDistanceSensor m_frontSensor;
 
     public final Trigger obstacleDetected = new Trigger(() ->
-        m_frontSensor.getDistanceInCentimeters() < 30.0
+        m_frontSensor.getDistance().in(Centimeters) < 30.0
     ).debounce(0.2);
 }
 
@@ -62,11 +77,13 @@ m_drive.obstacleDetected
 ### Target Distance Check
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 public class ShooterSubsystem extends SubsystemBase {
     private final BaseDistanceSensor m_rangefinder;
 
     public final Trigger inRange = new Trigger(() -> {
-        double distance = m_rangefinder.getDistanceInInches();
+        double distance = m_rangefinder.getDistance().in(Inches);
         return distance > 60 && distance < 180;  // 5-15 feet
     }).debounce(0.25);
 }
@@ -81,12 +98,14 @@ m_shooter.isReady
 ### Positioning
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 public class IntakeSubsystem extends SubsystemBase {
     private final BaseDistanceSensor m_lidar;
 
     public Command driveToWall() {
         return run(() -> {
-            double distance = m_lidar.getDistanceInCentimeters();
+            double distance = m_lidar.getDistance().in(Centimeters);
             double targetDistance = 50.0;  // 50cm from wall
 
             if (distance > targetDistance + 5) {
@@ -104,8 +123,10 @@ public class IntakeSubsystem extends SubsystemBase {
 ### 1. Validate Sensor Readings
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // Check for valid range
-double distance = sensor.getDistanceInCentimeters();
+double distance = sensor.getDistance().in(Centimeters);
 if (distance > 0 && distance < 500) {  // Valid range
     // Use the reading
 } else {
@@ -117,8 +138,10 @@ if (distance > 0 && distance < 500) {  // Valid range
 ### 2. Use Debouncing
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 public final Trigger inRange = new Trigger(() -> {
-    double dist = m_sensor.getDistanceInCentimeters();
+    double dist = m_sensor.getDistance().in(Centimeters);
     return dist > 20 && dist < 100;
 }).debounce(0.25);  // Prevent flickering
 ```
@@ -140,11 +163,13 @@ public final Trigger inRange = new Trigger(() -> {
 ### 4. Cache Readings in Periodic
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 private double m_cachedDistance;
 
 @Override
 public void periodic() {
-    m_cachedDistance = m_sensor.getDistanceInCentimeters();
+    m_cachedDistance = m_sensor.getDistance().in(Centimeters);
 }
 
 public final Trigger inRange = new Trigger(() ->
@@ -251,11 +276,13 @@ public final Trigger inRange = new Trigger(() ->
 3. Average multiple readings
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 private double[] readings = new double[5];
 private int index = 0;
 
 public double getFilteredDistance() {
-    readings[index] = m_sensor.getDistanceInCentimeters();
+    readings[index] = m_sensor.getDistance().in(Centimeters);
     index = (index + 1) % readings.length;
 
     // Return average

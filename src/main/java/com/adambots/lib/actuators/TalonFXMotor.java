@@ -7,6 +7,9 @@ import com.ctre.phoenix6.controls.*;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.*;
 
+import static edu.wpi.first.units.Units.*;
+import edu.wpi.first.units.measure.*;
+
 /**
  * A wrapper class for the CTRE TalonFX motor controller that implements the
  * BaseMotor interface.
@@ -299,12 +302,12 @@ public class TalonFXMotor implements BaseMotor {
      *
      * <p>Motion Magic generates smooth trapezoidal motion profiles for position control.
      *
-     * @param cruiseVelocityRPS Maximum velocity during motion in rotations per second
-     * @param accelerationRPSPerSec Acceleration rate in rotations per second²
+     * @param cruiseVelocity Maximum velocity during motion
+     * @param acceleration Acceleration rate
      * @param jerkRPSPerSecPerSec Jerk (rate of acceleration change) in rotations per second³
      */
     @Override
-    public void configureMotionMagic(double cruiseVelocityRPS, double accelerationRPSPerSec, double jerkRPSPerSecPerSec) {
+    public void configureMotionMagic(AngularVelocity cruiseVelocity, AngularAcceleration acceleration, double jerkRPSPerSecPerSec) {
         var config = new MotionMagicConfigs();
 
         // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
@@ -315,8 +318,8 @@ public class TalonFXMotor implements BaseMotor {
                 "). Configuration may be factory defaulted!", true);
         }
 
-        config.withMotionMagicCruiseVelocity(cruiseVelocityRPS)
-                .withMotionMagicAcceleration(accelerationRPSPerSec)
+        config.withMotionMagicCruiseVelocity(cruiseVelocity.in(RotationsPerSecond))
+                .withMotionMagicAcceleration(acceleration.in(RotationsPerSecondPerSecond))
                 .withMotionMagicJerk(jerkRPSPerSecPerSec);
 
         boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
@@ -541,31 +544,31 @@ public class TalonFXMotor implements BaseMotor {
     /**
      * Gets the current velocity of the motor.
      *
-     * @return The current velocity in units per second
+     * @return The current velocity
      */
     @Override
-    public double getVelocity() {
-        return motor.getVelocity().getValueAsDouble();
+    public AngularVelocity getVelocity() {
+        return RotationsPerSecond.of(motor.getVelocity().getValueAsDouble());
     }
 
     /**
      * Gets the current acceleration of the motor.
-     * 
-     * @return The current acceleration in units per second^2
+     *
+     * @return The current acceleration
      */
     @Override
-    public double getAcceleration() {
-        return motor.getAcceleration().getValueAsDouble();
+    public AngularAcceleration getAcceleration() {
+        return RotationsPerSecondPerSecond.of(motor.getAcceleration().getValueAsDouble());
     }
 
     /**
      * Gets the current draw of the motor.
-     * 
-     * @return The current draw in amps
+     *
+     * @return The current draw
      */
     @Override
-    public double getCurrentDraw() {
-        return motor.getStatorCurrent().getValueAsDouble();
+    public Current getCurrentDraw() {
+        return Amps.of(motor.getStatorCurrent().getValueAsDouble());
     }
 
     /**

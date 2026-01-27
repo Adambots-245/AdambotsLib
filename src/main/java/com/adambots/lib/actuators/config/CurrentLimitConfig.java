@@ -1,5 +1,8 @@
 package com.adambots.lib.actuators.config;
 
+import static edu.wpi.first.units.Units.*;
+import edu.wpi.first.units.measure.*;
+
 /**
  * Configuration record for motor current limiting.
  *
@@ -17,18 +20,52 @@ package com.adambots.lib.actuators.config;
  * <p><strong>Usage Example:</strong>
  * <pre>{@code
  * // Conservative limits for NEO on drive motor
- * CurrentLimitConfig driveLimits = new CurrentLimitConfig(40, 60, 5000);
+ * CurrentLimitConfig driveLimits = new CurrentLimitConfig(
+ *     Amps.of(40), Amps.of(60), 5000);
  *
  * // Allow higher current for shooter motor
- * CurrentLimitConfig shooterLimits = new CurrentLimitConfig(60, 120, 3000);
+ * CurrentLimitConfig shooterLimits = new CurrentLimitConfig(
+ *     Amps.of(60), Amps.of(120), 3000);
  * }</pre>
  *
- * @param stallLimitAmps Current limit when motor is under heavy load (amperes)
- * @param freeLimitAmps Current limit when motor is spinning freely (amperes)
+ * @param stallLimit Current limit when motor is under heavy load
+ * @param freeLimit Current limit when motor is spinning freely
  * @param limitRpmThreshold RPM threshold below which stall limit applies
  */
 public record CurrentLimitConfig(
-    int stallLimitAmps,
-    int freeLimitAmps,
+    Current stallLimit,
+    Current freeLimit,
     int limitRpmThreshold
-) {}
+) {
+    /**
+     * Creates a CurrentLimitConfig using raw ampere values for backwards compatibility.
+     *
+     * @param stallLimitAmps Current limit when motor is under heavy load (amperes)
+     * @param freeLimitAmps Current limit when motor is spinning freely (amperes)
+     * @param limitRpmThreshold RPM threshold below which stall limit applies
+     * @return A new CurrentLimitConfig instance
+     */
+    public static CurrentLimitConfig fromAmps(int stallLimitAmps, int freeLimitAmps, int limitRpmThreshold) {
+        return new CurrentLimitConfig(
+            Amps.of(stallLimitAmps),
+            Amps.of(freeLimitAmps),
+            limitRpmThreshold
+        );
+    }
+
+    /**
+     * Gets the stall limit in amperes for motor controller APIs.
+     * @return Stall limit in amperes
+     */
+    public double stallLimitAmps() {
+        return stallLimit.in(Amps);
+    }
+
+    /**
+     * Gets the free limit in amperes for motor controller APIs.
+     * @return Free limit in amperes
+     */
+    public double freeLimitAmps() {
+        return freeLimit.in(Amps);
+    }
+}

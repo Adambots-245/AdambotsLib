@@ -1,5 +1,8 @@
 package com.adambots.lib.actuators;
 
+import static edu.wpi.first.units.Units.*;
+import edu.wpi.first.units.measure.*;
+
 /**
  * Base interface for motor controllers in FRC robotics.
  *
@@ -167,17 +170,19 @@ public interface BaseMotor extends BaseActuator{
      *
      * <p><strong>Parameter Guidance:</strong>
      * <ul>
-     *   <li><strong>cruiseVelocityRPS:</strong> Set to 70-80% of mechanism's maximum speed</li>
-     *   <li><strong>accelerationRPSPerSec:</strong> Typically 2-4x cruise velocity</li>
+     *   <li><strong>cruiseVelocity:</strong> Set to 70-80% of mechanism's maximum speed</li>
+     *   <li><strong>acceleration:</strong> Typically 2-4x cruise velocity</li>
      *   <li><strong>jerkRPSPerSecPerSec:</strong> Optional smoothing (0 = disabled, or 5-10x acceleration)</li>
      * </ul>
      *
      * <p><strong>Example:</strong>
      * <pre>{@code
+     * import static edu.wpi.first.units.Units.*;
+     *
      * // Elevator motion profile
      * motor.configureMotionMagic(
-     *     50.0,    // 50 RPS cruise velocity
-     *     150.0,   // 150 RPS² acceleration
+     *     RotationsPerSecond.of(50),    // 50 RPS cruise velocity
+     *     RotationsPerSecondPerSecond.of(150),   // 150 RPS² acceleration
      *     500.0    // 500 RPS³ jerk limiting
      * );
      *
@@ -185,11 +190,11 @@ public interface BaseMotor extends BaseActuator{
      * motor.set(ControlMode.MOTION_MAGIC, 25.0);  // Smooth move to 25 rotations
      * }</pre>
      *
-     * @param cruiseVelocityRPS Maximum velocity during motion in rotations per second
-     * @param accelerationRPSPerSec Acceleration rate in rotations per second²
+     * @param cruiseVelocity Maximum velocity during motion
+     * @param acceleration Acceleration rate
      * @param jerkRPSPerSecPerSec Jerk (rate of acceleration change) in rotations per second³ (0 to disable)
      */
-    void configureMotionMagic(double cruiseVelocityRPS, double accelerationRPSPerSec, double jerkRPSPerSecPerSec);
+    void configureMotionMagic(AngularVelocity cruiseVelocity, AngularAcceleration acceleration, double jerkRPSPerSecPerSec);
 
     /**
      * Configures current limiting to protect the motor and battery.
@@ -355,18 +360,21 @@ public interface BaseMotor extends BaseActuator{
     /**
      * Gets the current motor velocity.
      *
-     * <p><strong>All motor types return velocity in rotations per second (RPS)</strong>.
+     * <p><strong>Returns typed AngularVelocity</strong> - use {@code .in(RotationsPerSecond)}
+     * or {@code .in(RPM)} to convert to raw values.
      *
-     * <p><strong>BREAKING CHANGE (v2026.2.0):</strong> NEOMotor now returns RPS instead of RPM.
-     * If you used NEOMotor velocity values, divide by 60 or update your code to expect RPS:
-     * <ul>
-     *   <li>Old: {@code motor.getVelocity()} returned 5000 (RPM)</li>
-     *   <li>New: {@code motor.getVelocity()} returns 83.33 (RPS)</li>
-     * </ul>
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * import static edu.wpi.first.units.Units.*;
      *
-     * @return Current velocity in rotations per second
+     * AngularVelocity velocity = motor.getVelocity();
+     * double rps = velocity.in(RotationsPerSecond);  // rotations per second
+     * double rpm = velocity.in(RPM);                  // revolutions per minute
+     * }</pre>
+     *
+     * @return Current velocity as AngularVelocity
      */
-    double getVelocity();
+    AngularVelocity getVelocity();
 
     /**
      * Gets the current motor acceleration.
@@ -374,18 +382,26 @@ public interface BaseMotor extends BaseActuator{
      * <p><strong>Note:</strong> Acceleration is calculated by the motor controller
      * and may not be available on all hardware.
      *
-     * @return Current acceleration in rotations per second² (0 if not supported)
+     * @return Current acceleration (returns zero if not supported)
      */
-    double getAcceleration();
+    AngularAcceleration getAcceleration();
 
     /**
      * Gets the current draw of the motor.
      *
      * <p>Monitor this value to detect stalls, overloads, or current limit violations.
      *
-     * @return Current draw in amperes
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * import static edu.wpi.first.units.Units.*;
+     *
+     * Current current = motor.getCurrentDraw();
+     * double amps = current.in(Amps);
+     * }</pre>
+     *
+     * @return Current draw
      */
-    double getCurrentDraw();
+    Current getCurrentDraw();
 
     /**
      * Gets the current motor output as a percentage.

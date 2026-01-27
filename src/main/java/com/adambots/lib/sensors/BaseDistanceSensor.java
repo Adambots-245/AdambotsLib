@@ -1,5 +1,7 @@
 package com.adambots.lib.sensors;
 
+import edu.wpi.first.units.measure.Distance;
+
 /**
  * Base interface for distance measurement sensors.
  *
@@ -15,18 +17,23 @@ package com.adambots.lib.sensors;
  * </ul>
  *
  * <p><strong>Distance Units:</strong>
- * Distance can be reported in centimeters, inches, or feet. Implementations
- * must provide all three measurement units.
+ * Distance is returned as a WPILib {@link Distance} type. Use the {@code .in()} method
+ * to convert to your desired unit (Centimeters, Inches, Meters, etc.).
  *
  * <p><strong>Usage Example:</strong>
  * <pre>{@code
+ * import static edu.wpi.first.units.Units.*;
+ *
  * BaseDistanceSensor rangefinder = new UltrasonicSensor(0);
  *
- * // Get distance in centimeters
- * double distanceCM = rangefinder.getDistanceInCentimeters();
+ * // Get distance in various units
+ * Distance distance = rangefinder.getDistance();
+ * double cm = distance.in(Centimeters);
+ * double inches = distance.in(Inches);
+ * double meters = distance.in(Meters);
  *
  * // Check if object is within range
- * if (distanceCM < 30.0) {
+ * if (distance.in(Centimeters) < 30.0) {
  *     System.out.println("Object detected within 30cm");
  * }
  * }</pre>
@@ -41,24 +48,18 @@ package com.adambots.lib.sensors;
 public interface BaseDistanceSensor {
 
     /**
-     * Take a measurement and return the distance in cm
-     * 
-     * @return Distance in cm
-     */
-    double getDistanceInCentimeters();
-
-    /**
-     * Take a measurement and return the distance in inches
-     * 
-     * @return Distance in inches
-     */
-    double getDistanceInInches();
-
-    /**
-     * Take a measurement and return the distance in feet
+     * Take a measurement and return the distance.
      *
-     * @return Distance in feet
+     * <p>Returns a WPILib {@link Distance} type that can be converted to any unit:
+     * <pre>{@code
+     * Distance d = sensor.getDistance();
+     * double cm = d.in(Centimeters);
+     * double inches = d.in(Inches);
+     * double meters = d.in(Meters);
+     * }</pre>
+     *
+     * @return Distance measurement
      */
-    double getDistanceInFeet();
+    Distance getDistance();
 
 }

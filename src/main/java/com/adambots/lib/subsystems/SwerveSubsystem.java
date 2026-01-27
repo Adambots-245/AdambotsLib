@@ -10,7 +10,8 @@ import java.util.Optional;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 
-import static edu.wpi.first.units.Units.Meter;
+import static edu.wpi.first.units.Units.*;
+import edu.wpi.first.units.measure.*;
 
 import org.photonvision.targeting.PhotonPipelineResult;
 
@@ -169,7 +170,7 @@ public class SwerveSubsystem extends SubsystemBase {
     // meters to get meters/second.
     // The gear ratio is 6.75 motor revolutions per wheel rotation.
     // The encoder resolution per motor revolution is 1 per motor revolution.
-    double driveConversionFactor = SwerveMath.calculateMetersPerRotation(ModuleConstants.kWheelRadiusMeters,
+    double driveConversionFactor = SwerveMath.calculateMetersPerRotation(ModuleConstants.kWheelRadius.in(Meters),
         1 / ModuleConstants.kSwerveModuleFinalGearRatio);
 
     // Configure the Telemetry before creating the SwerveDrive to avoid unnecessary
@@ -180,7 +181,7 @@ public class SwerveSubsystem extends SubsystemBase {
 
     try {
       // Loads the conversion factors via JSON files
-      swerveDrive = new SwerveParser(directory).createSwerveDrive(DriveConstants.kMaxSpeedMetersPerSecond,
+      swerveDrive = new SwerveParser(directory).createSwerveDrive(DriveConstants.kMaxSpeed.in(MetersPerSecond),
           new Pose2d(new Translation2d(Meter.of(1),
               Meter.of(4)),
               Rotation2d.fromDegrees(0)));
@@ -269,8 +270,8 @@ public class SwerveSubsystem extends SubsystemBase {
   public SwerveSubsystem(SwerveDriveConfiguration driveCfg, SwerveControllerConfiguration controllerCfg) {
     swerveDrive = new SwerveDrive(driveCfg,
         controllerCfg,
-        DriveConstants.kMaxSpeedMetersPerSecond,
-        new Pose2d(new Translation2d(Meter.of(2), Meter.of(0)),
+        DriveConstants.kMaxSpeed.in(MetersPerSecond),
+        new Pose2d(new Translation2d(Meters.of(2), Meters.of(0)),
             Rotation2d.fromDegrees(0)));
   }
 
@@ -557,7 +558,7 @@ public class SwerveSubsystem extends SubsystemBase {
         scaledInputs.getY(),
         angle.getRadians(),
         getHeading().getRadians(),
-        DriveConstants.kMaxSpeedMetersPerSecond);
+        DriveConstants.kMaxSpeed.in(MetersPerSecond));
   }
 
   /**
@@ -732,15 +733,28 @@ public class SwerveSubsystem extends SubsystemBase {
    * Trigger that is true when aligned with AprilTag within tolerance.
    *
    * @param tagID AprilTag ID to align with
-   * @param toleranceDegrees Angular tolerance in degrees
+   * @param tolerance Angular tolerance
    * @return Trigger for tag alignment
    */
-  public Trigger isAlignedWithTagTrigger(int tagID, double toleranceDegrees) {
+  public Trigger isAlignedWithTagTrigger(int tagID, Angle tolerance) {
     return new Trigger(() -> {
       if (!vision.hasTarget()) return false;
       double error = Math.abs(getAprilTagYaw(tagID).minus(getHeading()).getDegrees());
-      return error <= toleranceDegrees;
+      return error <= tolerance.in(Degrees);
     });
+  }
+
+  /**
+   * Trigger that is true when aligned with AprilTag within tolerance.
+   *
+   * @param tagID AprilTag ID to align with
+   * @param toleranceDegrees Angular tolerance in degrees
+   * @return Trigger for tag alignment
+   * @deprecated Use {@link #isAlignedWithTagTrigger(int, Angle)} instead
+   */
+  @Deprecated
+  public Trigger isAlignedWithTagTrigger(int tagID, double toleranceDegrees) {
+    return isAlignedWithTagTrigger(tagID, Degrees.of(toleranceDegrees));
   }
 
   /**

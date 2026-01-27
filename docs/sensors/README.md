@@ -38,8 +38,10 @@ Measure robot orientation and rotation for navigation and balance.
 
 **Quick Example:**
 ```java
+import static edu.wpi.first.units.Units.*;
+
 BaseGyro gyro = new Gyro(1);  // CAN ID 1
-double heading = gyro.getContinuousYawDeg();
+double heading = gyro.getYaw().in(Degrees);
 gyro.resetYaw();  // Zero the heading
 ```
 
@@ -62,9 +64,11 @@ Measure rotational position for arms, turrets, and mechanisms.
 
 **Quick Example:**
 ```java
+import static edu.wpi.first.units.Units.*;
+
 BaseAbsoluteEncoder armEncoder = new ThroughBoreEncoder(5);  // DIO port 5
-double angleDeg = armEncoder.getAbsolutePositionDegrees();
-Rotation2d rotation = armEncoder.getAbsolutePositionRotation2D();
+double angleDeg = armEncoder.getPosition().in(Degrees);
+Rotation2d rotation = armEncoder.getPositionRotation2d();
 ```
 
 [📖 Encoders Documentation →](encoders/README.md)
@@ -119,13 +123,15 @@ Measure range to objects for positioning, collision avoidance, and alignment.
 
 **Quick Example:**
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // Ultrasonic for close-range detection
 BaseDistanceSensor ultrasonic = new UltrasonicSensor(0);  // Analog port 0
-double distanceCM = ultrasonic.getDistanceInCentimeters();
+double distanceCM = ultrasonic.getDistance().in(Centimeters);
 
 // LIDAR for long-range measurement
 BaseDistanceSensor lidar = new Lidar(6);  // DIO port 6
-double distanceInches = lidar.getDistanceInInches();
+double distanceInches = lidar.getDistance().in(Inches);
 ```
 
 [📖 Distance Sensors Documentation →](distance/README.md)
@@ -139,6 +145,8 @@ double distanceInches = lidar.getDistanceInInches();
 Use base interfaces to allow hardware swapping:
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 public class Turret {
     private final BaseAbsoluteEncoder encoder;
     private final BaseGyro gyro;
@@ -149,11 +157,11 @@ public class Turret {
     }
 
     public double getAngle() {
-        return encoder.getAbsolutePositionDegrees();
+        return encoder.getPosition().in(Degrees);
     }
 
     public double getRobotHeading() {
-        return gyro.getContinuousYawDeg();
+        return gyro.getYaw().in(Degrees);
     }
 }
 
@@ -208,17 +216,19 @@ BaseAbsoluteEncoder encoder = new ThroughBoreEncoder(15);
 Use multiple sensors for robust system behavior:
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 public class Shooter {
     private final BaseGyro gyro;
     private final BaseDistanceSensor rangefinder;
     private final BaseProximitySensor magazineSensor;
 
     public final Trigger isAimed = new Trigger(() ->
-        MathUtil.isNear(gyro.getContinuousYawDeg(), getTargetAngle(), 2.0)
+        MathUtil.isNear(gyro.getYaw().in(Degrees), getTargetAngle(), 2.0)
     ).debounce(0.1);
 
     public final Trigger isInRange = new Trigger(() -> {
-        double distance = rangefinder.getDistanceInInches();
+        double distance = rangefinder.getDistance().in(Inches);
         return distance > 60 && distance < 180;
     }).debounce(0.25);
 
@@ -256,14 +266,16 @@ public class Arm {
 
 ### 2. Expose State as Triggers, Not Values
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // Good: Problem-domain question
 public final Trigger atSetpoint = new Trigger(() ->
-    MathUtil.isNear(encoder.getAbsolutePositionDegrees(), targetAngle, 2.0)
+    MathUtil.isNear(encoder.getPosition().in(Degrees), targetAngle, 2.0)
 ).debounce(0.1);
 
 // Avoid: Exposing raw values
 public double getEncoderPosition() {
-    return encoder.getAbsolutePositionDegrees();
+    return encoder.getPosition().in(Degrees);
 }
 ```
 
@@ -277,19 +289,23 @@ public final Trigger hasGamePiece =
 
 ### 4. Compare Doubles with MathUtil.isNear()
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // Good: Tolerant comparison
-if (MathUtil.isNear(gyro.getContinuousYawDeg(), 90.0, 2.0)) {
+if (MathUtil.isNear(gyro.getYaw().in(Degrees), 90.0, 2.0)) {
     // Within 2 degrees of 90
 }
 
 // Avoid: Direct equality (will rarely be true)
-if (gyro.getContinuousYawDeg() == 90.0) {
+if (gyro.getYaw().in(Degrees) == 90.0) {
     // Rarely true due to floating point precision
 }
 ```
 
 ### 5. Cache Expensive Sensor Reads
 ```java
+import static edu.wpi.first.units.Units.*;
+
 public class ArmSubsystem extends SubsystemBase {
     private final BaseAbsoluteEncoder encoder;
     private double cachedPosition;
@@ -297,7 +313,7 @@ public class ArmSubsystem extends SubsystemBase {
     @Override
     public void periodic() {
         // Read sensor once per iteration
-        cachedPosition = encoder.getAbsolutePositionDegrees();
+        cachedPosition = encoder.getPosition().in(Degrees);
     }
 
     public final Trigger atSetpoint = new Trigger(() ->
@@ -308,8 +324,10 @@ public class ArmSubsystem extends SubsystemBase {
 
 ### 6. Validate Sensor Readings
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // Check for invalid or out-of-range readings
-double distance = ultrasonic.getDistanceInCentimeters();
+double distance = ultrasonic.getDistance().in(Centimeters);
 if (distance > 0 && distance < 500) {  // Valid range
     // Use the reading
 } else {
@@ -322,24 +340,28 @@ if (distance > 0 && distance < 500) {  // Valid range
 
 ### Gyroscopes
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // WPILib (vendor-specific)
 Pigeon2 gyro = new Pigeon2(1);
 double yaw = gyro.getYaw().getValueAsDouble();
 
-// AdambotsLib (unified interface with validation)
+// AdambotsLib (unified interface with typed units)
 BaseGyro gyro = new Gyro(1);
-double yaw = gyro.getContinuousYawDeg();  // No wrapping, validated
+double yaw = gyro.getYaw().in(Degrees);  // Typed units, no wrapping, validated
 ```
 
 ### Encoders
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // WPILib (vendor-specific)
 DutyCycleEncoder encoder = new DutyCycleEncoder(5);
 double position = encoder.get() * 360.0;
 
-// AdambotsLib (with validation and units)
+// AdambotsLib (with validation and typed units)
 BaseAbsoluteEncoder encoder = new ThroughBoreEncoder(5);
-double position = encoder.getAbsolutePositionDegrees();  // Direct units
+double position = encoder.getPosition().in(Degrees);  // Typed units, validated
 ```
 
 ### Proximity Sensors
@@ -355,14 +377,16 @@ boolean triggered = limitSwitch.isDetecting();  // Clearer semantics
 
 ### Distance Sensors
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // WPILib
 AnalogInput ultrasonic = new AnalogInput(0);
 double voltage = ultrasonic.getAverageVoltage();
 double distance = voltage * scalingFactor;  // Manual conversion
 
-// AdambotsLib (with validation and automatic conversion)
+// AdambotsLib (with validation and typed units)
 BaseDistanceSensor ultrasonic = new UltrasonicSensor(0);
-double distance = ultrasonic.getDistanceInCentimeters();  // Direct units
+double distance = ultrasonic.getDistance().in(Centimeters);  // Typed units, validated
 ```
 
 ## Troubleshooting
@@ -437,12 +461,14 @@ Minimize CAN bus traffic for sensors:
 - Consider StatusFrame rates for CANcoders
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 // Good: Cache in periodic
 private double cachedYaw;
 
 @Override
 public void periodic() {
-    cachedYaw = gyro.getContinuousYawDeg();  // Read once
+    cachedYaw = gyro.getYaw().in(Degrees);  // Read once
 }
 
 public final Trigger atAngle =

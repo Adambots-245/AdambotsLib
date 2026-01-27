@@ -1,5 +1,8 @@
 package com.adambots.lib.actuators.config;
 
+import static edu.wpi.first.units.Units.*;
+import edu.wpi.first.units.measure.*;
+
 /**
  * Configuration record for Motion Magic motion profiling.
  *
@@ -9,8 +12,8 @@ package com.adambots.lib.actuators.config;
  *
  * <p><strong>Parameter Guidance:</strong>
  * <ul>
- *   <li><strong>cruiseVelocityRPS:</strong> Set to 70-80% of mechanism's maximum speed</li>
- *   <li><strong>accelerationRPSPerSec:</strong> Typically 2-4x cruise velocity</li>
+ *   <li><strong>cruiseVelocity:</strong> Set to 70-80% of mechanism's maximum speed</li>
+ *   <li><strong>acceleration:</strong> Typically 2-4x cruise velocity</li>
  *   <li><strong>jerkRPSPerSecPerSec:</strong> Optional smoothing (0 = disabled, or 5-10x acceleration)</li>
  * </ul>
  *
@@ -18,21 +21,57 @@ package com.adambots.lib.actuators.config;
  * <pre>{@code
  * // Elevator motion profile
  * MotionMagicConfig elevatorProfile = new MotionMagicConfig(
- *     50.0,    // 50 RPS cruise velocity
- *     150.0,   // 150 RPS² acceleration
+ *     RotationsPerSecond.of(50),    // 50 RPS cruise velocity
+ *     RotationsPerSecondPerSecond.of(150),   // 150 RPS² acceleration
  *     500.0    // 500 RPS³ jerk limiting
  * );
  *
  * // Arm motion profile (slower, smoother)
- * MotionMagicConfig armProfile = new MotionMagicConfig(30.0, 90.0, 300.0);
+ * MotionMagicConfig armProfile = new MotionMagicConfig(
+ *     RotationsPerSecond.of(30),
+ *     RotationsPerSecondPerSecond.of(90),
+ *     300.0
+ * );
  * }</pre>
  *
- * @param cruiseVelocityRPS Maximum velocity during motion in rotations per second
- * @param accelerationRPSPerSec Acceleration rate in rotations per second²
+ * @param cruiseVelocity Maximum velocity during motion
+ * @param acceleration Acceleration rate
  * @param jerkRPSPerSecPerSec Jerk (rate of acceleration change) in rotations per second³ (0 to disable)
  */
 public record MotionMagicConfig(
-    double cruiseVelocityRPS,
-    double accelerationRPSPerSec,
+    AngularVelocity cruiseVelocity,
+    AngularAcceleration acceleration,
     double jerkRPSPerSecPerSec
-) {}
+) {
+    /**
+     * Creates a MotionMagicConfig using raw RPS values for backwards compatibility.
+     *
+     * @param cruiseVelocityRPS Maximum velocity during motion in rotations per second
+     * @param accelerationRPSPerSec Acceleration rate in rotations per second²
+     * @param jerkRPSPerSecPerSec Jerk (rate of acceleration change) in rotations per second³ (0 to disable)
+     * @return A new MotionMagicConfig instance
+     */
+    public static MotionMagicConfig fromRPS(double cruiseVelocityRPS, double accelerationRPSPerSec, double jerkRPSPerSecPerSec) {
+        return new MotionMagicConfig(
+            RotationsPerSecond.of(cruiseVelocityRPS),
+            RotationsPerSecondPerSecond.of(accelerationRPSPerSec),
+            jerkRPSPerSecPerSec
+        );
+    }
+
+    /**
+     * Gets the cruise velocity in rotations per second for motor controller APIs.
+     * @return Cruise velocity in RPS
+     */
+    public double cruiseVelocityRPS() {
+        return cruiseVelocity.in(RotationsPerSecond);
+    }
+
+    /**
+     * Gets the acceleration in rotations per second² for motor controller APIs.
+     * @return Acceleration in RPS²
+     */
+    public double accelerationRPSPerSec() {
+        return acceleration.in(RotationsPerSecondPerSecond);
+    }
+}

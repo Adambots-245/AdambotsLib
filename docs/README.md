@@ -58,6 +58,7 @@ dependencies {
 import com.adambots.lib.actuators.*;
 import com.adambots.lib.sensors.*;
 import com.adambots.lib.subsystems.*;
+import static edu.wpi.first.units.Units.*;
 
 // Create a motor (NEO, TalonFX, or Minion)
 BaseMotor motor = new NEOMotor(1, false, 40, false);
@@ -76,9 +77,13 @@ BaseProximitySensor photoEye = new PhotoEye(3, false);  // DIO port 3
 // Create subsystems
 CANdleSubsystem leds = new CANdleSubsystem(10);  // CAN ID 10
 
-// Read sensor values
-double heading = gyro.getContinuousYawDeg();
-double armAngle = encoder.getAbsolutePositionDegrees();
+// Read sensor values with WPILib units
+Angle heading = gyro.getYaw();
+double headingDegrees = heading.in(Degrees);
+
+Angle armAngle = encoder.getPosition();
+double armDegrees = armAngle.in(Degrees);
+
 boolean hasGamePiece = photoEye.isDetecting();
 
 // Control LEDs

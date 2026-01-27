@@ -1,6 +1,7 @@
 package com.adambots.lib.sensors;
 
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.units.measure.Angle;
 
 /**
  * Base interface for absolute position encoders.
@@ -17,21 +18,22 @@ import edu.wpi.first.math.geometry.Rotation2d;
  * </ul>
  *
  * <p><strong>Position Units:</strong>
- * Position is reported as degrees (0.0 to 360.0) or radians (0.0 to 2π).
- * Values wrap at the boundaries for absolute position tracking.
+ * Position is returned as a WPILib {@link Angle} type. Use the {@code .in()} method
+ * to convert to degrees or radians.
  *
  * <p><strong>Usage Example:</strong>
  * <pre>{@code
- * BaseAbsoluteEncoder encoder = new ThroughBoreEncoder(5);
+ * import static edu.wpi.first.units.Units.*;
  *
- * // Get current position (degrees)
- * double position = encoder.getAbsolutePositionDegrees();
+ * BaseAbsoluteEncoder encoder = new CANCoder(5);
  *
- * // Get position in radians
- * double radians = encoder.getAbsolutePositionRadians();
+ * // Get current position (various units)
+ * Angle position = encoder.getPosition();
+ * double degrees = position.in(Degrees);
+ * double radians = position.in(Radians);
  *
  * // Get as Rotation2d for kinematics
- * Rotation2d rotation = encoder.getAbsolutePositionRotation2D();
+ * Rotation2d rotation = encoder.getPositionRotation2d();
  * }</pre>
  *
  * @see BaseGyro
@@ -39,21 +41,27 @@ import edu.wpi.first.math.geometry.Rotation2d;
 public interface BaseAbsoluteEncoder {
 
     /**
-     * Returns the discrete (does not continue past 360) value of the encoder in degrees
-     * @return Discrete value of encoder in degrees
+     * Returns the absolute position of the encoder.
+     *
+     * <p>Position values wrap at 360° (one full rotation).
+     * Use {@code .in(Degrees)} or {@code .in(Radians)} to convert:
+     * <pre>{@code
+     * Angle pos = encoder.getPosition();
+     * double degrees = pos.in(Degrees);  // 0.0 to 360.0
+     * double radians = pos.in(Radians);  // 0.0 to 2π
+     * }</pre>
+     *
+     * @return Absolute position (wraps at 360°)
      */
-    double getAbsolutePositionDegrees();
+    Angle getPosition();
 
     /**
-     * Returns the discrete (does not continue past 2pi) value of the encoder in radians
-     * @return Discrete value of encoder in radians
+     * Returns the absolute position as a Rotation2d.
+     *
+     * <p>Useful for WPILib kinematics and geometry classes.
+     *
+     * @return Absolute position as Rotation2d
      */
-    double getAbsolutePositionRadians();
-
-    /**
-     * Returns the discrete (does not continue past 2pi) value of the encoder in radians
-     * @return Discrete value of encoder in radians
-     */
-    Rotation2d getAbsolutePositionRotation2D();
+    Rotation2d getPositionRotation2d();
 
 }
