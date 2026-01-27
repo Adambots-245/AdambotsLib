@@ -27,11 +27,24 @@ Pre-built command-based subsystems for common robot components:
 - **[Subsystems Overview](subsystems/README.md)** - Introduction to subsystem implementations
 - **[SwerveSubsystem](subsystems/SwerveSubsystem.md)** - YAGSL-based swerve drive with PhotonVision and PathPlanner
 - **[CANdleSubsystem](subsystems/CANdleSubsystem.md)** - CTRE CANdle LED strip controller (Phoenix 6)
+- **[CANdleSubsystem Commands](subsystems/CANdleSubsystem-CommandFactory.md)** - Command factory methods for CANdle
+- **[CameraSubsystem](subsystems/CameraSubsystem.md)** - PhotonVision camera management
+- **[Custom Commands](subsystems/CustomCommands.md)** - Reusable command patterns
+
+### Vision
+Computer vision for AprilTag detection and pose estimation:
+
+- **[Vision Overview](vision/README.md)** - Introduction to vision processing
+- **[PhotonVision](vision/PhotonVision.md)** - PhotonVision integration guide
+- **[Vision Configuration](vision/VisionConfiguration.md)** - Camera and pipeline setup
 
 ### Utilities
 Utility classes and helpers for common programming patterns:
 
 - **[Utils Overview](utils/README.md)** - Introduction to utility classes
+- **[Utils](utils/Utils.md)** - General utility functions (alliance, math, angles, geometry)
+- **[Buttons](utils/Buttons.md)** - Controller input abstraction (Xbox, PS5, joystick)
+- **[Dash](utils/Dash.md)** - Simplified Shuffleboard interface
 - **[StateMachine](utils/StateMachine.md)** - Type-safe state machine for managing subsystem behavior
 
 ## 🚀 Quick Start
@@ -163,9 +176,19 @@ docs/
 ├── subsystems/
 │   ├── README.md (subsystems overview)
 │   ├── SwerveSubsystem.md
-│   └── CANdleSubsystem.md
+│   ├── CANdleSubsystem.md
+│   ├── CANdleSubsystem-CommandFactory.md
+│   ├── CameraSubsystem.md
+│   └── CustomCommands.md
+├── vision/
+│   ├── README.md (vision overview)
+│   ├── PhotonVision.md
+│   └── VisionConfiguration.md
 └── utils/
     ├── README.md (utils overview)
+    ├── Utils.md
+    ├── Buttons.md
+    ├── Dash.md
     └── StateMachine.md
 ```
 
