@@ -12,6 +12,7 @@ Unified controller input abstraction supporting Xbox, PS5, and joystick controll
 - [Initialization](#initialization)
 - [Input Processing](#input-processing)
 - [Triggers](#triggers)
+- [Advanced Trigger Patterns](#advanced-trigger-patterns)
 - [Rumble Feedback](#rumble-feedback)
 - [Drive Input Suppliers](#drive-input-suppliers)
 - [Complete Examples](#complete-examples)
@@ -428,6 +429,72 @@ Buttons.XboxRightBumper.and(Buttons.XboxA).onTrue(specialCommand());
 
 // Negate trigger
 Buttons.XboxLeftTriggerButton.negate().onTrue(defaultStateCommand());
+```
+
+---
+
+## Advanced Trigger Patterns
+
+> *Adapted from [FRC Team 6328 Mechanical Advantage](https://github.com/Mechanical-Advantage/RobotCode2026Public)*
+
+Advanced trigger utilities for specialized button behaviors.
+
+### Double-Press Detection
+
+Require two quick presses to activate - useful for safety-critical operations or special modes.
+
+```java
+// Require double-press to reset gyro (prevents accidental resets)
+Trigger resetGyro = Buttons.doublePress(Buttons.XboxStartButton);
+resetGyro.onTrue(Commands.runOnce(() -> gyro.reset()));
+
+// Double-press for special modes
+Trigger turboMode = Buttons.doublePress(Buttons.XboxAButton);
+turboMode.whileTrue(swerve.setMaxSpeedCommand(1.0));
+
+// Custom timeout (default is 0.4 seconds)
+Trigger emergencyStop = Buttons.doublePress(Buttons.XboxBackButton, 0.3);
+emergencyStop.onTrue(Commands.runOnce(() -> disableAllSubsystems()));
+```
+
+**How it works:** The trigger only activates when the button is pressed twice within the timeout window (default 0.4 seconds). Single presses are ignored.
+
+**Use cases:**
+- Reset gyro heading
+- Emergency stop
+- Enable "turbo" or special modes
+- Confirm destructive actions (climber deploy, etc.)
+
+### Continuous Command Scheduling
+
+Re-schedule a command every loop cycle while held, instead of just once.
+
+```java
+// Standard whileTrue() - schedules command ONCE when trigger becomes true
+Buttons.XboxAButton.whileTrue(new IntakeCommand(intake));
+
+// whileTrueContinuous() - re-schedules EVERY loop while held
+Buttons.whileTrueContinuous(Buttons.XboxAButton, new IntakeCommand(intake));
+```
+
+**When to use:**
+- Commands that complete quickly and need immediate restart
+- Fire-and-forget actions that should repeat while held
+- Commands that may get cancelled by other systems
+
+```java
+// Example: Continuously try to shoot while held
+// (command finishes after each shot, immediately re-starts)
+Buttons.whileTrueContinuous(
+    Buttons.XboxRightTriggerButton,
+    new ShootOnceCommand(shooter)
+);
+
+// Example: Continuously align to target
+Buttons.whileTrueContinuous(
+    Buttons.PS5L2Button,
+    new AlignToTargetCommand(swerve, vision).withTimeout(0.5)
+);
 ```
 
 ---
@@ -960,6 +1027,46 @@ Immediately stop PS5 controller rumble.
 
 ---
 
+### Advanced Trigger Patterns
+
+```java
+public static Trigger doublePress(Trigger baseTrigger)
+```
+Creates a trigger that activates only on double-press within 0.4 seconds.
+
+**Parameters:**
+- `baseTrigger` - The trigger to monitor for double-press
+
+**Returns:** A new Trigger that activates only on double-press
+
+---
+
+```java
+public static Trigger doublePress(Trigger baseTrigger, double maxTimeSecs)
+```
+Creates a trigger that activates only on double-press within the specified time.
+
+**Parameters:**
+- `baseTrigger` - The trigger to monitor for double-press
+- `maxTimeSecs` - Maximum time between presses to count as double-press
+
+**Returns:** A new Trigger that activates only on double-press
+
+---
+
+```java
+public static void whileTrueContinuous(Trigger trigger, Command command)
+```
+Creates a trigger binding that continuously re-schedules a command while held.
+
+**Parameters:**
+- `trigger` - The trigger to monitor
+- `command` - The command to continuously schedule while trigger is active
+
+**Note:** Unlike `whileTrue()`, which schedules the command once, this method re-schedules every loop cycle.
+
+---
+
 ### Controller Getters
 
 ```java
@@ -1297,4 +1404,4 @@ public void robotInit() {
 
 ---
 
-**Last Updated:** 2026-01-14
+**Last Updated:** 2026-01-27

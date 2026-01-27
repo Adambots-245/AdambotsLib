@@ -9,6 +9,8 @@ import java.util.function.DoubleSupplier;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.wpilibj.GenericHID.RumbleType;
 import edu.wpi.first.wpilibj.RobotBase;
+import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.button.CommandJoystick;
 import edu.wpi.first.wpilibj2.command.button.CommandPS5Controller;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
@@ -947,5 +949,171 @@ public class Buttons {
             currentRumbleTask.cancel(false);
         }
         controller.getHID().setRumble(RumbleType.kBothRumble, 0.0);
+    }
+
+    // ======================== ADVANCED TRIGGER PATTERNS ========================
+
+    /**
+     * Creates a trigger binding that continuously re-schedules a command while held.
+     *
+     * <p>Unlike the standard {@code whileTrue()}, which only schedules the command once,
+     * this method re-schedules the command on every loop cycle while the trigger is active.
+     * This is useful for commands that need to restart immediately after completing.
+     *
+     * <p>Adapted from FRC Team 6328 Mechanical Advantage.
+     * Licensed under MIT License - Copyright (c) 2025-2026 Littleton Robotics.
+     *
+     * @see <a href="https://github.com/Mechanical-Advantage/RobotCode2026Public">Original Source</a>
+     *
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * // Continuously reschedule intake command while button is held
+     * Buttons.whileTrueContinuous(Buttons.XboxAButton, new IntakeCommand(intake));
+     *
+     * // Useful for commands that complete quickly and need immediate restart
+     * Buttons.whileTrueContinuous(shootTrigger, new ShootOnceCommand(shooter));
+     * }</pre>
+     *
+     * @param trigger The trigger to monitor
+     * @param command The command to continuously schedule while trigger is active
+     */
+    public static void whileTrueContinuous(Trigger trigger, Command command) {
+        trigger.whileTrue(command.repeatedly()).onFalse(command.finallyDo(command::cancel));
+    }
+
+    /**
+     * Creates a trigger that activates only on double-press within 0.4 seconds.
+     *
+     * <p>The returned trigger activates when the base trigger is pressed twice
+     * in quick succession (within 400ms). Useful for confirming destructive
+     * actions or activating special modes.
+     *
+     * <p>Adapted from FRC Team 6328 Mechanical Advantage.
+     * Licensed under MIT License - Copyright (c) 2025-2026 Littleton Robotics.
+     *
+     * @see <a href="https://github.com/Mechanical-Advantage/RobotCode2026Public">Original Source</a>
+     *
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * // Require double-press to reset gyro (prevents accidental resets)
+     * Trigger resetGyroTrigger = Buttons.doublePress(Buttons.XboxStartButton);
+     * resetGyroTrigger.onTrue(Commands.runOnce(() -> gyro.reset()));
+     *
+     * // Double-press A button to enable "turbo mode"
+     * Buttons.doublePress(Buttons.XboxAButton).onTrue(enableTurboMode());
+     * }</pre>
+     *
+     * @param baseTrigger The trigger to monitor for double-press
+     * @return A new Trigger that activates only on double-press
+     */
+    public static Trigger doublePress(Trigger baseTrigger) {
+        return doublePress(baseTrigger, 0.4);
+    }
+
+    /**
+     * Creates a trigger that activates only on double-press within the specified time.
+     *
+     * <p>Adapted from FRC Team 6328 Mechanical Advantage.
+     * Licensed under MIT License - Copyright (c) 2025-2026 Littleton Robotics.
+     *
+     * @see <a href="https://github.com/Mechanical-Advantage/RobotCode2026Public">Original Source</a>
+     *
+     * @param baseTrigger The trigger to monitor for double-press
+     * @param maxTimeSecs Maximum time between presses to count as double-press
+     * @return A new Trigger that activates only on double-press
+     */
+    public static Trigger doublePress(Trigger baseTrigger, double maxTimeSecs) {
+        DoublePressTracker tracker = new DoublePressTracker(baseTrigger, maxTimeSecs);
+        return new Trigger(tracker::get);
+    }
+
+    /**
+     * Tracks double-press detection for a trigger using a state machine.
+     *
+     * <p>Adapted from FRC Team 6328 Mechanical Advantage.
+     * Licensed under MIT License - Copyright (c) 2025-2026 Littleton Robotics.
+     *
+     * @see <a href="https://github.com/Mechanical-Advantage/RobotCode2026Public">Original Source</a>
+     */
+    private static class DoublePressTracker {
+        /** State machine states for double-press detection. */
+        private enum State {
+            /** Waiting for first press. */
+            IDLE,
+            /** Button held after first press. */
+            FIRST_PRESS,
+            /** Button released, awaiting second press. */
+            FIRST_RELEASE,
+            /** Second press detected - trigger should activate. */
+            SECOND_PRESS
+        }
+
+        private final Trigger baseTrigger;
+        private final double maxTimeSecs;
+        private final Timer timer = new Timer();
+        private State state = State.IDLE;
+
+        /**
+         * Creates a new DoublePressTracker.
+         *
+         * @param baseTrigger The trigger to monitor
+         * @param maxTimeSecs Maximum time between presses
+         */
+        DoublePressTracker(Trigger baseTrigger, double maxTimeSecs) {
+            this.baseTrigger = baseTrigger;
+            this.maxTimeSecs = maxTimeSecs;
+        }
+
+        /**
+         * Returns whether a double-press is currently detected.
+         *
+         * <p>Must be called each loop cycle to update the state machine.
+         *
+         * @return {@code true} if currently in double-press state
+         */
+        boolean get() {
+            boolean pressed = baseTrigger.getAsBoolean();
+
+            switch (state) {
+                case IDLE:
+                    if (pressed) {
+                        state = State.FIRST_PRESS;
+                        timer.restart();
+                    }
+                    break;
+
+                case FIRST_PRESS:
+                    if (!pressed) {
+                        state = State.FIRST_RELEASE;
+                    } else if (timer.hasElapsed(maxTimeSecs)) {
+                        // Held too long without release - reset
+                        state = State.IDLE;
+                    }
+                    break;
+
+                case FIRST_RELEASE:
+                    if (pressed) {
+                        if (!timer.hasElapsed(maxTimeSecs)) {
+                            state = State.SECOND_PRESS;
+                        } else {
+                            // Too slow - treat as new first press
+                            state = State.FIRST_PRESS;
+                            timer.restart();
+                        }
+                    } else if (timer.hasElapsed(maxTimeSecs)) {
+                        // Timed out waiting for second press
+                        state = State.IDLE;
+                    }
+                    break;
+
+                case SECOND_PRESS:
+                    if (!pressed) {
+                        state = State.IDLE;
+                    }
+                    break;
+            }
+
+            return state == State.SECOND_PRESS;
+        }
     }
 }

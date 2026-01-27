@@ -27,6 +27,7 @@ This folder contains utility classes that provide reusable solutions for common 
   - All buttons as WPILib Trigger objects
   - Thread-safe rumble with automatic shutoff
   - Pre-built drive input suppliers
+  - **Advanced trigger patterns** (double-press, continuous scheduling) *
 
 ### Dashboard & Telemetry
 
@@ -48,6 +49,26 @@ This folder contains utility classes that provide reusable solutions for common 
   - Array utilities (average, min, max, index finding)
   - Time utilities (elapsed checks, conversions)
   - Error reporting (standardized DriverStation messages)
+  - **Epsilon comparison** (floating-point tolerance comparisons) *
+  - **Geometry conversions** (Pose2d/Transform2d, Twist2d operations) *
+
+### Performance Profiling
+
+- **LoggedTracer** - Performance timing utility for profiling code execution *
+  - Measure time between execution points
+  - Log durations to NetworkTables for analysis
+  - Identify slow subsystems causing loop overruns
+  - Debug periodic loop timing issues
+
+### Commands
+
+- **SuppliedWaitCommand** - Dynamic wait command for sequences *
+  - Accept duration from DoubleSupplier instead of fixed value
+  - Tunable autonomous timing
+  - Sensor-based wait durations
+  - Game state conditional delays
+
+*Adapted from FRC Team 6328 Mechanical Advantage ([source](https://github.com/Mechanical-Advantage/RobotCode2026Public))
 
 ---
 
@@ -338,12 +359,132 @@ if (RobotBase.isSimulation()) {
 
 ---
 
+## Utilities from Mechanical Advantage
+
+Several utilities in AdambotsLib are adapted from **FRC Team 6328 Mechanical Advantage**.
+These are marked with * in the feature lists above. Licensed under MIT License.
+
+**Source:** [github.com/Mechanical-Advantage/RobotCode2026Public](https://github.com/Mechanical-Advantage/RobotCode2026Public)
+
+### Epsilon Comparison (Utils)
+
+Floating-point comparison with tolerance:
+
+```java
+// Compare doubles with default epsilon (1e-9)
+if (Utils.epsilonEquals(motorPosition, targetPosition)) {
+    // Motor has reached target
+}
+
+// Compare with custom epsilon
+if (Utils.epsilonEquals(a, b, 0.001)) {
+    // Values are within 0.001 of each other
+}
+
+// Compare Twist2d objects
+if (Utils.epsilonEquals(currentTwist, targetTwist)) {
+    // Velocities match
+}
+```
+
+### Geometry Utilities (Utils)
+
+Pose/Transform conversions and operations:
+
+```java
+// Convert between Pose2d and Transform2d
+Transform2d transform = Utils.toTransform2d(pose);
+Pose2d pose = Utils.toPose2d(transform);
+
+// Compute inverse pose
+Pose2d robotPose = odometry.getPose();
+Pose2d inversePose = Utils.inverse(robotPose);
+
+// Scale a Twist2d
+Twist2d halfVelocity = Utils.multiply(velocity, 0.5);
+
+// Convert ChassisSpeeds to Twist2d
+Twist2d twist = Utils.toTwist2d(chassisSpeeds);
+
+// Modify pose components
+Pose2d newPose = Utils.withRotation(pose, newRotation);
+Pose2d newPose2 = Utils.withTranslation(pose, newTranslation);
+```
+
+### LoggedTracer
+
+Profile code execution by measuring time between checkpoints:
+
+```java
+public void robotPeriodic() {
+    LoggedTracer.reset();
+
+    swerve.periodic();
+    LoggedTracer.record("Swerve");  // Logs DrivetrainMS to NetworkTables
+
+    vision.periodic();
+    LoggedTracer.record("Vision");  // Logs VisionMS to NetworkTables
+
+    arm.periodic();
+    LoggedTracer.record("Arm");     // Logs ArmMS to NetworkTables
+}
+```
+
+View timing data in AdvantageScope or SmartDashboard under "LoggedTracer/".
+
+### Advanced Trigger Patterns (Buttons)
+
+Double-press detection:
+
+```java
+// Require double-press to reset gyro (prevents accidents)
+Trigger resetGyro = Buttons.doublePress(Buttons.XboxStartButton);
+resetGyro.onTrue(Commands.runOnce(() -> gyro.reset()));
+
+// Double-press with custom timeout (default is 0.4 seconds)
+Trigger turboMode = Buttons.doublePress(Buttons.XboxAButton, 0.3);
+```
+
+Continuous command scheduling:
+
+```java
+// Re-schedule command every loop while held (vs once with whileTrue)
+Buttons.whileTrueContinuous(Buttons.XboxAButton, new IntakeCommand(intake));
+```
+
+### SuppliedWaitCommand
+
+Wait command with dynamic duration:
+
+```java
+// Wait for tunable duration (value can change between executions)
+TunableDouble waitTime = new TunableDouble("AutoWait", 2.0);
+Command autoSequence = Commands.sequence(
+    driveForward(),
+    new SuppliedWaitCommand(waitTime::get),
+    intake()
+);
+
+// Wait based on sensor
+Command dynamicWait = new SuppliedWaitCommand(
+    () -> distanceSensor.getRange() / 10.0
+);
+
+// Conditional wait duration
+Command smartWait = new SuppliedWaitCommand(
+    () -> DriverStation.isTeleop() ? 0.5 : 1.5
+);
+```
+
+---
+
 ## See Also
 
 - [Actuators Documentation](../actuators/README.md)
 - [Sensors Documentation](../sensors/README.md)
 - [Subsystems Documentation](../subsystems/README.md)
 - [WPILib Command-Based](https://docs.wpilib.org/en/stable/docs/software/commandbased/)
+- [Mechanical Advantage RobotCode2026Public](https://github.com/Mechanical-Advantage/RobotCode2026Public)
 
 ---
 

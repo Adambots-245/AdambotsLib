@@ -5,8 +5,15 @@
 package com.adambots.lib.utils;
 
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Rotation3d;
+import edu.wpi.first.math.geometry.Transform2d;
+import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.geometry.Translation3d;
+import edu.wpi.first.math.geometry.Twist2d;
+import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.util.Color;
 
@@ -188,6 +195,320 @@ public class Utils {
             );
         }
         return pose;
+    }
+
+    // ======================== EPSILON COMPARISON UTILITIES ========================
+
+    /** Default epsilon value for floating-point comparisons. */
+    private static final double DEFAULT_EPSILON = 1e-9;
+
+    /**
+     * Compares two doubles with a specified epsilon tolerance.
+     *
+     * <p>Floating-point arithmetic can produce small rounding errors, making direct
+     * equality comparison unreliable. This method checks if two values are "close enough"
+     * to be considered equal.
+     *
+     * <p>Adapted from FRC Team 6328 Mechanical Advantage.
+     * Licensed under MIT License - Copyright (c) 2025-2026 Littleton Robotics.
+     *
+     * @see <a href="https://github.com/Mechanical-Advantage/RobotCode2026Public">Original Source</a>
+     *
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * double a = 0.1 + 0.2;  // May not equal exactly 0.3
+     * if (Utils.epsilonEquals(a, 0.3, 1e-9)) {
+     *     // Values are close enough
+     * }
+     * }</pre>
+     *
+     * @param a First value
+     * @param b Second value
+     * @param epsilon Maximum allowed difference
+     * @return {@code true} if the absolute difference is less than or equal to epsilon
+     */
+    public static boolean epsilonEquals(double a, double b, double epsilon) {
+        return (a - epsilon <= b) && (a + epsilon >= b);
+    }
+
+    /**
+     * Compares two doubles with the default epsilon tolerance of 1e-9.
+     *
+     * <p>Adapted from FRC Team 6328 Mechanical Advantage.
+     * Licensed under MIT License - Copyright (c) 2025-2026 Littleton Robotics.
+     *
+     * @see <a href="https://github.com/Mechanical-Advantage/RobotCode2026Public">Original Source</a>
+     *
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * if (Utils.epsilonEquals(motorPosition, targetPosition)) {
+     *     // Motor has reached target
+     * }
+     * }</pre>
+     *
+     * @param a First value
+     * @param b Second value
+     * @return {@code true} if the absolute difference is less than or equal to 1e-9
+     */
+    public static boolean epsilonEquals(double a, double b) {
+        return epsilonEquals(a, b, DEFAULT_EPSILON);
+    }
+
+    /**
+     * Compares two Twist2d objects with the default epsilon tolerance.
+     *
+     * <p>Checks if dx, dy, and dtheta components are all equal within epsilon.
+     *
+     * <p>Adapted from FRC Team 6328 Mechanical Advantage.
+     * Licensed under MIT License - Copyright (c) 2025-2026 Littleton Robotics.
+     *
+     * @see <a href="https://github.com/Mechanical-Advantage/RobotCode2026Public">Original Source</a>
+     *
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * Twist2d currentTwist = drivetrain.getTwist();
+     * Twist2d targetTwist = new Twist2d(1.0, 0.0, 0.5);
+     * if (Utils.epsilonEquals(currentTwist, targetTwist)) {
+     *     // Velocities match
+     * }
+     * }</pre>
+     *
+     * @param a First Twist2d
+     * @param b Second Twist2d
+     * @return {@code true} if all components are equal within default epsilon
+     */
+    public static boolean epsilonEquals(Twist2d a, Twist2d b) {
+        return epsilonEquals(a.dx, b.dx)
+            && epsilonEquals(a.dy, b.dy)
+            && epsilonEquals(a.dtheta, b.dtheta);
+    }
+
+    // ======================== GEOMETRY CONVERSION UTILITIES ========================
+
+    /**
+     * Converts a Pose2d to a Transform2d.
+     *
+     * <p>Useful for converting pose representations for kinematic chain operations.
+     *
+     * <p>Adapted from FRC Team 6328 Mechanical Advantage.
+     * Licensed under MIT License - Copyright (c) 2025-2026 Littleton Robotics.
+     *
+     * @see <a href="https://github.com/Mechanical-Advantage/RobotCode2026Public">Original Source</a>
+     *
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * Pose2d cameraPose = new Pose2d(0.3, 0.0, Rotation2d.fromDegrees(0));
+     * Transform2d cameraTransform = Utils.toTransform2d(cameraPose);
+     * }</pre>
+     *
+     * @param pose The Pose2d to convert
+     * @return A Transform2d with the same translation and rotation
+     */
+    public static Transform2d toTransform2d(Pose2d pose) {
+        return new Transform2d(pose.getTranslation(), pose.getRotation());
+    }
+
+    /**
+     * Converts a Transform2d to a Pose2d.
+     *
+     * <p>Adapted from FRC Team 6328 Mechanical Advantage.
+     * Licensed under MIT License - Copyright (c) 2025-2026 Littleton Robotics.
+     *
+     * @see <a href="https://github.com/Mechanical-Advantage/RobotCode2026Public">Original Source</a>
+     *
+     * @param transform The Transform2d to convert
+     * @return A Pose2d with the same translation and rotation
+     */
+    public static Pose2d toPose2d(Transform2d transform) {
+        return new Pose2d(transform.getTranslation(), transform.getRotation());
+    }
+
+    /**
+     * Creates a Pose2d from a Translation2d with zero rotation.
+     *
+     * <p>Adapted from FRC Team 6328 Mechanical Advantage.
+     * Licensed under MIT License - Copyright (c) 2025-2026 Littleton Robotics.
+     *
+     * @see <a href="https://github.com/Mechanical-Advantage/RobotCode2026Public">Original Source</a>
+     *
+     * @param translation The translation for the pose
+     * @return A Pose2d with the given translation and zero rotation
+     */
+    public static Pose2d toPose2d(Translation2d translation) {
+        return new Pose2d(translation, Rotation2d.kZero);
+    }
+
+    /**
+     * Creates a Pose2d from a Rotation2d with zero translation.
+     *
+     * <p>Adapted from FRC Team 6328 Mechanical Advantage.
+     * Licensed under MIT License - Copyright (c) 2025-2026 Littleton Robotics.
+     *
+     * @see <a href="https://github.com/Mechanical-Advantage/RobotCode2026Public">Original Source</a>
+     *
+     * @param rotation The rotation for the pose
+     * @return A Pose2d with zero translation and the given rotation
+     */
+    public static Pose2d toPose2d(Rotation2d rotation) {
+        return new Pose2d(Translation2d.kZero, rotation);
+    }
+
+    /**
+     * Computes the inverse of a Pose2d.
+     *
+     * <p>The inverse pose, when composed with the original, yields the identity pose.
+     *
+     * <p>Adapted from FRC Team 6328 Mechanical Advantage.
+     * Licensed under MIT License - Copyright (c) 2025-2026 Littleton Robotics.
+     *
+     * @see <a href="https://github.com/Mechanical-Advantage/RobotCode2026Public">Original Source</a>
+     *
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * Pose2d robotPose = odometry.getPose();
+     * Pose2d inversePose = Utils.inverse(robotPose);
+     * // robotPose.transformBy(Utils.toTransform2d(inversePose)) ≈ origin
+     * }</pre>
+     *
+     * @param pose The pose to invert
+     * @return The inverse pose
+     */
+    public static Pose2d inverse(Pose2d pose) {
+        Rotation2d rotationInverse = pose.getRotation().unaryMinus();
+        return new Pose2d(
+            pose.getTranslation().unaryMinus().rotateBy(rotationInverse),
+            rotationInverse);
+    }
+
+    /**
+     * Multiplies a Twist2d by a scalar.
+     *
+     * <p>Scales all components (dx, dy, dtheta) by the given factor.
+     *
+     * <p>Adapted from FRC Team 6328 Mechanical Advantage.
+     * Licensed under MIT License - Copyright (c) 2025-2026 Littleton Robotics.
+     *
+     * @see <a href="https://github.com/Mechanical-Advantage/RobotCode2026Public">Original Source</a>
+     *
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * Twist2d velocity = new Twist2d(2.0, 1.0, 0.5);
+     * Twist2d halfVelocity = Utils.multiply(velocity, 0.5);
+     * // halfVelocity = (1.0, 0.5, 0.25)
+     * }</pre>
+     *
+     * @param twist The twist to scale
+     * @param scalar The scaling factor
+     * @return A new Twist2d with scaled components
+     */
+    public static Twist2d multiply(Twist2d twist, double scalar) {
+        return new Twist2d(twist.dx * scalar, twist.dy * scalar, twist.dtheta * scalar);
+    }
+
+    /**
+     * Converts ChassisSpeeds to a Twist2d.
+     *
+     * <p>Extracts velocity components from chassis speeds into twist representation.
+     *
+     * <p>Adapted from FRC Team 6328 Mechanical Advantage.
+     * Licensed under MIT License - Copyright (c) 2025-2026 Littleton Robotics.
+     *
+     * @see <a href="https://github.com/Mechanical-Advantage/RobotCode2026Public">Original Source</a>
+     *
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * ChassisSpeeds speeds = swerve.getChassisSpeeds();
+     * Twist2d twist = Utils.toTwist2d(speeds);
+     * }</pre>
+     *
+     * @param speeds The chassis speeds to convert
+     * @return A Twist2d with the velocity components
+     */
+    public static Twist2d toTwist2d(ChassisSpeeds speeds) {
+        return new Twist2d(
+            speeds.vxMetersPerSecond,
+            speeds.vyMetersPerSecond,
+            speeds.omegaRadiansPerSecond);
+    }
+
+    /**
+     * Returns a new Pose2d with the given translation but preserving the original rotation.
+     *
+     * <p>Adapted from FRC Team 6328 Mechanical Advantage.
+     * Licensed under MIT License - Copyright (c) 2025-2026 Littleton Robotics.
+     *
+     * @see <a href="https://github.com/Mechanical-Advantage/RobotCode2026Public">Original Source</a>
+     *
+     * @param pose The original pose
+     * @param translation The new translation
+     * @return A new Pose2d with the given translation and original rotation
+     */
+    public static Pose2d withTranslation(Pose2d pose, Translation2d translation) {
+        return new Pose2d(translation, pose.getRotation());
+    }
+
+    /**
+     * Returns a new Pose2d with the given rotation but preserving the original translation.
+     *
+     * <p>Adapted from FRC Team 6328 Mechanical Advantage.
+     * Licensed under MIT License - Copyright (c) 2025-2026 Littleton Robotics.
+     *
+     * @see <a href="https://github.com/Mechanical-Advantage/RobotCode2026Public">Original Source</a>
+     *
+     * @param pose The original pose
+     * @param rotation The new rotation
+     * @return A new Pose2d with the original translation and given rotation
+     */
+    public static Pose2d withRotation(Pose2d pose, Rotation2d rotation) {
+        return new Pose2d(pose.getTranslation(), rotation);
+    }
+
+    /**
+     * Converts a Pose3d to a Transform3d.
+     *
+     * <p>Adapted from FRC Team 6328 Mechanical Advantage.
+     * Licensed under MIT License - Copyright (c) 2025-2026 Littleton Robotics.
+     *
+     * @see <a href="https://github.com/Mechanical-Advantage/RobotCode2026Public">Original Source</a>
+     *
+     * @param pose The Pose3d to convert
+     * @return A Transform3d with the same translation and rotation
+     */
+    public static Transform3d toTransform3d(Pose3d pose) {
+        return new Transform3d(pose.getTranslation(), pose.getRotation());
+    }
+
+    /**
+     * Converts a Transform3d to a Pose3d.
+     *
+     * <p>Adapted from FRC Team 6328 Mechanical Advantage.
+     * Licensed under MIT License - Copyright (c) 2025-2026 Littleton Robotics.
+     *
+     * @see <a href="https://github.com/Mechanical-Advantage/RobotCode2026Public">Original Source</a>
+     *
+     * @param transform The Transform3d to convert
+     * @return A Pose3d with the same translation and rotation
+     */
+    public static Pose3d toPose3d(Transform3d transform) {
+        return new Pose3d(transform.getTranslation(), transform.getRotation());
+    }
+
+    /**
+     * Reduces a Transform3d to a Transform2d (XY plane projection).
+     *
+     * <p>Adapted from FRC Team 6328 Mechanical Advantage.
+     * Licensed under MIT License - Copyright (c) 2025-2026 Littleton Robotics.
+     *
+     * @see <a href="https://github.com/Mechanical-Advantage/RobotCode2026Public">Original Source</a>
+     *
+     * @param transform The Transform3d to convert
+     * @return A Transform2d projected onto the XY plane
+     */
+    public static Transform2d toTransform2d(Transform3d transform) {
+        return new Transform2d(
+            transform.getTranslation().getX(),
+            transform.getTranslation().getY(),
+            transform.getRotation().toRotation2d());
     }
 
     // ======================== MATH UTILITIES ========================

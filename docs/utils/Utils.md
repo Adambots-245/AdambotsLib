@@ -7,6 +7,8 @@ Comprehensive collection of utility functions for common FRC programming tasks.
 ## Table of Contents
 
 - [Overview](#overview)
+- [Epsilon Comparison](#epsilon-comparison)
+- [Geometry Utilities](#geometry-utilities)
 - [Alliance Utilities](#alliance-utilities)
 - [Math Utilities](#math-utilities)
 - [Angle Utilities](#angle-utilities)
@@ -26,6 +28,8 @@ The `Utils` class provides general-purpose utility functions that complement WPI
 
 ### Categories
 
+- **Epsilon Comparison** - Floating-point comparison with tolerance *
+- **Geometry Utilities** - Pose/Transform conversions and operations *
 - **Alliance Utilities** - Check alliance color, mirror poses for red/blue
 - **Math Utilities** - Linear interpolation, range mapping, progress calculation
 - **Angle Utilities** - Normalize angles, compute shortest angular difference
@@ -33,6 +37,8 @@ The `Utils` class provides general-purpose utility functions that complement WPI
 - **Array Utilities** - Average, min, max, and index finding for arrays
 - **Time Utilities** - Time conversion and elapsed time checks
 - **Error Reporting** - Standardized error/warning messages to DriverStation
+
+*Adapted from [FRC Team 6328 Mechanical Advantage](https://github.com/Mechanical-Advantage/RobotCode2026Public)
 
 ### When to Use
 
@@ -48,6 +54,153 @@ The `Utils` class provides general-purpose utility functions that complement WPI
 - WPILib already has the function (clamp, deadband, etc.)
 - You need complex mathematical operations (use Math or MathUtil)
 - You need unit conversions (use edu.wpi.first.math.util.Units)
+
+---
+
+## Epsilon Comparison
+
+> *Adapted from [FRC Team 6328 Mechanical Advantage](https://github.com/Mechanical-Advantage/RobotCode2026Public)*
+
+Floating-point arithmetic can produce small rounding errors, making direct equality comparison unreliable. These methods check if values are "close enough" to be considered equal.
+
+### Compare Doubles
+
+```java
+// Compare with default epsilon (1e-9)
+double a = 0.1 + 0.2;  // May not equal exactly 0.3
+if (Utils.epsilonEquals(a, 0.3)) {
+    // Values are close enough
+}
+
+// Compare with custom epsilon for larger tolerances
+if (Utils.epsilonEquals(motorPosition, targetPosition, 0.001)) {
+    // Within 0.001 of target
+}
+
+// Check if motor has reached setpoint
+if (Utils.epsilonEquals(encoder.getPosition(), setpoint, 0.5)) {
+    // Within 0.5 units of setpoint
+}
+```
+
+### Compare Twist2d
+
+```java
+// Compare velocity vectors
+Twist2d currentTwist = drivetrain.getTwist();
+Twist2d targetTwist = new Twist2d(1.0, 0.0, 0.5);
+
+if (Utils.epsilonEquals(currentTwist, targetTwist)) {
+    // Velocities match (dx, dy, and dtheta all within epsilon)
+}
+```
+
+### When to Use
+
+- **Motor control**: Check if position/velocity reached setpoint
+- **Odometry**: Compare pose estimates
+- **Path following**: Check if waypoint reached
+- **Unit tests**: Compare calculated vs expected values
+
+---
+
+## Geometry Utilities
+
+> *Adapted from [FRC Team 6328 Mechanical Advantage](https://github.com/Mechanical-Advantage/RobotCode2026Public)*
+
+Conversions and operations for WPILib geometry types (Pose2d, Transform2d, Twist2d, etc.).
+
+### Pose2d ↔ Transform2d Conversion
+
+```java
+// Convert Pose2d to Transform2d (for kinematic chains)
+Pose2d cameraPose = new Pose2d(0.3, 0.0, Rotation2d.fromDegrees(0));
+Transform2d cameraTransform = Utils.toTransform2d(cameraPose);
+
+// Convert Transform2d back to Pose2d
+Pose2d pose = Utils.toPose2d(cameraTransform);
+```
+
+### Create Pose from Components
+
+```java
+// Create Pose2d from Translation2d only (zero rotation)
+Translation2d point = new Translation2d(2.0, 3.0);
+Pose2d pose = Utils.toPose2d(point);  // (2.0, 3.0, 0°)
+
+// Create Pose2d from Rotation2d only (zero translation)
+Rotation2d heading = Rotation2d.fromDegrees(45);
+Pose2d pose = Utils.toPose2d(heading);  // (0, 0, 45°)
+```
+
+### Pose Inverse
+
+```java
+// Compute inverse pose (useful for relative transformations)
+Pose2d robotPose = odometry.getPose();
+Pose2d inversePose = Utils.inverse(robotPose);
+
+// robotPose.transformBy(Utils.toTransform2d(inversePose)) ≈ origin
+```
+
+### Twist2d Operations
+
+```java
+// Scale a twist (velocity) by a factor
+Twist2d velocity = new Twist2d(2.0, 1.0, 0.5);
+Twist2d halfVelocity = Utils.multiply(velocity, 0.5);
+// halfVelocity = (1.0, 0.5, 0.25)
+
+// Convert ChassisSpeeds to Twist2d
+ChassisSpeeds speeds = swerve.getChassisSpeeds();
+Twist2d twist = Utils.toTwist2d(speeds);
+```
+
+### Modify Pose Components
+
+```java
+// Replace translation while keeping rotation
+Pose2d original = new Pose2d(1.0, 2.0, Rotation2d.fromDegrees(45));
+Translation2d newTranslation = new Translation2d(5.0, 6.0);
+Pose2d modified = Utils.withTranslation(original, newTranslation);
+// modified = (5.0, 6.0, 45°)
+
+// Replace rotation while keeping translation
+Rotation2d newRotation = Rotation2d.fromDegrees(90);
+Pose2d modified2 = Utils.withRotation(original, newRotation);
+// modified2 = (1.0, 2.0, 90°)
+```
+
+### 3D Geometry
+
+```java
+// Convert Pose3d to Transform3d
+Pose3d cameraPose3d = new Pose3d(...);
+Transform3d cameraTransform3d = Utils.toTransform3d(cameraPose3d);
+
+// Convert Transform3d to Pose3d
+Pose3d pose3d = Utils.toPose3d(cameraTransform3d);
+
+// Project 3D transform to 2D (XY plane)
+Transform2d transform2d = Utils.toTransform2d(cameraTransform3d);
+```
+
+### Real-World Example: Vision Target Tracking
+
+```java
+public Pose2d getTargetPose(Pose2d robotPose, Transform2d cameraToRobot) {
+    // Get target position relative to camera
+    Pose2d targetRelativeToCamera = vision.getTargetPose();
+
+    // Convert to transform for composition
+    Transform2d targetTransform = Utils.toTransform2d(targetRelativeToCamera);
+
+    // Compose transforms: robot -> camera -> target
+    return robotPose
+        .transformBy(cameraToRobot)
+        .transformBy(targetTransform);
+}
+```
 
 ---
 
@@ -624,6 +777,115 @@ public class SwerveSubsystem extends SubsystemBase {
 
 ## API Reference
 
+### Epsilon Comparison
+
+```java
+static boolean epsilonEquals(double a, double b, double epsilon)
+```
+Compares two doubles with specified epsilon tolerance.
+
+---
+
+```java
+static boolean epsilonEquals(double a, double b)
+```
+Compares two doubles with default epsilon (1e-9).
+
+---
+
+```java
+static boolean epsilonEquals(Twist2d a, Twist2d b)
+```
+Compares two Twist2d objects (dx, dy, dtheta) with default epsilon.
+
+---
+
+### Geometry Utilities
+
+```java
+static Transform2d toTransform2d(Pose2d pose)
+```
+Converts a Pose2d to a Transform2d.
+
+---
+
+```java
+static Pose2d toPose2d(Transform2d transform)
+```
+Converts a Transform2d to a Pose2d.
+
+---
+
+```java
+static Pose2d toPose2d(Translation2d translation)
+```
+Creates a Pose2d from Translation2d with zero rotation.
+
+---
+
+```java
+static Pose2d toPose2d(Rotation2d rotation)
+```
+Creates a Pose2d from Rotation2d with zero translation.
+
+---
+
+```java
+static Pose2d inverse(Pose2d pose)
+```
+Computes the inverse of a Pose2d.
+
+---
+
+```java
+static Twist2d multiply(Twist2d twist, double scalar)
+```
+Multiplies all Twist2d components by a scalar.
+
+---
+
+```java
+static Twist2d toTwist2d(ChassisSpeeds speeds)
+```
+Converts ChassisSpeeds to Twist2d.
+
+---
+
+```java
+static Pose2d withTranslation(Pose2d pose, Translation2d translation)
+```
+Returns a new Pose2d with the given translation, preserving original rotation.
+
+---
+
+```java
+static Pose2d withRotation(Pose2d pose, Rotation2d rotation)
+```
+Returns a new Pose2d with the given rotation, preserving original translation.
+
+---
+
+```java
+static Transform3d toTransform3d(Pose3d pose)
+```
+Converts a Pose3d to a Transform3d.
+
+---
+
+```java
+static Pose3d toPose3d(Transform3d transform)
+```
+Converts a Transform3d to a Pose3d.
+
+---
+
+```java
+static Transform2d toTransform2d(Transform3d transform)
+```
+Reduces a Transform3d to a Transform2d (XY plane projection).
+
+---
+
 ### Alliance Utilities
 
 ```java
@@ -924,4 +1186,4 @@ Utils complements (doesn't duplicate) WPILib utilities:
 
 ---
 
-**Last Updated:** 2026-01-14
+**Last Updated:** 2026-01-27
