@@ -256,38 +256,41 @@ public class SwerveConfig {
     }
 
     /**
-     * Controls whether to use manual odometry updates or YAGSL's internal odometry thread.
+     * Controls whether to stop YAGSL's odometry thread and enable vision pose estimation.
+     *
+     * <p><strong>Note:</strong> Odometry is always updated in periodic() regardless of this
+     * setting. This setting only controls:
+     * <ul>
+     *   <li>Whether to stop YAGSL's internal odometry thread (to avoid duplicate updates)</li>
+     *   <li>Whether to enable vision pose estimation (requires synchronized updates)</li>
+     * </ul>
      *
      * <p>When enabled (default), the SwerveSubsystem:
      * <ul>
      *   <li>Stops YAGSL's internal odometry thread</li>
-     *   <li>Manually calls {@code swerveDrive.updateOdometry()} in periodic()</li>
-     *   <li>Allows synchronized vision pose updates</li>
+     *   <li>Enables vision pose estimation if vision is configured</li>
      * </ul>
      *
-     * <p>When disabled, YAGSL's internal odometry thread handles updates automatically.
-     * This may work better in simulation (maple-sim) where the odometry thread
-     * integrates better with the physics simulation.
+     * <p>When disabled:
+     * <ul>
+     *   <li>YAGSL's internal odometry thread continues running (may cause duplicate updates)</li>
+     *   <li>Vision pose estimation is disabled</li>
+     * </ul>
      *
      * <p><strong>When to Disable:</strong>
      * <ul>
-     *   <li>Running in simulation with maple-sim</li>
      *   <li>Not using vision pose estimation</li>
-     *   <li>Autonomous odometry not updating correctly</li>
+     *   <li>Testing without vision cameras</li>
      * </ul>
      *
      * <p><strong>Usage Example:</strong>
      * <pre>{@code
-     * // Disable manual odometry for simulation
+     * // Disable vision integration (still updates odometry)
      * SwerveConfig config = new SwerveConfig()
      *     .withManualOdometry(false);
-     *
-     * // Or conditionally based on simulation
-     * SwerveConfig config = new SwerveConfig()
-     *     .withManualOdometry(!RobotBase.isSimulation());
      * }</pre>
      *
-     * @param enabled true to use manual odometry updates (default), false to use YAGSL thread
+     * @param enabled true to stop YAGSL thread and enable vision (default), false otherwise
      * @return This config for chaining
      */
     public SwerveConfig withManualOdometry(boolean enabled) {

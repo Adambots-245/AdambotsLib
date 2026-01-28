@@ -487,17 +487,14 @@ public class SwerveSubsystem extends SubsystemBase {
   public void periodic() {
     // This method will be called once per scheduler run
 
-    // Update odometry manually when using manual odometry mode
-    // (when YAGSL's odometry thread is stopped for vision synchronization)
-    if (swerveConfig.useManualOdometry()) {
-      swerveDrive.updateOdometry();
+    // Always update odometry - required for pose to update in both teleop and auto
+    swerveDrive.updateOdometry();
 
-      // Vision pose estimation only when vision is configured
-      if (vision != null) {
-        vision.updatePoseEstimation(swerveDrive);
-      }
+    // Vision pose estimation only when manual odometry mode AND vision is configured
+    // (vision requires synchronized updates which is why we stop the odometry thread)
+    if (swerveConfig.useManualOdometry() && vision != null) {
+      vision.updatePoseEstimation(swerveDrive);
     }
-    // When not using manual odometry, YAGSL's internal thread handles updates
   }
 
   @Override
