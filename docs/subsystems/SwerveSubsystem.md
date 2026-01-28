@@ -6,6 +6,7 @@ YAGSL-based swerve drive subsystem for holonomic drivetrain control with PhotonV
 
 - [Overview](#overview)
 - [Getting Started](#getting-started)
+- [SwerveConfig](#swerveconfig)
 - [JSON Configuration](#json-configuration)
 - [Zeroing Swerve Modules](#zeroing-swerve-modules)
 - [Command Factories](#command-factories)
@@ -65,6 +66,7 @@ YAGSL-based swerve drive subsystem for holonomic drivetrain control with PhotonV
 
 ```java
 import com.adambots.lib.subsystems.SwerveSubsystem;
+import com.adambots.lib.subsystems.SwerveConfig;
 import edu.wpi.first.wpilibj.Filesystem;
 import java.io.File;
 
@@ -72,9 +74,21 @@ public class RobotContainer {
   private final SwerveSubsystem swerve;
 
   public RobotContainer() {
-    // Point to YOUR robot project's deploy folder
+    // Option 1: Use default configuration
     swerve = new SwerveSubsystem(
       new File(Filesystem.getDeployDirectory(), "swerve/kraken")
+    );
+
+    // Option 2: With custom PathPlanner PID and behavior settings
+    SwerveConfig config = new SwerveConfig()
+      .withTranslationPID(5.0, 0.0, 0.0)  // PathPlanner translation PID
+      .withRotationPID(3.0, 0.0, 0.0)      // PathPlanner rotation PID
+      .withHeadingCorrection(false)
+      .withCosineCompensation(true);
+
+    swerve = new SwerveSubsystem(
+      new File(Filesystem.getDeployDirectory(), "swerve/kraken"),
+      config
     );
 
     configureButtonBindings();
@@ -96,6 +110,135 @@ public class RobotContainer {
 ### Step 3: Configure JSON Files for Your Robot
 
 See [JSON Configuration](#json-configuration) section below.
+
+---
+
+## SwerveConfig
+
+`SwerveConfig` allows you to customize PathPlanner PID values and drive behavior settings without modifying AdambotsLib source code.
+
+### Why Use SwerveConfig?
+
+Previously, PathPlanner PID values were hardcoded in AdambotsLib's Constants file, making it impossible for robot projects to customize them without recreating the entire AutoBuilder setup. `SwerveConfig` solves this by providing a clean builder-style API.
+
+### Available Settings
+
+| Setting | Method | Default | Description |
+|---------|--------|---------|-------------|
+| Translation PID | `withTranslationPID(p, i, d)` | 5.0, 0, 0 | PathPlanner X/Y position following |
+| Rotation PID | `withRotationPID(p, i, d)` | 5.0, 0, 0 | PathPlanner heading following |
+| Heading Correction | `withHeadingCorrection(bool)` | false | Auto-maintain heading during teleop |
+| Cosine Compensation | `withCosineCompensation(bool)` | true | Adjust speed based on wheel alignment |
+| Angular Velocity Comp | `withAngularVelocityCompensation(bool, coeff)` | true, 0.1 | Counteract skewing during rotation |
+
+### Basic Usage
+
+```java
+// In Constants.java
+public static final SwerveConfig SWERVE_CONFIG = new SwerveConfig()
+    .withTranslationPID(5.0, 0.0, 0.0)
+    .withRotationPID(3.0, 0.0, 0.0);
+
+// In RobotContainer.java
+SwerveSubsystem swerve = new SwerveSubsystem(
+    new File(Filesystem.getDeployDirectory(), "swerve/kraken"),
+    Constants.SWERVE_CONFIG
+);
+```
+
+### PathPlanner PID Tuning
+
+The translation and rotation PID values control how accurately the robot follows PathPlanner autonomous paths.
+
+#### Translation PID (X/Y Position)
+
+Controls how the robot corrects position errors during path following.
+
+```java
+.withTranslationPID(5.0, 0.0, 0.0)  // Default
+```
+
+**Tuning Tips:**
+- **Start with P=5.0** - This is a good baseline for most robots
+- **Increase P** if the robot is sluggish or cuts corners
+- **Decrease P** if the robot oscillates around the path
+- **Add D (0.1-0.5)** to reduce overshoot at waypoints
+- **I is rarely needed** - avoid unless you have persistent steady-state error
+
+#### Rotation PID (Heading)
+
+Controls how the robot corrects heading errors during path following.
+
+```java
+.withRotationPID(3.0, 0.0, 0.0)  // Slightly lower than translation
+```
+
+**Tuning Tips:**
+- **Start with P=3.0-5.0** - Rotation typically needs less gain
+- **Increase P** if the robot doesn't turn sharply enough
+- **Decrease P** if heading oscillates after turns
+- **Add D (0.1-0.5)** if heading overshoots target
+
+### Drive Behavior Settings
+
+#### Heading Correction
+
+When enabled, the robot automatically maintains its heading during teleop driving.
+
+```java
+.withHeadingCorrection(true)
+```
+
+**When to Enable:**
+- Robot tends to drift rotationally during straight-line driving
+- You want the robot to resist external rotation forces
+
+**When to Disable (default):**
+- Driver prefers full manual control
+- Heading correction causes jerky behavior
+
+#### Cosine Compensation
+
+Adjusts wheel speeds based on their alignment with the desired movement direction.
+
+```java
+.withCosineCompensation(true)  // Default: enabled
+```
+
+**Note:** Does not work in simulation. Test on real robot.
+
+#### Angular Velocity Compensation
+
+Counteracts the skewing effect when the robot translates and rotates simultaneously.
+
+```java
+.withAngularVelocityCompensation(true, 0.1)  // enabled, coefficient
+```
+
+### Full Configuration Example
+
+```java
+public static final SwerveConfig SWERVE_CONFIG = new SwerveConfig()
+    // PathPlanner autonomous PID
+    .withTranslationPID(5.0, 0.0, 0.0)
+    .withRotationPID(3.0, 0.0, 0.5)  // Added D for heading stability
+
+    // Drive behavior
+    .withHeadingCorrection(false)
+    .withCosineCompensation(true)
+    .withAngularVelocityCompensation(true, 0.1);
+```
+
+### Accessing Config at Runtime
+
+```java
+// Get the current configuration
+SwerveConfig config = swerve.getSwerveConfig();
+
+// Check settings (for debugging/logging)
+PIDConstants translationPID = config.getTranslationPID();
+boolean headingCorrection = config.isHeadingCorrectionEnabled();
+```
 
 ---
 

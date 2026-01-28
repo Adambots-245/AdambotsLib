@@ -15,8 +15,6 @@ import edu.wpi.first.units.measure.*;
 
 import org.photonvision.targeting.PhotonPipelineResult;
 
-import com.adambots.lib.Constants;
-import com.adambots.lib.Constants.AutoConstants;
 import com.adambots.lib.Constants.DriveConstants;
 import com.adambots.lib.Constants.ModuleConstants;
 import com.adambots.lib.utils.Utils;
@@ -26,7 +24,6 @@ import com.adambots.lib.vision.config.VisionSystemConfig;
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.commands.PathPlannerAuto;
 import com.pathplanner.lib.commands.PathfindingCommand;
-import com.pathplanner.lib.config.PIDConstants;
 import com.pathplanner.lib.config.RobotConfig;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
 import edu.wpi.first.apriltag.AprilTagFieldLayout;
@@ -76,6 +73,7 @@ import swervelib.telemetry.SwerveDriveTelemetry.TelemetryVerbosity;
  *   <li>Swerve modules: /deploy/swerve/kraken/modules/*.json</li>
  *   <li>Drive config: /deploy/swerve/kraken/swervedrive.json</li>
  *   <li>PID properties: /deploy/swerve/kraken/modules/pidfproperties.json</li>
+ *   <li>PathPlanner PID and behavior: {@link SwerveConfig} (passed to constructor)</li>
  * </ul>
  *
  * <p><strong>Command Factories:</strong>
@@ -139,14 +137,55 @@ public class SwerveSubsystem extends SubsystemBase {
   private final boolean visionDriveTest = true;
   private PhotonVision vision;
 
+  // Configuration
+  private final SwerveConfig swerveConfig;
+
   // State tracking for commands
   private Pose2d startPose;
 
   /**
-   * Creates a new SwerveSubsystem. Adapted from YAGSL-Example
-   * Talk to Mr.B before making major changes to this file.
+   * Creates a new SwerveSubsystem with default configuration.
+   *
+   * <p>Uses default PID values and drive behavior settings. For custom configuration,
+   * use {@link #SwerveSubsystem(File, SwerveConfig)} instead.
+   *
+   * @param directory The directory containing YAGSL swerve configuration JSON files
+   *
+   * @see #SwerveSubsystem(File, SwerveConfig)
    */
   public SwerveSubsystem(File directory) {
+    this(directory, new SwerveConfig());
+  }
+
+  /**
+   * Creates a new SwerveSubsystem with custom configuration.
+   *
+   * <p>Allows customization of PathPlanner PID values and drive behavior settings
+   * without modifying AdambotsLib source code.
+   *
+   * <p><strong>Usage Example:</strong>
+   * <pre>{@code
+   * // Define config in Constants
+   * public static final SwerveConfig SWERVE_CONFIG = new SwerveConfig()
+   *     .withTranslationPID(5.0, 0.0, 0.0)
+   *     .withRotationPID(3.0, 0.0, 0.0)
+   *     .withHeadingCorrection(false)
+   *     .withCosineCompensation(true);
+   *
+   * // Create subsystem with config
+   * SwerveSubsystem swerve = new SwerveSubsystem(
+   *     new File(Filesystem.getDeployDirectory(), "swerve/kraken"),
+   *     Constants.SWERVE_CONFIG
+   * );
+   * }</pre>
+   *
+   * @param directory The directory containing YAGSL swerve configuration JSON files
+   * @param config Configuration object with PID values and behavior settings
+   *
+   * @see SwerveConfig
+   */
+  public SwerveSubsystem(File directory, SwerveConfig config) {
+    this.swerveConfig = config;
     // The 2 value below will be defined in the JSON configuration file. However,
     // alternatively, we can do it here.
     // Use the same values when defining the JSON file
@@ -204,7 +243,7 @@ public class SwerveSubsystem extends SubsystemBase {
     // Applying the Correction: The computed ω is then used to adjust the swerve
     // modules' wheel angles and speeds, facilitating the desired rotational
     // movement.
-    swerveDrive.setHeadingCorrection(false);
+    swerveDrive.setHeadingCorrection(swerveConfig.isHeadingCorrectionEnabled());
 
     // Cosine compensation is a technique used in swerve drive systems to enhance
     // control and efficiency by adjusting the speed of each wheel based on its
@@ -218,7 +257,7 @@ public class SwerveSubsystem extends SubsystemBase {
     // This may cause unintended consequences. Hence, test it before fully enabling
     // it.
     // Will not work in simulation
-    swerveDrive.setCosineCompensator(true);
+    swerveDrive.setCosineCompensator(swerveConfig.isCosineCompensationEnabled());
 
     // Angular Velocity Compensation is a feature designed to mitigate the skewing
     // effect that can occur when a swerve-drive robot moves linearly while
@@ -231,7 +270,10 @@ public class SwerveSubsystem extends SubsystemBase {
     // By doing so, the robot maintains a straighter trajectory during combined
     // translational and rotational motions, enhancing overall maneuverability and
     // control.
-    swerveDrive.setAngularVelocityCompensation(true, true, 0.1);
+    swerveDrive.setAngularVelocityCompensation(
+        swerveConfig.isAngularVelocityCompensationEnabled(),
+        swerveConfig.isAngularVelocityCompensationEnabled(),
+        swerveConfig.getAngularVelocityCoeff());
 
     // Enable if you want to resynchronize your absolute encoders and motor encoders
     // periodically when they are not moving.
@@ -262,17 +304,34 @@ public class SwerveSubsystem extends SubsystemBase {
   }
 
   /**
-   * Construct the swerve drive.
+   * Construct the swerve drive with explicit configuration objects.
+   *
+   * <p>This constructor is for advanced use cases where you need direct control
+   * over the SwerveDriveConfiguration and SwerveControllerConfiguration.
    *
    * @param driveCfg      SwerveDriveConfiguration for the swerve.
    * @param controllerCfg Swerve Controller.
    */
   public SwerveSubsystem(SwerveDriveConfiguration driveCfg, SwerveControllerConfiguration controllerCfg) {
+    this(driveCfg, controllerCfg, new SwerveConfig());
+  }
+
+  /**
+   * Construct the swerve drive with explicit configuration objects and SwerveConfig.
+   *
+   * @param driveCfg      SwerveDriveConfiguration for the swerve.
+   * @param controllerCfg Swerve Controller.
+   * @param config        SwerveConfig with PID and behavior settings.
+   */
+  public SwerveSubsystem(SwerveDriveConfiguration driveCfg, SwerveControllerConfiguration controllerCfg,
+                         SwerveConfig config) {
+    this.swerveConfig = config;
     swerveDrive = new SwerveDrive(driveCfg,
         controllerCfg,
         DriveConstants.kMaxSpeed.in(MetersPerSecond),
         new Pose2d(new Translation2d(Meters.of(2), Meters.of(0)),
             Rotation2d.fromDegrees(0)));
+    setupPathPlanner();
   }
 
   /**
@@ -344,11 +403,8 @@ public class SwerveSubsystem extends SubsystemBase {
           new PPHolonomicDriveController(
               // PPHolonomicController is the built in path following controller for holonomic
               // drive trains
-              new PIDConstants(AutoConstants.kPTranslationController, AutoConstants.kITranslationController,
-                  AutoConstants.kDTranslationController), // Translation PID constants
-              new PIDConstants(AutoConstants.kPThetaController, AutoConstants.kIThetaController,
-                  AutoConstants.kDThetaController) // Rotation PID constants
-          // Rotation PID constants
+              swerveConfig.getTranslationPID(), // Translation PID constants from SwerveConfig
+              swerveConfig.getRotationPID() // Rotation PID constants from SwerveConfig
           ),
           config,
           // The robot configuration
@@ -488,6 +544,15 @@ public class SwerveSubsystem extends SubsystemBase {
    */
   public SwerveDriveConfiguration getSwerveDriveConfiguration() {
     return swerveDrive.swerveDriveConfiguration;
+  }
+
+  /**
+   * Get the {@link SwerveConfig} object used to configure this subsystem.
+   *
+   * @return The SwerveConfig with PID and behavior settings
+   */
+  public SwerveConfig getSwerveConfig() {
+    return swerveConfig;
   }
 
   /**
