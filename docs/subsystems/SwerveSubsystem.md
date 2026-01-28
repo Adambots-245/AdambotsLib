@@ -127,6 +127,7 @@ Previously, PathPlanner PID values were hardcoded in AdambotsLib's Constants fil
 |---------|--------|---------|-------------|
 | Translation PID | `withTranslationPID(p, i, d)` | 5.0, 0, 0 | PathPlanner X/Y position following |
 | Rotation PID | `withRotationPID(p, i, d)` | 5.0, 0, 0 | PathPlanner heading following |
+| Feedforward | `withFeedforward(bool)` | true | Use feedforward in PathPlanner auto |
 | Heading Correction | `withHeadingCorrection(bool)` | false | Auto-maintain heading during teleop |
 | Cosine Compensation | `withCosineCompensation(bool)` | true | Adjust speed based on wheel alignment |
 | Angular Velocity Comp | `withAngularVelocityCompensation(bool, coeff)` | true, 0.1 | Counteract skewing during rotation |
@@ -179,6 +180,40 @@ Controls how the robot corrects heading errors during path following.
 - **Decrease P** if heading oscillates after turns
 - **Add D (0.1-0.5)** if heading overshoots target
 
+### PathPlanner Feedforward
+
+Controls whether PathPlanner uses feedforward-based driving for autonomous paths.
+
+```java
+.withFeedforward(true)   // Default: enabled
+.withFeedforward(false)  // Disable for simulation
+```
+
+**When Enabled (default):**
+```java
+swerveDrive.drive(speedsRobotRelative, swerveModuleStates, moduleFeedForwards.linearForces());
+```
+
+**When Disabled:**
+```java
+swerveDrive.setChassisSpeeds(speedsRobotRelative);
+```
+
+**When to Disable:**
+- Running in simulation with **maple-sim** (feedforward doesn't work properly)
+- Debugging autonomous path following issues
+- If feedforward causes erratic behavior
+
+**Simulation-Aware Configuration:**
+```java
+SwerveConfig config = new SwerveConfig()
+    .withTranslationPID(5.0, 0.0, 0.0)
+    .withRotationPID(5.0, 0.0, 0.0)
+    .withFeedforward(!RobotBase.isSimulation());  // Auto-disable in sim
+```
+
+---
+
 ### Drive Behavior Settings
 
 #### Heading Correction
@@ -222,6 +257,7 @@ public static final SwerveConfig SWERVE_CONFIG = new SwerveConfig()
     // PathPlanner autonomous PID
     .withTranslationPID(5.0, 0.0, 0.0)
     .withRotationPID(3.0, 0.0, 0.5)  // Added D for heading stability
+    .withFeedforward(!RobotBase.isSimulation())  // Disable in sim for maple-sim
 
     // Drive behavior
     .withHeadingCorrection(false)

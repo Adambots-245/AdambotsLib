@@ -64,6 +64,9 @@ public class SwerveConfig {
     private boolean angularVelocityCompensationEnabled = true;
     private double angularVelocityCoeff = 0.1;
 
+    // PathPlanner feedforward
+    private boolean feedforwardEnabled = true;
+
     /**
      * Creates a new SwerveConfig with default values.
      */
@@ -210,6 +213,45 @@ public class SwerveConfig {
         return this;
     }
 
+    /**
+     * Enables or disables feedforward for PathPlanner autonomous driving.
+     *
+     * <p>When enabled (default), PathPlanner uses a feedforward-based drive method:
+     * <pre>{@code
+     * swerveDrive.drive(speedsRobotRelative, swerveModuleStates, moduleFeedForwards.linearForces());
+     * }</pre>
+     *
+     * <p>When disabled, it uses the simpler method:
+     * <pre>{@code
+     * swerveDrive.setChassisSpeeds(speedsRobotRelative);
+     * }</pre>
+     *
+     * <p><strong>When to Disable:</strong>
+     * <ul>
+     *   <li>Running in simulation with maple-sim (feedforward doesn't work properly)</li>
+     *   <li>Debugging autonomous path following issues</li>
+     *   <li>If feedforward causes erratic behavior on your robot</li>
+     * </ul>
+     *
+     * <p><strong>Usage Example:</strong>
+     * <pre>{@code
+     * // Disable feedforward for simulation
+     * SwerveConfig config = new SwerveConfig()
+     *     .withFeedforward(false);
+     *
+     * // Or conditionally based on simulation
+     * SwerveConfig config = new SwerveConfig()
+     *     .withFeedforward(!RobotBase.isSimulation());
+     * }</pre>
+     *
+     * @param enabled true to enable feedforward (default), false to disable
+     * @return This config for chaining
+     */
+    public SwerveConfig withFeedforward(boolean enabled) {
+        this.feedforwardEnabled = enabled;
+        return this;
+    }
+
     // ==================== GETTERS ====================
 
     /**
@@ -256,5 +298,12 @@ public class SwerveConfig {
      */
     public double getAngularVelocityCoeff() {
         return angularVelocityCoeff;
+    }
+
+    /**
+     * @return true if feedforward is enabled for PathPlanner
+     */
+    public boolean isFeedforwardEnabled() {
+        return feedforwardEnabled;
     }
 }
