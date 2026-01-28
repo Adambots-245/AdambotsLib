@@ -67,6 +67,9 @@ public class SwerveConfig {
     // PathPlanner feedforward
     private boolean feedforwardEnabled = true;
 
+    // Vision/Odometry control
+    private boolean useManualOdometry = true;
+
     /**
      * Creates a new SwerveConfig with default values.
      */
@@ -252,6 +255,46 @@ public class SwerveConfig {
         return this;
     }
 
+    /**
+     * Controls whether to use manual odometry updates or YAGSL's internal odometry thread.
+     *
+     * <p>When enabled (default), the SwerveSubsystem:
+     * <ul>
+     *   <li>Stops YAGSL's internal odometry thread</li>
+     *   <li>Manually calls {@code swerveDrive.updateOdometry()} in periodic()</li>
+     *   <li>Allows synchronized vision pose updates</li>
+     * </ul>
+     *
+     * <p>When disabled, YAGSL's internal odometry thread handles updates automatically.
+     * This may work better in simulation (maple-sim) where the odometry thread
+     * integrates better with the physics simulation.
+     *
+     * <p><strong>When to Disable:</strong>
+     * <ul>
+     *   <li>Running in simulation with maple-sim</li>
+     *   <li>Not using vision pose estimation</li>
+     *   <li>Autonomous odometry not updating correctly</li>
+     * </ul>
+     *
+     * <p><strong>Usage Example:</strong>
+     * <pre>{@code
+     * // Disable manual odometry for simulation
+     * SwerveConfig config = new SwerveConfig()
+     *     .withManualOdometry(false);
+     *
+     * // Or conditionally based on simulation
+     * SwerveConfig config = new SwerveConfig()
+     *     .withManualOdometry(!RobotBase.isSimulation());
+     * }</pre>
+     *
+     * @param enabled true to use manual odometry updates (default), false to use YAGSL thread
+     * @return This config for chaining
+     */
+    public SwerveConfig withManualOdometry(boolean enabled) {
+        this.useManualOdometry = enabled;
+        return this;
+    }
+
     // ==================== GETTERS ====================
 
     /**
@@ -305,5 +348,12 @@ public class SwerveConfig {
      */
     public boolean isFeedforwardEnabled() {
         return feedforwardEnabled;
+    }
+
+    /**
+     * @return true if manual odometry updates should be used (stops YAGSL odometry thread)
+     */
+    public boolean useManualOdometry() {
+        return useManualOdometry;
     }
 }

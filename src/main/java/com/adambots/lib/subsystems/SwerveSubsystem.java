@@ -134,7 +134,6 @@ public class SwerveSubsystem extends SubsystemBase {
 
   private final SwerveDrive swerveDrive;
   private final AprilTagFieldLayout aprilTagFieldLayout = AprilTagFieldLayout.loadField(AprilTagFields.kDefaultField);
-  private final boolean visionDriveTest = true;
   private PhotonVision vision;
 
   // Configuration
@@ -293,10 +292,10 @@ public class SwerveSubsystem extends SubsystemBase {
     // brown-out.
     // swerveDrive.pushOffsetsToEncoders();
 
-    if (visionDriveTest) {
+    if (swerveConfig.useManualOdometry()) {
       // Note: Vision must now be configured externally using setupPhotonVision(VisionSystemConfig)
       // Stop the odometry thread if we are using vision that way we can synchronize
-      // updates better.
+      // updates better. Disable this in simulation (maple-sim) for proper odometry updates.
       swerveDrive.stopOdometryThread();
     }
 
@@ -488,18 +487,23 @@ public class SwerveSubsystem extends SubsystemBase {
   public void periodic() {
     // This method will be called once per scheduler run
 
-    // Always update odometry
-    swerveDrive.updateOdometry();
+    // Update odometry manually when using manual odometry mode
+    // (when YAGSL's odometry thread is stopped for vision synchronization)
+    if (swerveConfig.useManualOdometry()) {
+      swerveDrive.updateOdometry();
 
-    // Vision pose estimation only when vision is configured
-    if (visionDriveTest && vision != null) {
-      vision.updatePoseEstimation(swerveDrive);
+      // Vision pose estimation only when vision is configured
+      if (vision != null) {
+        vision.updatePoseEstimation(swerveDrive);
+      }
     }
-
+    // When not using manual odometry, YAGSL's internal thread handles updates
   }
 
   @Override
   public void simulationPeriodic() {
+    // YAGSL handles simulation updates internally via its physics simulation thread.
+    // No additional calls needed here for maple-sim compatibility.
   }
 
   /**
@@ -703,12 +707,15 @@ public class SwerveSubsystem extends SubsystemBase {
   }
 
   /**
-   * Checks if the vision drive test mode is enabled.
+   * Checks if manual odometry mode is enabled.
    *
-   * @return true if vision drive test mode is enabled, false otherwise.
+   * <p>When true, YAGSL's odometry thread is stopped and odometry is updated
+   * manually in periodic() for synchronized vision updates.
+   *
+   * @return true if manual odometry mode is enabled, false otherwise.
    */
-  public boolean isVisionDriveTest() {
-    return visionDriveTest;
+  public boolean isManualOdometryEnabled() {
+    return swerveConfig.useManualOdometry();
   }
 
   /**
