@@ -17,6 +17,9 @@ import org.photonvision.targeting.PhotonPipelineResult;
 
 import com.adambots.lib.Constants.DriveConstants;
 import com.adambots.lib.Constants.ModuleConstants;
+import com.adambots.lib.targets.GameTarget;
+import com.adambots.lib.targets.GameTargetConfig;
+import com.adambots.lib.targets.GameTargetLoader;
 import com.adambots.lib.utils.Utils;
 import com.adambots.lib.vision.PhotonVision;
 import com.adambots.lib.vision.VisionCamera;
@@ -138,6 +141,9 @@ public class SwerveSubsystem extends SubsystemBase {
 
   // Configuration
   private final SwerveConfig swerveConfig;
+
+  // Game target configuration
+  private GameTargetConfig gameTargetConfig;
 
   // State tracking for commands
   private Pose2d startPose;
@@ -771,7 +777,7 @@ public class SwerveSubsystem extends SubsystemBase {
   }
 
   /**
-   * Trigger that is true when robot is stationary.
+   * Trigger that is true when robot is stationary (linear velocity below threshold).
    *
    * @param velocityThreshold Velocity threshold in m/s
    * @return Trigger for stationary state
@@ -785,17 +791,51 @@ public class SwerveSubsystem extends SubsystemBase {
   }
 
   /**
-   * Trigger that is true when robot exceeds velocity threshold.
+   * Convenience trigger that is true when robot is stopped.
+   *
+   * <p>Uses default thresholds: 0.05 m/s linear, 0.1 rad/s angular.
+   *
+   * @return Trigger for stopped state
+   */
+  public Trigger isStoppedTrigger() {
+    return isFullyStoppedTrigger(0.05, 0.1);
+  }
+
+  /**
+   * Trigger that is true when robot is moving (linear velocity above threshold).
    *
    * @param velocityThreshold Velocity threshold in m/s
-   * @return Trigger for high-speed state
+   * @return Trigger for moving state
    */
-  public Trigger isMovingFastTrigger(double velocityThreshold) {
+  public Trigger isMovingTrigger(double velocityThreshold) {
     return new Trigger(() -> {
       ChassisSpeeds speeds = getRobotVelocity();
       double velocity = Math.hypot(speeds.vxMetersPerSecond, speeds.vyMetersPerSecond);
       return velocity >= velocityThreshold;
     });
+  }
+
+  /**
+   * Convenience trigger that is true when robot is moving.
+   *
+   * <p>Uses default threshold of 0.1 m/s.
+   *
+   * @return Trigger for moving state
+   */
+  public Trigger isMovingTrigger() {
+    return isMovingTrigger(0.1);
+  }
+
+  /**
+   * Trigger that is true when robot exceeds velocity threshold.
+   *
+   * @param velocityThreshold Velocity threshold in m/s
+   * @return Trigger for high-speed state
+   * @deprecated Use {@link #isMovingTrigger(double)} instead
+   */
+  @Deprecated
+  public Trigger isMovingFastTrigger(double velocityThreshold) {
+    return isMovingTrigger(velocityThreshold);
   }
 
   /**
@@ -861,6 +901,368 @@ public class SwerveSubsystem extends SubsystemBase {
     return new Trigger(() -> {
       double error = Math.abs(getHeading().minus(targetHeading).getDegrees());
       return error <= toleranceDegrees;
+    });
+  }
+
+  /**
+   * Trigger that is true when robot angular velocity exceeds threshold.
+   *
+   * <p>Useful for detecting when the robot is actively rotating, which may
+   * affect vision accuracy or require different control strategies.
+   *
+   * @param thresholdRadPerSec Angular velocity threshold in radians per second
+   * @return Trigger for rotation detection
+   */
+  public Trigger isRotatingTrigger(double thresholdRadPerSec) {
+    return new Trigger(() -> {
+      ChassisSpeeds speeds = getRobotVelocity();
+      return Math.abs(speeds.omegaRadiansPerSecond) > thresholdRadPerSec;
+    });
+  }
+
+  /**
+   * Trigger that is true when robot angular velocity is below threshold.
+   *
+   * <p>Useful for detecting when the robot has settled after a rotation,
+   * which may be needed before taking vision measurements or scoring.
+   *
+   * @param thresholdRadPerSec Angular velocity threshold in radians per second
+   * @return Trigger for rotation settled detection
+   */
+  public Trigger isNotRotatingTrigger(double thresholdRadPerSec) {
+    return new Trigger(() -> {
+      ChassisSpeeds speeds = getRobotVelocity();
+      return Math.abs(speeds.omegaRadiansPerSecond) <= thresholdRadPerSec;
+    });
+  }
+
+  /**
+   * Trigger that is true when robot is moving in specified field direction.
+   *
+   * <p>Useful for detecting movement direction for game piece handling,
+   * such as detecting when moving toward a scoring location.
+   *
+   * <p><strong>Usage Example:</strong>
+   * <pre>{@code
+   * // Trigger when moving toward blue alliance wall (+X direction)
+   * swerve.isMovingInDirectionTrigger(Rotation2d.fromDegrees(0), 45, 0.1)
+   *     .onTrue(Commands.print("Moving forward"));
+   *
+   * // Trigger when moving left (field +Y direction)
+   * swerve.isMovingInDirectionTrigger(Rotation2d.fromDegrees(90), 30, 0.2)
+   *     .whileTrue(intake.runCommand());
+   * }</pre>
+   *
+   * @param direction Target field direction as Rotation2d (0° = +X toward red alliance)
+   * @param toleranceDegrees Angular tolerance in degrees
+   * @param minVelocity Minimum velocity in m/s to consider as "moving"
+   * @return Trigger for directional movement detection
+   */
+  public Trigger isMovingInDirectionTrigger(Rotation2d direction, double toleranceDegrees, double minVelocity) {
+    return new Trigger(() -> {
+      ChassisSpeeds fieldSpeeds = getFieldVelocity();
+      double velocity = Math.hypot(fieldSpeeds.vxMetersPerSecond, fieldSpeeds.vyMetersPerSecond);
+
+      if (velocity < minVelocity) {
+        return false;
+      }
+
+      // Calculate actual movement direction
+      Rotation2d movementDirection = new Rotation2d(fieldSpeeds.vxMetersPerSecond, fieldSpeeds.vyMetersPerSecond);
+      double error = Math.abs(movementDirection.minus(direction).getDegrees());
+
+      return error <= toleranceDegrees;
+    });
+  }
+
+  /**
+   * Convenience trigger for detecting forward movement (field +X direction).
+   *
+   * <p>Uses 45° tolerance and 0.1 m/s minimum velocity.
+   *
+   * @return Trigger for forward movement detection
+   */
+  public Trigger isMovingForwardTrigger() {
+    return isMovingInDirectionTrigger(Rotation2d.fromDegrees(0), 45, 0.1);
+  }
+
+  /**
+   * Trigger that is true when robot is strafing (moving perpendicular to heading).
+   *
+   * <p>Useful for detecting lateral movement during alignment maneuvers.
+   *
+   * @param minVelocity Minimum velocity in m/s to consider as "moving"
+   * @return Trigger for strafe detection
+   */
+  public Trigger isStrafingTrigger(double minVelocity) {
+    return new Trigger(() -> {
+      ChassisSpeeds fieldSpeeds = getFieldVelocity();
+      double velocity = Math.hypot(fieldSpeeds.vxMetersPerSecond, fieldSpeeds.vyMetersPerSecond);
+
+      if (velocity < minVelocity) {
+        return false;
+      }
+
+      // Calculate movement direction relative to robot heading
+      Rotation2d movementDirection = new Rotation2d(fieldSpeeds.vxMetersPerSecond, fieldSpeeds.vyMetersPerSecond);
+      Rotation2d heading = getHeading();
+      double angleFromHeading = Math.abs(movementDirection.minus(heading).getDegrees());
+
+      // Strafing is when movement is roughly perpendicular to heading (60-120 degrees)
+      return angleFromHeading >= 60 && angleFromHeading <= 120;
+    });
+  }
+
+  /**
+   * Trigger that is true when robot is within distance range of a field point.
+   *
+   * <p>Useful for region-based triggers around scoring locations, pickup zones,
+   * or defensive positions.
+   *
+   * <p><strong>Usage Example:</strong>
+   * <pre>{@code
+   * // Trigger when within 1-3 meters of a scoring location
+   * Translation2d scoringSpot = new Translation2d(2.0, 5.5);
+   * swerve.distanceFromPointTrigger(scoringSpot, 1.0, 3.0)
+   *     .whileTrue(swerve.aimAtAprilTagCommand(7, 2.0));
+   * }</pre>
+   *
+   * @param point Field point to measure distance from
+   * @param minDistance Minimum distance in meters (inclusive)
+   * @param maxDistance Maximum distance in meters (inclusive)
+   * @return Trigger for distance range detection
+   */
+  public Trigger distanceFromPointTrigger(Translation2d point, double minDistance, double maxDistance) {
+    return new Trigger(() -> {
+      double distance = getPose().getTranslation().getDistance(point);
+      return distance >= minDistance && distance <= maxDistance;
+    });
+  }
+
+  /**
+   * Trigger that is true when robot pitch exceeds threshold.
+   *
+   * <p>Useful for detecting when the robot is on a ramp, incline, or climbing.
+   * This can be used to adjust driving behavior or trigger climbing sequences.
+   *
+   * @param thresholdDegrees Pitch threshold in degrees (absolute value)
+   * @return Trigger for pitch detection
+   */
+  public Trigger isPitchedTrigger(double thresholdDegrees) {
+    return new Trigger(() -> {
+      double pitch = Math.abs(getPitch().getDegrees());
+      return pitch > thresholdDegrees;
+    });
+  }
+
+  /**
+   * Trigger that is true when both linear AND angular velocity are below thresholds.
+   *
+   * <p>Useful for detecting when the robot has fully stopped, which is
+   * important for vision measurements, scoring, or state transitions.
+   *
+   * <p>This is stricter than isStationaryTrigger, which only checks linear velocity.
+   *
+   * @param linearThreshold Linear velocity threshold in m/s
+   * @param angularThreshold Angular velocity threshold in rad/s
+   * @return Trigger for fully stopped detection
+   */
+  public Trigger isFullyStoppedTrigger(double linearThreshold, double angularThreshold) {
+    return new Trigger(() -> {
+      ChassisSpeeds speeds = getRobotVelocity();
+      double linearVelocity = Math.hypot(speeds.vxMetersPerSecond, speeds.vyMetersPerSecond);
+      double angularVelocity = Math.abs(speeds.omegaRadiansPerSecond);
+      return linearVelocity < linearThreshold && angularVelocity < angularThreshold;
+    });
+  }
+
+  // ==================== GAME TARGET CONFIGURATION ====================
+
+  /**
+   * Sets up game targets from a JSON file in the deploy directory.
+   *
+   * <p>The JSON file should define game-specific targets like scoring locations,
+   * pickup zones, etc. Target positions are calculated by combining AprilTag
+   * positions from the field layout with offsets defined in the JSON.
+   *
+   * <p><strong>Usage Example:</strong>
+   * <pre>{@code
+   * // In RobotContainer constructor
+   * swerve.setupGameTargets("gametargets-2026-rebuilt.json");
+   *
+   * // Then use targets
+   * swerve.driveToTargetCommand("tower-blue").schedule();
+   * }</pre>
+   *
+   * @param jsonFilename Name of JSON file in deploy directory
+   * @see GameTargetLoader
+   * @see GameTargetConfig
+   */
+  public void setupGameTargets(String jsonFilename) {
+    gameTargetConfig = GameTargetLoader.load(jsonFilename);
+  }
+
+  /**
+   * Sets up game targets using a programmatically built configuration.
+   *
+   * <p>Use this method when you prefer to define targets in code rather than JSON.
+   *
+   * <p><strong>Usage Example:</strong>
+   * <pre>{@code
+   * GameTargetConfig config = GameTargetConfigBuilder.create()
+   *     .gameYear(2026)
+   *     .gameName("REBUILT")
+   *     .addTarget("tower-blue").tagIds(15, 16).offsetMeters(-0.5, 0, 180).done()
+   *     .addTarget("tower-red").tagIds(31, 32).offsetMeters(-0.5, 0, 0).done()
+   *     .build();
+   *
+   * swerve.setupGameTargets(config);
+   * }</pre>
+   *
+   * @param config GameTargetConfig built using GameTargetConfigBuilder
+   * @see GameTargetConfigBuilder
+   */
+  public void setupGameTargets(GameTargetConfig config) {
+    gameTargetConfig = config;
+  }
+
+  /**
+   * Gets the current game target configuration.
+   *
+   * @return GameTargetConfig or null if not configured
+   */
+  public GameTargetConfig getGameTargetConfig() {
+    return gameTargetConfig;
+  }
+
+  /**
+   * Gets the pose for a named game target.
+   *
+   * @param targetName Target name (e.g., "tower-blue")
+   * @return Target pose, or empty if target not found or tag not in layout
+   */
+  public Optional<Pose2d> getTargetPose(String targetName) {
+    if (gameTargetConfig == null) {
+      return Optional.empty();
+    }
+    return gameTargetConfig.getTargetPose(aprilTagFieldLayout, targetName);
+  }
+
+  /**
+   * Gets the alliance-specific target pose.
+   *
+   * <p>Automatically appends "-blue" or "-red" to the base name based on
+   * the current alliance color.
+   *
+   * <p><strong>Usage Example:</strong>
+   * <pre>{@code
+   * // If on blue alliance, gets "tower-blue"
+   * // If on red alliance, gets "tower-red"
+   * Optional<Pose2d> towerPose = swerve.getAllianceTargetPose("tower");
+   * }</pre>
+   *
+   * @param baseName Base target name (without alliance suffix)
+   * @return Target pose for current alliance, or empty if not found
+   */
+  public Optional<Pose2d> getAllianceTargetPose(String baseName) {
+    if (gameTargetConfig == null) {
+      return Optional.empty();
+    }
+    return gameTargetConfig.getAllianceTargetPose(aprilTagFieldLayout, baseName, Utils.isOnRedAlliance());
+  }
+
+  // ==================== GAME TARGET TRIGGERS ====================
+
+  /**
+   * Trigger that is true when robot is at the specified game target.
+   *
+   * <p>Uses the tolerance values defined in the target configuration.
+   *
+   * <p><strong>Usage Example:</strong>
+   * <pre>{@code
+   * // Trigger when at the tower scoring position
+   * swerve.isAtTargetTrigger("tower-blue")
+   *     .onTrue(shooter.shootCommand());
+   * }</pre>
+   *
+   * @param targetName Name of the target to check
+   * @return Trigger for target proximity, always false if target not configured
+   */
+  public Trigger isAtTargetTrigger(String targetName) {
+    return new Trigger(() -> {
+      if (gameTargetConfig == null) {
+        return false;
+      }
+      Optional<GameTarget> target = gameTargetConfig.getTarget(targetName);
+      return target.map(t -> t.isAtTarget(aprilTagFieldLayout, getPose())).orElse(false);
+    });
+  }
+
+  /**
+   * Trigger that is true when robot is at the alliance-specific target.
+   *
+   * @param baseName Base target name (without alliance suffix)
+   * @return Trigger for alliance target proximity
+   */
+  public Trigger isAtAllianceTargetTrigger(String baseName) {
+    return new Trigger(() -> {
+      if (gameTargetConfig == null) {
+        return false;
+      }
+      Optional<GameTarget> target = gameTargetConfig.getAllianceTarget(baseName, Utils.isOnRedAlliance());
+      return target.map(t -> t.isAtTarget(aprilTagFieldLayout, getPose())).orElse(false);
+    });
+  }
+
+  /**
+   * Trigger that is true when robot is within distance range of a game target.
+   *
+   * <p><strong>Usage Example:</strong>
+   * <pre>{@code
+   * // Start aiming when within 1-3 meters of tower
+   * swerve.isInRangeOfTargetTrigger("tower-blue", 1.0, 3.0)
+   *     .whileTrue(swerve.aimAtTargetCommand("tower-blue", 2.0));
+   * }</pre>
+   *
+   * @param targetName Name of the target
+   * @param minDistance Minimum distance in meters
+   * @param maxDistance Maximum distance in meters
+   * @return Trigger for distance range, always false if target not configured
+   */
+  public Trigger isInRangeOfTargetTrigger(String targetName, double minDistance, double maxDistance) {
+    return new Trigger(() -> {
+      if (gameTargetConfig == null) {
+        return false;
+      }
+      Optional<GameTarget> target = gameTargetConfig.getTarget(targetName);
+      if (target.isEmpty()) {
+        return false;
+      }
+      double distance = target.get().getDistance(aprilTagFieldLayout, getPose());
+      return distance >= 0 && distance >= minDistance && distance <= maxDistance;
+    });
+  }
+
+  /**
+   * Trigger that is true when robot heading is aligned with target rotation.
+   *
+   * <p>Checks if the robot is facing the direction specified in the target's offset rotation.
+   *
+   * @param targetName Name of the target
+   * @param tolerance Angular tolerance
+   * @return Trigger for rotational alignment, always false if target not configured
+   */
+  public Trigger isAlignedWithTargetTrigger(String targetName, Angle tolerance) {
+    return new Trigger(() -> {
+      if (gameTargetConfig == null) {
+        return false;
+      }
+      Optional<Pose2d> targetPose = getTargetPose(targetName);
+      if (targetPose.isEmpty()) {
+        return false;
+      }
+      double error = Math.abs(getHeading().minus(targetPose.get().getRotation()).getDegrees());
+      return error <= tolerance.in(Degrees);
     });
   }
 
@@ -1299,6 +1701,114 @@ public class SwerveSubsystem extends SubsystemBase {
   public Command getAutonomousCommand(String pathName) {
     return new PathPlannerAuto(pathName)
         .withName("Auto(" + pathName + ")");
+  }
+
+  // ==================== GAME TARGET COMMANDS ====================
+
+  /**
+   * Command to drive to a named game target using PathPlanner pathfinding.
+   *
+   * <p>The target pose is calculated by applying the target's offset to the
+   * associated AprilTag position from the field layout.
+   *
+   * <p><strong>Usage Example:</strong>
+   * <pre>{@code
+   * // Drive to the tower scoring position
+   * Buttons.XboxAButton.onTrue(swerve.driveToTargetCommand("tower-blue"));
+   *
+   * // Drive to alliance-specific target
+   * Buttons.XboxBButton.onTrue(swerve.driveToAllianceTargetCommand("tower"));
+   * }</pre>
+   *
+   * @param targetName Name of the game target
+   * @return PathPlanner pathfinding command, or empty command if target not found
+   */
+  public Command driveToTargetCommand(String targetName) {
+    return Commands.either(
+        Commands.defer(() -> {
+          Optional<Pose2d> targetPose = getTargetPose(targetName);
+          return targetPose.map(this::driveToPoseCommand)
+              .orElse(Commands.none());
+        }, java.util.Set.of(this)),
+        Commands.none(),
+        () -> gameTargetConfig != null && gameTargetConfig.hasTarget(targetName)
+    ).withName("DriveToTarget(" + targetName + ")");
+  }
+
+  /**
+   * Command to drive to the alliance-specific game target.
+   *
+   * <p>Automatically selects the blue or red variant based on current alliance.
+   *
+   * @param baseName Base target name (without alliance suffix)
+   * @return PathPlanner pathfinding command
+   */
+  public Command driveToAllianceTargetCommand(String baseName) {
+    return Commands.defer(() -> {
+      String fullName = baseName + (Utils.isOnRedAlliance() ? "-red" : "-blue");
+      return driveToTargetCommand(fullName);
+    }, java.util.Set.of(this)).withName("DriveToAllianceTarget(" + baseName + ")");
+  }
+
+  /**
+   * Command to aim (rotate) the robot toward a game target's position.
+   *
+   * <p>This command rotates the robot to face the target but does not drive toward it.
+   *
+   * <p><strong>Usage Example:</strong>
+   * <pre>{@code
+   * // Aim at tower while driving
+   * swerve.isInRangeOfTargetTrigger("tower-blue", 2.0, 5.0)
+   *     .whileTrue(swerve.aimAtGameTargetCommand("tower-blue", 2.0));
+   * }</pre>
+   *
+   * @param targetName Name of the game target
+   * @param toleranceDegrees Angular tolerance in degrees
+   * @return Aiming command, or empty command if target not found
+   */
+  public Command aimAtGameTargetCommand(String targetName, double toleranceDegrees) {
+    return Commands.run(() -> {
+      Optional<Pose2d> targetPose = getTargetPose(targetName);
+      if (targetPose.isEmpty()) return;
+
+      // Calculate yaw to target
+      Translation2d robotPos = getPose().getTranslation();
+      Translation2d targetPos = targetPose.get().getTranslation();
+      Translation2d diff = targetPos.minus(robotPos);
+      Rotation2d targetYaw = new Rotation2d(diff.getX(), diff.getY());
+
+      // Use heading controller to rotate toward target
+      ChassisSpeeds speeds = ChassisSpeeds.fromFieldRelativeSpeeds(0, 0,
+          swerveDrive.swerveController.headingCalculate(
+              getHeading().getRadians(),
+              targetYaw.getRadians()),
+          getHeading());
+      drive(speeds);
+    }, this).until(() -> {
+      Optional<Pose2d> targetPose = getTargetPose(targetName);
+      if (targetPose.isEmpty()) return true;
+
+      Translation2d robotPos = getPose().getTranslation();
+      Translation2d targetPos = targetPose.get().getTranslation();
+      Translation2d diff = targetPos.minus(robotPos);
+      Rotation2d targetYaw = new Rotation2d(diff.getX(), diff.getY());
+
+      return Math.abs(targetYaw.minus(getHeading()).getDegrees()) < toleranceDegrees;
+    }).withName("AimAtGameTarget(" + targetName + ")");
+  }
+
+  /**
+   * Command to aim at the alliance-specific game target.
+   *
+   * @param baseName Base target name (without alliance suffix)
+   * @param toleranceDegrees Angular tolerance in degrees
+   * @return Aiming command
+   */
+  public Command aimAtAllianceGameTargetCommand(String baseName, double toleranceDegrees) {
+    return Commands.defer(() -> {
+      String fullName = baseName + (Utils.isOnRedAlliance() ? "-red" : "-blue");
+      return aimAtGameTargetCommand(fullName, toleranceDegrees);
+    }, java.util.Set.of(this)).withName("AimAtAllianceGameTarget(" + baseName + ")");
   }
 
   // ==================== MANUAL DRIVE COMMANDS ====================

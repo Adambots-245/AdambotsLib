@@ -10,6 +10,7 @@ YAGSL-based swerve drive subsystem for holonomic drivetrain control with PhotonV
 - [JSON Configuration](#json-configuration)
 - [Zeroing Swerve Modules](#zeroing-swerve-modules)
 - [Command Factories](#command-factories)
+- [Game Target Configuration](#game-target-configuration)
 - [Trigger Methods](#trigger-methods)
 - [Usage Examples](#usage-examples)
 - [Troubleshooting](#troubleshooting)
@@ -24,8 +25,9 @@ YAGSL-based swerve drive subsystem for holonomic drivetrain control with PhotonV
 - ✅ JSON-based configuration (no custom SwerveModule class needed)
 - ✅ PhotonVision integration for vision-corrected odometry
 - ✅ PathPlanner integration for autonomous path following
-- ✅ 17 command factory methods for all drive operations
-- ✅ 8 trigger methods for state-based command composition
+- ✅ Game-specific target configuration (JSON or builder pattern)
+- ✅ 21 command factory methods for all drive operations
+- ✅ 18 trigger methods for state-based command composition
 - ✅ Support for multiple motor types (Kraken X60/X44, Falcon 500, NEO)
 
 **Important:** AdambotsLib provides the `SwerveSubsystem` class and example JSON files, but **each robot project must create its own JSON configuration files** with robot-specific CAN IDs, dimensions, and motor types.
@@ -928,9 +930,175 @@ Command sysIdAngle = swerve.sysIdAngleMotorCommand();
 
 ---
 
+## Game Target Configuration
+
+Game-specific targets allow you to define semantic names (like "tower", "hub", "source") that map to AprilTag positions with robot offsets. This eliminates the need to hardcode field positions that change every year.
+
+### Why Use Game Targets?
+
+- **Semantic names**: Use `"tower-blue"` instead of remembering tag ID 15
+- **Alliance-aware**: Automatically select blue/red targets based on alliance
+- **Offset-based**: Define where the robot should be relative to the tag
+- **Tolerance support**: Built-in alignment checking
+
+### Setup Methods
+
+#### JSON Configuration (Recommended)
+
+Create a JSON file in your deploy folder:
+
+**deploy/gametargets.json:**
+```json
+{
+  "gameYear": 2026,
+  "gameName": "REBUILT",
+  "targets": [
+    {
+      "name": "tower-blue",
+      "tagIds": [15, 16],
+      "offset": { "x": -0.5, "y": 0.0, "rotation": 180 },
+      "tolerance": { "position": 0.05, "rotation": 2.0 }
+    },
+    {
+      "name": "tower-red",
+      "tagIds": [31, 32],
+      "offset": { "x": -0.5, "y": 0.0, "rotation": 0 },
+      "tolerance": { "position": 0.05, "rotation": 2.0 }
+    }
+  ]
+}
+```
+
+Load in RobotContainer:
+```java
+swerve.setupGameTargets("gametargets.json");
+```
+
+#### Builder Pattern (Code-Based)
+
+```java
+import com.adambots.lib.targets.GameTargetConfigBuilder;
+import static edu.wpi.first.units.Units.*;
+
+GameTargetConfig config = GameTargetConfigBuilder.create()
+    .gameYear(2026)
+    .gameName("REBUILT")
+    .addTarget("tower-blue")
+        .tagIds(15, 16)
+        .offset(Meters.of(-0.5), Meters.of(0), Degrees.of(180))
+        .tolerance(0.05, 2.0)
+        .done()
+    .addTarget("tower-red")
+        .tagIds(31, 32)
+        .offset(Meters.of(-0.5), Meters.of(0), Degrees.of(0))
+        .tolerance(0.05, 2.0)
+        .done()
+    .build();
+
+swerve.setupGameTargets(config);
+```
+
+### Game Target Commands
+
+#### driveToTargetCommand(String targetName)
+Drives to a named game target using PathPlanner pathfinding.
+
+```java
+// Drive to the tower scoring position
+Buttons.XboxAButton.onTrue(swerve.driveToTargetCommand("tower-blue"));
+```
+
+---
+
+#### driveToAllianceTargetCommand(String baseName)
+Drives to the alliance-appropriate target (auto-selects blue/red).
+
+```java
+// Drives to "tower-blue" or "tower-red" based on alliance
+Buttons.XboxBButton.onTrue(swerve.driveToAllianceTargetCommand("tower"));
+```
+
+---
+
+#### aimAtGameTargetCommand(String targetName, double toleranceDegrees)
+Rotates to face the target position (does not drive toward it).
+
+```java
+// Aim at tower while in range
+swerve.isInRangeOfTargetTrigger("tower-blue", 2.0, 5.0)
+    .whileTrue(swerve.aimAtGameTargetCommand("tower-blue", 2.0));
+```
+
+---
+
+#### aimAtAllianceGameTargetCommand(String baseName, double toleranceDegrees)
+Aims at the alliance-appropriate target.
+
+```java
+// Aim at alliance tower
+swerve.aimAtAllianceGameTargetCommand("tower", 2.0);
+```
+
+### Game Target Triggers
+
+#### isAtTargetTrigger(String targetName)
+True when robot is at the target position within tolerance.
+
+```java
+swerve.isAtTargetTrigger("tower-blue")
+    .onTrue(shooter.shootCommand());
+```
+
+---
+
+#### isAtAllianceTargetTrigger(String baseName)
+True when at alliance-specific target.
+
+```java
+swerve.isAtAllianceTargetTrigger("tower")
+    .onTrue(Commands.print("At alliance tower!"));
+```
+
+---
+
+#### isInRangeOfTargetTrigger(String targetName, double minDistance, double maxDistance)
+True when within distance range of target.
+
+```java
+swerve.isInRangeOfTargetTrigger("tower-blue", 1.0, 3.0)
+    .whileTrue(swerve.aimAtGameTargetCommand("tower-blue", 2.0));
+```
+
+---
+
+#### isAlignedWithTargetTrigger(String targetName, Angle tolerance)
+True when robot heading matches target rotation.
+
+```java
+swerve.isAlignedWithTargetTrigger("tower-blue", Degrees.of(3.0))
+    .onTrue(shooter.spinUpCommand());
+```
+
+### Getting Target Poses
+
+```java
+// Get specific target pose
+Optional<Pose2d> towerPose = swerve.getTargetPose("tower-blue");
+
+// Get alliance-appropriate target pose
+Optional<Pose2d> allianceTowerPose = swerve.getAllianceTargetPose("tower");
+
+// Use in custom commands
+towerPose.ifPresent(pose -> {
+    System.out.println("Tower at: " + pose);
+});
+```
+
+---
+
 ## Trigger Methods
 
-`SwerveSubsystem` provides 8 trigger methods for state-based command composition.
+`SwerveSubsystem` provides 18 trigger methods for state-based command composition.
 
 ### Pose-Based Triggers
 
@@ -962,8 +1130,35 @@ inCommunity.whileTrue(leds.setColorCommand(Color.kBlue));
 
 ### Velocity-Based Triggers
 
+#### isMovingTrigger() / isMovingTrigger(double velocityThreshold)
+Returns a trigger that is true when robot is moving (linear velocity above threshold).
+
+```java
+// Convenience: uses 0.1 m/s default
+Trigger isMoving = swerve.isMovingTrigger();
+
+// Custom threshold
+Trigger isMovingFast = swerve.isMovingTrigger(3.0); // > 3 m/s
+
+isMovingFast.whileTrue(leds.strobeCommand(Color.kRed, 0.1));
+```
+
+---
+
+#### isStoppedTrigger()
+Returns a trigger that is true when robot is fully stopped (both linear AND angular velocity below thresholds).
+
+```java
+// Uses defaults: 0.05 m/s linear, 0.1 rad/s angular
+Trigger isStopped = swerve.isStoppedTrigger();
+
+isStopped.whileTrue(shooter.spinUpCommand());
+```
+
+---
+
 #### isStationaryTrigger(double velocityThreshold)
-Returns a trigger that is true when robot velocity is below threshold.
+Returns a trigger that is true when robot linear velocity is below threshold.
 
 ```java
 Trigger isStopped = swerve.isStationaryTrigger(0.1); // < 0.1 m/s
@@ -973,13 +1168,105 @@ isStopped.whileTrue(shooter.spinUpCommand());
 
 ---
 
-#### isMovingFastTrigger(double velocityThreshold)
-Returns a trigger that is true when robot velocity exceeds threshold.
+#### isFullyStoppedTrigger(double linearThreshold, double angularThreshold)
+Returns a trigger that is true when both linear AND angular velocity are below thresholds.
 
 ```java
-Trigger isMovingFast = swerve.isMovingFastTrigger(3.0); // > 3 m/s
+// Stricter than isStationaryTrigger - checks rotation too
+Trigger fullyStopped = swerve.isFullyStoppedTrigger(0.05, 0.1);
 
-isMovingFast.whileTrue(leds.strobeCommand(Color.kRed, 0.1));
+fullyStopped.onTrue(vision.takeMeasurementCommand());
+```
+
+---
+
+### Rotation Triggers
+
+#### isRotatingTrigger(double thresholdRadPerSec)
+Returns a trigger that is true when angular velocity exceeds threshold.
+
+```java
+Trigger isSpinning = swerve.isRotatingTrigger(0.5); // > 0.5 rad/s
+
+// Disable vision during fast rotation
+isSpinning.whileTrue(swerve.disableVisionCommand());
+```
+
+---
+
+#### isNotRotatingTrigger(double thresholdRadPerSec)
+Returns a trigger that is true when angular velocity is below threshold.
+
+```java
+Trigger settledRotation = swerve.isNotRotatingTrigger(0.1);
+
+settledRotation.onTrue(vision.enableVisionCommand());
+```
+
+---
+
+### Direction Triggers
+
+#### isMovingInDirectionTrigger(Rotation2d direction, double toleranceDegrees, double minVelocity)
+Returns a trigger that is true when moving in specified field direction.
+
+```java
+// Trigger when moving toward blue alliance wall (+X direction)
+Trigger movingForward = swerve.isMovingInDirectionTrigger(
+    Rotation2d.fromDegrees(0), 45, 0.1);
+
+// Trigger when moving left (field +Y direction)
+Trigger movingLeft = swerve.isMovingInDirectionTrigger(
+    Rotation2d.fromDegrees(90), 30, 0.2);
+```
+
+---
+
+#### isMovingForwardTrigger()
+Convenience trigger for forward movement (field +X direction, 45° tolerance, 0.1 m/s min).
+
+```java
+Trigger goingForward = swerve.isMovingForwardTrigger();
+```
+
+---
+
+#### isStrafingTrigger(double minVelocity)
+Returns a trigger that is true when moving perpendicular to heading (60-120° from heading).
+
+```java
+Trigger strafing = swerve.isStrafingTrigger(0.2);
+
+strafing.whileTrue(leds.setColorCommand(Color.kYellow));
+```
+
+---
+
+### Position Triggers
+
+#### distanceFromPointTrigger(Translation2d point, double minDistance, double maxDistance)
+Returns a trigger that is true when within distance range of a field point.
+
+```java
+Translation2d scoringSpot = new Translation2d(2.0, 5.5);
+
+// Trigger when 1-3 meters from scoring spot
+Trigger nearScoring = swerve.distanceFromPointTrigger(scoringSpot, 1.0, 3.0);
+
+nearScoring.whileTrue(swerve.aimAtAprilTagCommand(7, 2.0));
+```
+
+---
+
+### Physical State Triggers
+
+#### isPitchedTrigger(double thresholdDegrees)
+Returns a trigger that is true when robot pitch exceeds threshold (for ramps/climbing).
+
+```java
+Trigger onRamp = swerve.isPitchedTrigger(10.0); // > 10 degrees pitch
+
+onRamp.whileTrue(driveSlowCommand());
 ```
 
 ---
@@ -1310,5 +1597,5 @@ Check console output to verify vision data.
 
 ---
 
-**Last Updated:** 2026-01-14
+**Last Updated:** 2026-01-29
 **AdambotsLib Version:** 2026.2.0+

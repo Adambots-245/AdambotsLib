@@ -1,0 +1,66 @@
+{
+  "gameYear": 2026,
+  "gameName": "REBUILT",
+  "targets": [
+    {
+      "name": "tower-blue",
+      "tagIds": [15, 16],
+      "offset": { "x": -0.5, "y": 0.0, "rotation": 180 },
+      "tolerance": { "position": 0.05, "rotation": 2.0 }
+    },
+    {
+      "name": "tower-red",
+      "tagIds": [31, 32],
+      "offset": { "x": -0.5, "y": 0.0, "rotation": 0 },
+      "tolerance": { "position": 0.05, "rotation": 2.0 }
+    },
+    {
+      "name": "hub-blue",
+      "tagIds": [1, 2, 3],
+      "offset": { "x": -0.3, "y": 0.0, "rotation": 90 },
+      "tolerance": { "position": 0.08, "rotation": 3.0 }
+    },
+    {
+      "name": "hub-red",
+      "tagIds": [9, 10, 11],
+      "offset": { "x": -0.3, "y": 0.0, "rotation": -90 },
+      "tolerance": { "position": 0.08, "rotation": 3.0 }
+    },
+    {
+      "name": "outpost-blue-left",
+      "tagIds": [4],
+      "offset": { "x": -0.4, "y": 0.2, "rotation": 135 },
+      "tolerance": { "position": 0.1, "rotation": 5.0 }
+    },
+    {
+      "name": "outpost-blue-right",
+      "tagIds": [5],
+      "offset": { "x": -0.4, "y": -0.2, "rotation": -135 },
+      "tolerance": { "position": 0.1, "rotation": 5.0 }
+    },
+    {
+      "name": "outpost-red-left",
+      "tagIds": [12],
+      "offset": { "x": -0.4, "y": 0.2, "rotation": 45 },
+      "tolerance": { "position": 0.1, "rotation": 5.0 }
+    },
+    {
+      "name": "outpost-red-right",
+      "tagIds": [13],
+      "offset": { "x": -0.4, "y": -0.2, "rotation": -45 },
+      "tolerance": { "position": 0.1, "rotation": 5.0 }
+    },
+    {
+      "name": "source-blue",
+      "tagIds": [6, 7, 8],
+      "offset": { "x": 0.5, "y": 0.0, "rotation": 0 },
+      "tolerance": { "position": 0.1, "rotation": 5.0 }
+    },
+    {
+      "name": "source-red",
+      "tagIds": [14, 15, 16],
+      "offset": { "x": 0.5, "y": 0.0, "rotation": 180 },
+      "tolerance": { "position": 0.1, "rotation": 5.0 }
+    }
+  ]
+}

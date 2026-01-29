@@ -14,8 +14,9 @@ This folder contains pre-built subsystem classes that encapsulate common robot f
   - JSON-based configuration (no custom SwerveModule class)
   - PhotonVision integration for vision-corrected odometry
   - PathPlanner integration for autonomous
-  - 17 command factory methods for all drive operations
-  - 8 trigger methods for state-based command composition
+  - Game-specific target configuration (JSON or builder pattern)
+  - 21 command factory methods for all drive operations
+  - 18 trigger methods for state-based command composition
   - Support for Kraken X60/X44, Falcon 500, and NEO motors
 
 ### Vision & Cameras

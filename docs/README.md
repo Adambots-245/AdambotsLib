@@ -31,6 +31,14 @@ Pre-built command-based subsystems for common robot components:
 - **[CameraSubsystem](subsystems/CameraSubsystem.md)** - PhotonVision camera management
 - **[Custom Commands](subsystems/CustomCommands.md)** - Reusable command patterns
 
+### Game Targets
+Game-specific target configuration for AprilTag-based positioning:
+
+- **Game Target Configuration** - See [SwerveSubsystem](subsystems/SwerveSubsystem.md#game-target-configuration) for setup
+- **JSON Configuration** - Define targets in deploy/gametargets.json
+- **Builder Pattern** - Programmatic target definition with GameTargetConfigBuilder
+- **Alliance-Aware** - Automatic blue/red target selection
+
 ### Vision
 Computer vision for AprilTag detection and pose estimation:
 
