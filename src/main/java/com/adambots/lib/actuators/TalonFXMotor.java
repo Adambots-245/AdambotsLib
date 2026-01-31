@@ -617,16 +617,45 @@ public class TalonFXMotor implements BaseMotor {
 
     /**
      * Sets this motor as a strict follower of another motor controller.
-     * The follower will respect the inversion state set via {@link #setInverted(boolean)}.
+     * Uses the inversion state set via {@link #setInverted(boolean)} to determine alignment.
      *
-     * @param deviceID The ID of the motor controller to follow
+     * <p>Note: In follower mode, the motor's own inversion config is ignored. The alignment
+     * is determined by the {@code isInverted} flag: if true, uses Opposed alignment to make
+     * the follower spin opposite to the leader's output.
+     *
+     * <p>For explicit control over alignment, use {@link #setStrictFollower(int, boolean)}.
+     *
+     * @param deviceID The CAN ID of the motor controller to follow
      */
     @Override
     public void setStrictFollower(int deviceID) {
+        setStrictFollower(deviceID, isInverted);
+    }
+
+    /**
+     * Sets this motor as a strict follower of another motor controller with explicit alignment control.
+     *
+     * <p>Use this when you need direct control over whether the follower matches or opposes
+     * the leader's output direction. This is useful for mechanisms like shooters where motors
+     * face each other and need to spin opposite directions.
+     *
+     * <p>Example:
+     * <pre>
+     * // Shooter with motors facing each other
+     * leftMotor.set(ControlMode.PERCENT_OUTPUT, 0.5);  // leader
+     * rightMotor.setStrictFollower(leftMotorId, true); // oppose leader
+     * </pre>
+     *
+     * @param deviceID The CAN ID of the motor controller to follow
+     * @param opposeMaster true to spin opposite to the leader (Opposed),
+     *                     false to spin same direction as leader (Aligned)
+     */
+    @Override
+    public void setStrictFollower(int deviceID, boolean opposeMaster) {
         // Set this motor as a follower using the Follower control request
-        // Use Opposed if inverted, since Follower control ignores motor inversion config
-        motor.setControl(new com.ctre.phoenix6.controls.Follower(deviceID,
-            isInverted ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned));
+        // Follower control ignores motor inversion config, so we must use MotorAlignment
+        MotorAlignmentValue alignment = opposeMaster ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned;
+        motor.setControl(new com.ctre.phoenix6.controls.Follower(deviceID, alignment));
     }
 
     /**

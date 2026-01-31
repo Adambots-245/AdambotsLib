@@ -470,6 +470,33 @@ public interface BaseMotor extends BaseActuator{
     void setStrictFollower(int leaderDeviceID);
 
     /**
+     * Configures this motor to follow another motor's output with explicit direction control.
+     *
+     * <p>Use this overload when you need to explicitly control whether the follower
+     * matches or opposes the leader's output direction. This is useful for mechanisms
+     * like shooters where motors face each other and need to spin opposite directions.
+     *
+     * <p><strong>Note:</strong> For TalonFX motors, the motor's own inversion config is
+     * ignored in follower mode. Direction is controlled entirely by the opposeMaster parameter.
+     *
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * // Shooter with motors facing each other
+     * TalonFXMotor leftShooter = new TalonFXMotor(1, true, 60, true);
+     * TalonFXMotor rightShooter = new TalonFXMotor(2, true, 60, true);
+     * rightShooter.setStrictFollower(1, true);  // Oppose leader for shooter
+     * }</pre>
+     *
+     * @param leaderDeviceID CAN device ID of the motor to follow
+     * @param opposeMaster true to spin opposite to the leader, false to match leader direction
+     */
+    default void setStrictFollower(int leaderDeviceID, boolean opposeMaster) {
+        // Default implementation ignores opposeMaster - subclasses can override
+        // This preserves backward compatibility while allowing TalonFXMotor to use it
+        setStrictFollower(leaderDeviceID);
+    }
+
+    /**
      * Configures hardware limit switches for automatic position zeroing.
      *
      * <p>Hardware limit switches can automatically reset the encoder position when triggered,
