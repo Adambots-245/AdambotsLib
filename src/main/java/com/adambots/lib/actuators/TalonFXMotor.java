@@ -53,6 +53,7 @@ public class TalonFXMotor implements BaseMotor {
     private final boolean isKraken;
     private boolean focFlag = false;
     private double feedForward = 0.0;
+    private boolean isInverted = false; // Track inversion state for follower mode
     private final int maxRetries = 3; // Maximum retries for configuration
 
     // Reusable control request objects to avoid allocation overhead
@@ -428,6 +429,7 @@ public class TalonFXMotor implements BaseMotor {
      */
     @Override
     public void setInverted(boolean inverted) {
+        this.isInverted = inverted;
         var config = new MotorOutputConfigs();
 
         // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
@@ -615,14 +617,16 @@ public class TalonFXMotor implements BaseMotor {
 
     /**
      * Sets this motor as a strict follower of another motor controller.
-     * 
+     * The follower will respect the inversion state set via {@link #setInverted(boolean)}.
+     *
      * @param deviceID The ID of the motor controller to follow
      */
     @Override
     public void setStrictFollower(int deviceID) {
         // Set this motor as a follower using the Follower control request
-        motor.setControl(new com.ctre.phoenix6.controls.Follower(deviceID, MotorAlignmentValue.Aligned)); // Aligned = don't oppose master
-                                                                                    // direction
+        // Use Opposed if inverted, since Follower control ignores motor inversion config
+        motor.setControl(new com.ctre.phoenix6.controls.Follower(deviceID,
+            isInverted ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned));
     }
 
     /**
