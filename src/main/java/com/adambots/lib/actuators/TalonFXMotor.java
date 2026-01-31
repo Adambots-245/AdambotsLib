@@ -440,7 +440,7 @@ public class TalonFXMotor implements BaseMotor {
                 "). Configuration may be factory defaulted!", true);
         }
 
-        config.withInverted(inverted ? InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive);
+        config.Inverted = inverted ? InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive;
 
         boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
         if (!success) {
@@ -468,7 +468,7 @@ public class TalonFXMotor implements BaseMotor {
                 "). Configuration may be factory defaulted!", true);
         }
 
-        config.withNeutralMode(brake ? NeutralModeValue.Brake : NeutralModeValue.Coast);
+        config.NeutralMode = brake ? NeutralModeValue.Brake : NeutralModeValue.Coast;
 
         boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
         if (!success) {
