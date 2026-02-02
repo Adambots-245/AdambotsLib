@@ -90,6 +90,8 @@ import swervelib.telemetry.SwerveDriveTelemetry.TelemetryVerbosity;
  *       driveFieldOrientedCommand, centerModulesCommand</li>
  *   <li><strong>Distance-based commands:</strong> driveToDistanceCommand,
  *       driveToDistanceFieldOrientedCommand, driveForwardDistanceCommand</li>
+ *   <li><strong>Simple movement commands:</strong> turnToAngleCommand, strafeCommand,
+ *       creepForwardCommand, creepCommand, driveToPositionWithHeadingCommand</li>
  *   <li><strong>SysId commands:</strong> sysIdDriveMotorCommand, sysIdAngleMotorCommand</li>
  * </ul>
  *
@@ -2199,6 +2201,282 @@ public class SwerveSubsystem extends SubsystemBase {
         currentPose.getRotation().minus(targetPose.getRotation()).getDegrees());
 
     return poseError < positionTolerance && rotationError < rotationTolerance;
+  }
+
+  // ==================== SIMPLE MOVEMENT COMMANDS ====================
+
+  /**
+   * Command to rotate the robot to face a specific field-relative angle.
+   *
+   * <p><strong>How It Works:</strong> Uses the YAGSL heading controller to smoothly
+   * rotate the robot to the target angle. The command ends when the robot is within
+   * the specified tolerance of the target heading.
+   *
+   * <p><strong>Use Cases:</strong>
+   * <ul>
+   *   <li>Pre-positioning for shots (face speaker direction)</li>
+   *   <li>Autonomous alignment to field-relative angles</li>
+   *   <li>Resetting robot orientation during teleop</li>
+   * </ul>
+   *
+   * <p><strong>Usage Example:</strong>
+   * <pre>{@code
+   * // Turn to face 0 degrees (toward red alliance wall)
+   * swerve.turnToAngleCommand(Rotation2d.fromDegrees(0), 2.0).schedule();
+   *
+   * // Turn to face speaker before shooting
+   * Commands.sequence(
+   *     swerve.turnToAngleCommand(Rotation2d.fromDegrees(180), 1.0),
+   *     shooter.shootCommand()
+   * );
+   *
+   * // Compose turn-then-drive sequence
+   * Commands.sequence(
+   *     swerve.turnToAngleCommand(Rotation2d.fromDegrees(45), 2.0),
+   *     swerve.driveToDistanceCommand(1.5, 2.0)
+   * );
+   * }</pre>
+   *
+   * @param targetAngle Field-relative target angle
+   * @param toleranceDegrees Angular tolerance in degrees (command ends when within this)
+   * @return Command that rotates robot to face the specified angle
+   *
+   * @see #aimAtAprilTagCommand(int, double)
+   * @see #isFacingHeadingTrigger(Rotation2d, double)
+   */
+  public Command turnToAngleCommand(Rotation2d targetAngle, double toleranceDegrees) {
+    return Commands.run(() -> {
+      ChassisSpeeds speeds = ChassisSpeeds.fromFieldRelativeSpeeds(0, 0,
+          swerveDrive.swerveController.headingCalculate(
+              getHeading().getRadians(),
+              targetAngle.getRadians()),
+          getHeading());
+      drive(speeds);
+    }, this).until(() ->
+        Math.abs(targetAngle.minus(getHeading()).getDegrees()) < toleranceDegrees
+    ).withName("TurnToAngle(" + targetAngle.getDegrees() + "°)");
+  }
+
+  /**
+   * Command to strafe (move sideways) a specified distance while maintaining current heading.
+   *
+   * <p><strong>How It Works:</strong> Moves the robot perpendicular to its current
+   * heading using field-oriented control. The robot maintains its heading throughout
+   * the strafe movement.
+   *
+   * <p><strong>Strafe Direction:</strong>
+   * <ul>
+   *   <li>Positive distance → Strafe left (robot's left side)</li>
+   *   <li>Negative distance → Strafe right (robot's right side)</li>
+   * </ul>
+   *
+   * <p><strong>Use Cases:</strong>
+   * <ul>
+   *   <li>Manual positioning adjustments during autonomous</li>
+   *   <li>Aligning with game pieces or scoring positions</li>
+   *   <li>Side-stepping obstacles</li>
+   * </ul>
+   *
+   * <p><strong>Usage Example:</strong>
+   * <pre>{@code
+   * // Strafe 0.5 meters left at 1.0 m/s
+   * swerve.strafeCommand(0.5, 1.0).schedule();
+   *
+   * // Strafe 0.3 meters right at 0.5 m/s
+   * swerve.strafeCommand(-0.3, 0.5).schedule();
+   *
+   * // Align then strafe sequence
+   * Commands.sequence(
+   *     swerve.turnToAngleCommand(Rotation2d.fromDegrees(90), 2.0),
+   *     swerve.strafeCommand(0.4, 0.8)
+   * );
+   * }</pre>
+   *
+   * @param distanceMeters Distance to strafe in meters (positive = left, negative = right)
+   * @param speedMetersPerSecond Speed in meters per second (always positive)
+   * @return Command that strafes the specified distance then stops
+   *
+   * @see #alignAndStrafeCommand(int, double, double, double)
+   * @see #driveToDistanceCommand(double, double)
+   */
+  public Command strafeCommand(double distanceMeters, double speedMetersPerSecond) {
+    return Commands.sequence(
+        Commands.runOnce(() -> startPose = swerveDrive.getPose()),
+
+        Commands.run(() -> {
+          Rotation2d heading = getHeading();
+          double speed = Math.abs(speedMetersPerSecond);
+          int direction = (distanceMeters >= 0) ? 1 : -1;
+
+          // Strafe perpendicular to heading (90 degrees offset)
+          double strafeAngle = heading.getRadians() + Math.PI / 2;
+          double xVel = direction * speed * Math.cos(strafeAngle);
+          double yVel = direction * speed * Math.sin(strafeAngle);
+
+          driveFieldOriented(new ChassisSpeeds(xVel, yVel, 0));
+        }, this)
+            .until(() -> swerveDrive.getPose().getTranslation()
+                .getDistance(startPose.getTranslation()) >= Math.abs(distanceMeters)),
+
+        Commands.runOnce(() -> drive(new ChassisSpeeds(0, 0, 0)))
+    ).withName("Strafe(" + distanceMeters + "m)");
+  }
+
+  /**
+   * Command for slow, continuous forward movement (creeping).
+   *
+   * <p><strong>How It Works:</strong> Drives forward at a slow, preset speed
+   * (0.3 m/s) continuously until the command is cancelled. This is useful for
+   * fine positioning with visual feedback.
+   *
+   * <p><strong>Use Cases:</strong>
+   * <ul>
+   *   <li>Slow approach to game pieces for pickup</li>
+   *   <li>Fine-tuning position before scoring</li>
+   *   <li>Moving while operator aligns visually</li>
+   * </ul>
+   *
+   * <p><strong>Note:</strong> This command runs indefinitely until cancelled.
+   * Use with .until(), .withTimeout(), or .whileTrue() for controlled execution.
+   *
+   * <p><strong>Usage Example:</strong>
+   * <pre>{@code
+   * // Creep forward while button is held
+   * Buttons.XboxAButton.whileTrue(swerve.creepForwardCommand());
+   *
+   * // Creep until sensor detects game piece
+   * swerve.creepForwardCommand()
+   *     .until(() -> intake.hasGamePiece())
+   *     .schedule();
+   * }</pre>
+   *
+   * @return Command that drives forward slowly (0.3 m/s) continuously
+   *
+   * @see #creepCommand(double)
+   * @see #driveToDistanceCommand(double, double)
+   */
+  public Command creepForwardCommand() {
+    return creepCommand(0.3);
+  }
+
+  /**
+   * Command for slow, continuous movement at a configurable speed.
+   *
+   * <p><strong>How It Works:</strong> Drives forward (or backward if negative)
+   * at the specified speed continuously until the command is cancelled.
+   *
+   * <p><strong>Speed Direction:</strong>
+   * <ul>
+   *   <li>Positive speed → Move forward</li>
+   *   <li>Negative speed → Move backward</li>
+   * </ul>
+   *
+   * <p><strong>Recommended Speed Range:</strong> 0.1 to 0.5 m/s for fine positioning.
+   * Higher speeds defeat the purpose of creeping.
+   *
+   * <p><strong>Note:</strong> This command runs indefinitely until cancelled.
+   * Use with .until(), .withTimeout(), or .whileTrue() for controlled execution.
+   *
+   * <p><strong>Usage Example:</strong>
+   * <pre>{@code
+   * // Creep forward at custom speed while button is held
+   * Buttons.XboxLeftBumper.whileTrue(swerve.creepCommand(0.2));
+   *
+   * // Creep backward slowly
+   * Buttons.XboxRightBumper.whileTrue(swerve.creepCommand(-0.2));
+   *
+   * // Creep until aligned with target
+   * swerve.creepCommand(0.25)
+   *     .until(() -> swerve.isAlignedWithTagTrigger(7, Degrees.of(2)).getAsBoolean())
+   *     .schedule();
+   * }</pre>
+   *
+   * @param speedMetersPerSecond Speed in meters per second (positive = forward, negative = backward)
+   * @return Command that drives at the specified speed continuously
+   *
+   * @see #creepForwardCommand()
+   */
+  public Command creepCommand(double speedMetersPerSecond) {
+    return Commands.run(() -> drive(new ChassisSpeeds(speedMetersPerSecond, 0, 0)), this)
+        .withName("Creep(" + speedMetersPerSecond + "m/s)");
+  }
+
+  /**
+   * Command to drive to a position while maintaining a specified heading.
+   *
+   * <p><strong>How It Works:</strong> Drives the robot to the target X,Y position
+   * while independently controlling the robot's heading. This decouples translation
+   * and rotation, unlike {@link #driveToPoseCommand(Pose2d)} which uses PathPlanner
+   * and couples the rotation to the path.
+   *
+   * <p><strong>Key Difference from driveToPoseCommand:</strong>
+   * <ul>
+   *   <li>This command: Maintains specified heading throughout entire movement</li>
+   *   <li>driveToPoseCommand: Rotates as part of the path trajectory</li>
+   * </ul>
+   *
+   * <p><strong>Use Cases:</strong>
+   * <ul>
+   *   <li>Drive to pickup spot while facing the game piece</li>
+   *   <li>Approach scoring position while facing the target</li>
+   *   <li>Strafe to a position while maintaining forward orientation</li>
+   * </ul>
+   *
+   * <p><strong>Usage Example:</strong>
+   * <pre>{@code
+   * // Drive to position (2, 5) while facing 90 degrees
+   * swerve.driveToPositionWithHeadingCommand(
+   *     new Translation2d(2.0, 5.0),
+   *     Rotation2d.fromDegrees(90),
+   *     0.1
+   * ).schedule();
+   *
+   * // Approach speaker while facing it
+   * swerve.driveToPositionWithHeadingCommand(
+   *     new Translation2d(1.5, 5.5),
+   *     Rotation2d.fromDegrees(180),
+   *     0.05
+   * ).schedule();
+   * }</pre>
+   *
+   * @param targetPosition Target X,Y position on the field
+   * @param heading Desired heading to maintain throughout the movement
+   * @param positionToleranceMeters Position tolerance in meters (command ends when within this)
+   * @return Command that drives to position while maintaining heading
+   *
+   * @see #driveToPoseCommand(Pose2d)
+   * @see #turnToAngleCommand(Rotation2d, double)
+   */
+  public Command driveToPositionWithHeadingCommand(Translation2d targetPosition, Rotation2d heading,
+                                                   double positionToleranceMeters) {
+    return Commands.run(() -> {
+      Translation2d currentPosition = getPose().getTranslation();
+      Translation2d toTarget = targetPosition.minus(currentPosition);
+      double distance = toTarget.getNorm();
+
+      // Calculate translation speed (slow down as we approach)
+      double maxSpeed = DriveConstants.kMaxSpeed.in(MetersPerSecond);
+      double translationSpeed = Math.min(maxSpeed, Math.max(0.3, distance * 2.0));
+
+      // Calculate field-relative velocities toward target
+      double xVel = 0;
+      double yVel = 0;
+      if (distance > positionToleranceMeters) {
+        Rotation2d directionToTarget = new Rotation2d(toTarget.getX(), toTarget.getY());
+        xVel = translationSpeed * Math.cos(directionToTarget.getRadians());
+        yVel = translationSpeed * Math.sin(directionToTarget.getRadians());
+      }
+
+      // Calculate rotation speed using heading controller
+      double omega = swerveDrive.swerveController.headingCalculate(
+          getHeading().getRadians(),
+          heading.getRadians());
+
+      driveFieldOriented(new ChassisSpeeds(xVel, yVel, omega));
+    }, this).until(() -> {
+      double distance = getPose().getTranslation().getDistance(targetPosition);
+      return distance < positionToleranceMeters;
+    }).withName("DriveToPositionWithHeading(" + targetPosition + ")");
   }
 
   // ==================== SYSID COMMANDS ====================

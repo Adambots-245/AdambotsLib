@@ -26,7 +26,7 @@ YAGSL-based swerve drive subsystem for holonomic drivetrain control with PhotonV
 - ✅ PhotonVision integration for vision-corrected odometry
 - ✅ PathPlanner integration for autonomous path following
 - ✅ Game-specific target configuration (JSON or builder pattern)
-- ✅ 21 command factory methods for all drive operations
+- ✅ 26 command factory methods for all drive operations
 - ✅ 18 trigger methods for state-based command composition
 - ✅ Support for multiple motor types (Kraken X60/X44, Falcon 500, NEO)
 
@@ -916,6 +916,121 @@ Command driveForward = swerve.driveForwardDistanceCommand(1.5, 1.0);
 
 ---
 
+### Simple Movement Commands
+
+#### turnToAngleCommand(Rotation2d targetAngle, double toleranceDegrees)
+Rotates robot to face a specific field-relative angle.
+
+```java
+// Turn to face 0 degrees (toward red alliance wall)
+swerve.turnToAngleCommand(Rotation2d.fromDegrees(0), 2.0).schedule();
+
+// Turn to face speaker before shooting
+Commands.sequence(
+    swerve.turnToAngleCommand(Rotation2d.fromDegrees(180), 1.0),
+    shooter.shootCommand()
+);
+
+// Compose turn-then-drive sequence
+Commands.sequence(
+    swerve.turnToAngleCommand(Rotation2d.fromDegrees(45), 2.0),
+    swerve.driveToDistanceCommand(1.5, 2.0)
+);
+```
+
+**Parameters:**
+- `targetAngle` - Field-relative target angle as Rotation2d
+- `toleranceDegrees` - Angle tolerance in degrees (command ends when within tolerance)
+
+**Use Case:** Pre-positioning for shots, autonomous alignment, resetting robot orientation.
+
+---
+
+#### strafeCommand(double distanceMeters, double speedMetersPerSecond)
+Strafes (moves sideways) a specified distance while maintaining current heading.
+
+```java
+// Strafe 0.5 meters left at 1.0 m/s
+swerve.strafeCommand(0.5, 1.0).schedule();
+
+// Strafe 0.3 meters right at 0.5 m/s
+swerve.strafeCommand(-0.3, 0.5).schedule();
+
+// Align then strafe sequence
+Commands.sequence(
+    swerve.turnToAngleCommand(Rotation2d.fromDegrees(90), 2.0),
+    swerve.strafeCommand(0.4, 0.8)
+);
+```
+
+**Parameters:**
+- `distanceMeters` - Distance to strafe in meters (positive = left, negative = right)
+- `speedMetersPerSecond` - Speed in meters per second (always positive)
+
+**Use Case:** Manual positioning adjustments, aligning with game pieces or scoring positions.
+
+---
+
+#### creepForwardCommand() / creepCommand(double speedMetersPerSecond)
+Slow, continuous movement for fine positioning.
+
+```java
+// Creep forward while button is held (0.3 m/s default)
+Buttons.XboxAButton.whileTrue(swerve.creepForwardCommand());
+
+// Creep at custom speed while button is held
+Buttons.XboxLeftBumper.whileTrue(swerve.creepCommand(0.2));
+
+// Creep backward slowly
+Buttons.XboxRightBumper.whileTrue(swerve.creepCommand(-0.2));
+
+// Creep until sensor detects game piece
+swerve.creepForwardCommand()
+    .until(() -> intake.hasGamePiece())
+    .schedule();
+```
+
+**Parameters (creepCommand only):**
+- `speedMetersPerSecond` - Speed in m/s (positive = forward, negative = backward)
+
+**Note:** These commands run indefinitely until cancelled. Use with `.until()`, `.withTimeout()`, or `.whileTrue()` for controlled execution.
+
+**Use Case:** Slow approach to game pieces, fine-tuning position before scoring.
+
+---
+
+#### driveToPositionWithHeadingCommand(Translation2d targetPosition, Rotation2d heading, double positionToleranceMeters)
+Drives to a position while maintaining a specified heading (decoupled from path rotation).
+
+```java
+// Drive to position (2, 5) while facing 90 degrees
+swerve.driveToPositionWithHeadingCommand(
+    new Translation2d(2.0, 5.0),
+    Rotation2d.fromDegrees(90),
+    0.1
+).schedule();
+
+// Approach speaker while facing it
+swerve.driveToPositionWithHeadingCommand(
+    new Translation2d(1.5, 5.5),
+    Rotation2d.fromDegrees(180),
+    0.05
+).schedule();
+```
+
+**Parameters:**
+- `targetPosition` - Target X,Y position on the field
+- `heading` - Desired heading to maintain throughout the movement
+- `positionToleranceMeters` - Position tolerance in meters (command ends when within this)
+
+**Key Difference from driveToPoseCommand:**
+- `driveToPositionWithHeadingCommand`: Maintains specified heading throughout entire movement
+- `driveToPoseCommand`: Rotates as part of the path trajectory (PathPlanner controls rotation)
+
+**Use Case:** Drive to pickup spot while facing the game piece, approach scoring while facing target.
+
+---
+
 ### SysId Commands
 
 #### sysIdDriveMotorCommand() / sysIdAngleMotorCommand()
@@ -1597,5 +1712,5 @@ Check console output to verify vision data.
 
 ---
 
-**Last Updated:** 2026-01-29
+**Last Updated:** 2026-02-02
 **AdambotsLib Version:** 2026.2.0+
