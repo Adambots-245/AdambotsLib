@@ -1,5 +1,6 @@
 package com.adambots.lib.sensors;
 
+import edu.wpi.first.epilogue.Logged;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.units.measure.Angle;
 
@@ -28,6 +29,7 @@ import edu.wpi.first.units.measure.Angle;
  *
  * @see Rotation2d
  */
+@Logged
 public interface BaseGyro {
 
     /**

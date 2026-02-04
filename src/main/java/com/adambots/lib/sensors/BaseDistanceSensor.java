@@ -1,5 +1,6 @@
 package com.adambots.lib.sensors;
 
+import edu.wpi.first.epilogue.Logged;
 import edu.wpi.first.units.measure.Distance;
 
 /**
@@ -45,6 +46,7 @@ import edu.wpi.first.units.measure.Distance;
  *   <li>All sensors: may return invalid readings for very close or distant objects</li>
  * </ul>
  */
+@Logged
 public interface BaseDistanceSensor {
 
     /**

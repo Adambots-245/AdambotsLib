@@ -1,5 +1,7 @@
 package com.adambots.lib.sensors;
 
+import edu.wpi.first.epilogue.Logged;
+
 /**
  * Base interface for proximity sensors that detect object presence.
  *
@@ -27,6 +29,7 @@ package com.adambots.lib.sensors;
  * @see LimitSwitch
  * @see PhotoEye
  */
+@Logged
 public interface BaseProximitySensor {
 
     /**

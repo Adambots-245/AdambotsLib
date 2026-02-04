@@ -1,6 +1,8 @@
 package com.adambots.lib.actuators;
 
 import static edu.wpi.first.units.Units.*;
+
+import edu.wpi.first.epilogue.Logged;
 import edu.wpi.first.units.measure.*;
 
 /**
@@ -50,6 +52,7 @@ import edu.wpi.first.units.measure.*;
  * @see TalonFXMotor
  * @see MinionMotor
  */
+@Logged
 public interface BaseMotor extends BaseActuator{
 
     /**
