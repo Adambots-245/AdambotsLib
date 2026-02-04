@@ -1,8 +1,19 @@
 plugins {
     id "java"
     id "java-library"
+    id "java-gradle-plugin"
     id "maven-publish"
     id "edu.wpi.first.GradleRIO" version "2026.2.1"
+}
+
+// Configure the Gradle plugin
+gradlePlugin {
+    plugins {
+        deployGuard {
+            id = 'com.adambots.deploy-guard'
+            implementationClass = 'com.adambots.lib.gradle.DeployGuardPlugin'
+        }
+    }
 }
 
 java {
@@ -55,6 +66,9 @@ def includeDesktopSupport = true
 // Defining my dependencies. In this case, WPILib (+ friends), and vendor libraries.
 // Also defines JUnit 5.
 dependencies {
+    // Gradle API for plugin development
+    compileOnly gradleApi()
+
     annotationProcessor wpi.java.deps.wpilibAnnotations()
     implementation wpi.java.deps.wpilib()
     implementation wpi.java.vendor.java()
@@ -99,7 +113,11 @@ wpi.sim.addDriverstation()
 //   - docs/ (documentation - not needed at runtime)
 //   - tests/ (test/example programs - not part of library)
 jar {
-    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+    // Exclude Gradle API from fat jar - it's only needed at build time for the plugin
+    def gradleApiJars = configurations.compileClasspath.filter { it.name.contains('gradle') }
+    from {
+        (configurations.runtimeClasspath - gradleApiJars).collect { it.isDirectory() ? it : zipTree(it) }
+    }
     from('src') { into 'backup/src' }
     from('vendordeps') { into 'backup/vendordeps' }
     from('build.gradle') { into 'backup' }
@@ -108,6 +126,8 @@ jar {
     // but making it explicit for clarity)
     exclude 'docs/**'
     exclude 'tests/**'
+    // Exclude Gradle API classes - they're provided by Gradle at plugin runtime
+    exclude 'org/gradle/**'
 
     manifest edu.wpi.first.gradlerio.GradleRIOPlugin.javaManifest(ROBOT_MAIN_CLASS)
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
