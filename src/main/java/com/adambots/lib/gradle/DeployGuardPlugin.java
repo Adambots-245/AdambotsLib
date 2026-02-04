@@ -91,8 +91,8 @@ public class DeployGuardPlugin implements Plugin<Project> {
         }
 
         // Branch is not allowed - block deployment
-        printBlockedMessage(project, currentBranch);
-        throw new GradleException("Deploy blocked: Branch '" + currentBranch + "' is not authorized for deployment.");
+        printBlockedMessage(project);
+        throw new GradleException("Deploy blocked: Current branch is not authorized for deployment.");
     }
 
     /**
@@ -158,8 +158,8 @@ public class DeployGuardPlugin implements Plugin<Project> {
     /**
      * Prints a prominent error message when deployment is blocked.
      */
-    private void printBlockedMessage(Project project, String branch) {
-        String message = String.format(
+    private void printBlockedMessage(Project project) {
+        String message =
                 "\n" +
                 "  ╔══════════════════════════════════════════════════════════════════╗\n" +
                 "  ║                                                                  ║\n" +
@@ -179,8 +179,6 @@ public class DeployGuardPlugin implements Plugin<Project> {
                 "  ║                                                                  ║\n" +
                 "  ╠══════════════════════════════════════════════════════════════════╣\n" +
                 "  ║                                                                  ║\n" +
-                "  ║   Current branch:  %-45s  ║\n" +
-                "  ║                                                                  ║\n" +
                 "  ║   You cannot deploy from this branch!                            ║\n" +
                 "  ║                                                                  ║\n" +
                 "  ║   To deploy robot code:                                          ║\n" +
@@ -191,9 +189,7 @@ public class DeployGuardPlugin implements Plugin<Project> {
                 "  ║     5. Switch to 'main' and pull latest                          ║\n" +
                 "  ║     6. Run deploy again                                          ║\n" +
                 "  ║                                                                  ║\n" +
-                "  ╚══════════════════════════════════════════════════════════════════╝\n",
-                branch
-        );
+                "  ╚══════════════════════════════════════════════════════════════════╝\n";
         project.getLogger().error(message);
     }
 }

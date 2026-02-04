@@ -6,8 +6,10 @@ plugins {
     id "edu.wpi.first.GradleRIO" version "2026.2.1"
 }
 
-// Configure the Gradle plugin
+// Configure the Gradle plugin - disable automatic marker generation
+// We'll create our own marker that points to the standalone plugin artifact
 gradlePlugin {
+    automatedPublishing = false
     plugins {
         deployGuard {
             id = 'com.adambots.deploy-guard'
@@ -143,6 +145,16 @@ tasks.withType(JavaCompile) {
     options.compilerArgs.add '-XDstringConcat=inline'
 }
 
+// Create a minimal plugin-only JAR (no dependencies)
+task pluginJar(type: Jar) {
+    archiveBaseName = 'deploy-guard'
+    archiveClassifier = ''  // No classifier - just deploy-guard-VERSION.jar
+    from(sourceSets.main.output) {
+        include 'com/adambots/lib/gradle/**'
+        include 'META-INF/gradle-plugins/**'
+    }
+}
+
 // Maven Publishing Configuration
 publishing {
     publications {
@@ -157,6 +169,44 @@ publishing {
                 name = 'AdambotsLib'
                 description = project.description
                 url = 'https://github.com/Adambots-245/AdambotsLib'
+            }
+        }
+
+        // Standalone plugin publication with NO dependencies
+        deployGuardPlugin(MavenPublication) {
+            groupId = 'com.adambots'
+            artifactId = 'deploy-guard'
+            version = project.version
+
+            artifact(pluginJar)
+
+            pom {
+                name = 'DeployGuard'
+                description = 'Gradle plugin to prevent deploying robot code from unauthorized git branches'
+                url = 'https://github.com/Adambots-245/AdambotsLib'
+                packaging = 'jar'
+                // No dependencies - plugin only uses Gradle API which is provided
+            }
+        }
+
+        // Plugin marker - allows `plugins { id 'com.adambots.deploy-guard' }` syntax
+        deployGuardPluginMarker(MavenPublication) {
+            groupId = 'com.adambots.deploy-guard'
+            artifactId = 'com.adambots.deploy-guard.gradle.plugin'
+            version = project.version
+
+            pom {
+                name = 'DeployGuard Plugin Marker'
+                description = 'Plugin marker for com.adambots.deploy-guard'
+                packaging = 'pom'
+
+                withXml {
+                    def dependenciesNode = asNode().appendNode('dependencies')
+                    def depNode = dependenciesNode.appendNode('dependency')
+                    depNode.appendNode('groupId', 'com.adambots')
+                    depNode.appendNode('artifactId', 'deploy-guard')
+                    depNode.appendNode('version', project.version)
+                }
             }
         }
     }
