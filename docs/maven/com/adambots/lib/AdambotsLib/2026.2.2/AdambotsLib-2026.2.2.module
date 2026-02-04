@@ -27,11 +27,11 @@
         {
           "name": "AdambotsLib-2026.2.2.jar",
           "url": "AdambotsLib-2026.2.2.jar",
-          "size": 27830306,
-          "sha512": "b602bf9acf8822245ca5b777282a263cb5e6081cee6fa11f3ba4f60af610e0d255e4ea8b9ca88db843d57460ebc29e069f471589880c34408f80d3d79fdbf782",
-          "sha256": "86c61a2585b10f7edc54cc12db04a3474ba00485cd2d6ce806c2382c64e7c696",
-          "sha1": "c51f4337d168c3c3842808971a3190eb53af91a5",
-          "md5": "4448528e2c427c346ba3f6a7faaac346"
+          "size": 27830180,
+          "sha512": "5e93a3effe8dabbee3aa78945860325a51f0c20f31c5d3df69c56d5edb0db754f8975cacd016874d4100563d594df1e1ee59721dbaa3b0bc8b256615c753df01",
+          "sha256": "ad7af496950a0c5ba55978029aa0f5606c59eadca3bd22c2575df43f51c21db3",
+          "sha1": "39e8188ec0d6c44382b7b826b3e012099a5af23f",
+          "md5": "10656ccdb271f43b5f5ae5e154aa9cfb"
         }
       ]
     },
@@ -267,11 +267,11 @@
         {
           "name": "AdambotsLib-2026.2.2.jar",
           "url": "AdambotsLib-2026.2.2.jar",
-          "size": 27830306,
-          "sha512": "b602bf9acf8822245ca5b777282a263cb5e6081cee6fa11f3ba4f60af610e0d255e4ea8b9ca88db843d57460ebc29e069f471589880c34408f80d3d79fdbf782",
-          "sha256": "86c61a2585b10f7edc54cc12db04a3474ba00485cd2d6ce806c2382c64e7c696",
-          "sha1": "c51f4337d168c3c3842808971a3190eb53af91a5",
-          "md5": "4448528e2c427c346ba3f6a7faaac346"
+          "size": 27830180,
+          "sha512": "5e93a3effe8dabbee3aa78945860325a51f0c20f31c5d3df69c56d5edb0db754f8975cacd016874d4100563d594df1e1ee59721dbaa3b0bc8b256615c753df01",
+          "sha256": "ad7af496950a0c5ba55978029aa0f5606c59eadca3bd22c2575df43f51c21db3",
+          "sha1": "39e8188ec0d6c44382b7b826b3e012099a5af23f",
+          "md5": "10656ccdb271f43b5f5ae5e154aa9cfb"
         }
       ]
     }

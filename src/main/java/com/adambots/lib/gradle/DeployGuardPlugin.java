@@ -6,24 +6,18 @@ import org.gradle.api.Project;
 import org.gradle.api.Task;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.InputStreamReader;
-import java.util.Set;
 
 /**
  * Gradle plugin that prevents deploying robot code from unauthorized git branches.
  *
  * <p>This plugin automatically hooks into GradleRIO's deploy task and validates
- * that the current git branch is in the allowed list before deployment proceeds.
+ * that the current git branch is authorized before deployment proceeds.
  *
  * <p><strong>Allowed branches:</strong>
  * <ul>
- *   <li>main</li>
- *   <li>master</li>
- *   <li>competition</li>
- *   <li>comp</li>
- *   <li>deploy</li>
- *   <li>release</li>
+ *   <li>{@code main} - exact match</li>
+ *   <li>{@code comp/*} - any branch starting with "comp/" (e.g., comp/kettering-week-2)</li>
  * </ul>
  *
  * <p><strong>Usage:</strong>
@@ -38,18 +32,11 @@ import java.util.Set;
  */
 public class DeployGuardPlugin implements Plugin<Project> {
 
-    /**
-     * Set of branch names that are allowed for deployment.
-     * These are the only branches from which robot code can be deployed.
-     */
-    private static final Set<String> ALLOWED_BRANCHES = Set.of(
-            "main",
-            "master",
-            "competition",
-            "comp",
-            "deploy",
-            "release"
-    );
+    /** Branch name allowed for deployment (exact match). */
+    private static final String ALLOWED_BRANCH_EXACT = "main";
+
+    /** Branch prefix allowed for deployment (e.g., comp/kettering-week-2). */
+    private static final String ALLOWED_BRANCH_PREFIX = "comp/";
 
     @Override
     public void apply(Project project) {
@@ -97,7 +84,7 @@ public class DeployGuardPlugin implements Plugin<Project> {
             return;
         }
 
-        if (ALLOWED_BRANCHES.contains(currentBranch)) {
+        if (isBranchAllowed(currentBranch)) {
             // Branch is allowed
             printAllowedMessage(project, currentBranch);
             return;
@@ -106,6 +93,24 @@ public class DeployGuardPlugin implements Plugin<Project> {
         // Branch is not allowed - block deployment
         printBlockedMessage(project, currentBranch);
         throw new GradleException("Deploy blocked: Branch '" + currentBranch + "' is not authorized for deployment.");
+    }
+
+    /**
+     * Checks if the given branch is allowed for deployment.
+     *
+     * @param branch The branch name to check
+     * @return true if the branch is allowed, false otherwise
+     */
+    private boolean isBranchAllowed(String branch) {
+        // Exact match for 'main'
+        if (ALLOWED_BRANCH_EXACT.equals(branch)) {
+            return true;
+        }
+        // Prefix match for 'comp/'
+        if (branch.startsWith(ALLOWED_BRANCH_PREFIX)) {
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -154,7 +159,6 @@ public class DeployGuardPlugin implements Plugin<Project> {
      * Prints a prominent error message when deployment is blocked.
      */
     private void printBlockedMessage(Project project, String branch) {
-        String allowedList = String.join(", ", ALLOWED_BRANCHES);
         String message = String.format(
                 "\n" +
                 "  ╔══════════════════════════════════════════════════════════════════╗\n" +
@@ -187,10 +191,8 @@ public class DeployGuardPlugin implements Plugin<Project> {
                 "  ║     5. Switch to 'main' and pull latest                          ║\n" +
                 "  ║     6. Run deploy again                                          ║\n" +
                 "  ║                                                                  ║\n" +
-                "  ║   Allowed branches: %-43s  ║\n" +
-                "  ║                                                                  ║\n" +
                 "  ╚══════════════════════════════════════════════════════════════════╝\n",
-                branch, allowedList
+                branch
         );
         project.getLogger().error(message);
     }
