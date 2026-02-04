@@ -6,6 +6,8 @@ package com.adambots.lib.sensors;
 
 import com.adambots.lib.utils.Utils;
 
+import edu.wpi.first.epilogue.Logged;
+import edu.wpi.first.epilogue.NotLogged;
 import edu.wpi.first.wpilibj.DigitalInput;
 
 /**
@@ -41,8 +43,12 @@ import edu.wpi.first.wpilibj.DigitalInput;
  *
  * @see BaseProximitySensor
  */
+@Logged
 public class LimitSwitch implements BaseProximitySensor {
+    @NotLogged
     private DigitalInput sensor;
+
+    @NotLogged
     private boolean inverted;
 
     public LimitSwitch(int port, boolean inverted) {

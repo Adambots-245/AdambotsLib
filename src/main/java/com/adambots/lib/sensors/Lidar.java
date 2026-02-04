@@ -9,6 +9,8 @@ package com.adambots.lib.sensors;
 
 import com.adambots.lib.utils.Utils;
 
+import edu.wpi.first.epilogue.Logged;
+import edu.wpi.first.epilogue.NotLogged;
 import edu.wpi.first.wpilibj.Counter;
 import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.units.measure.Distance;
@@ -36,8 +38,12 @@ import static edu.wpi.first.units.Units.*;
  * @see BaseDistanceSensor
  * @see edu.wpi.first.wpilibj.Counter
  */
+@Logged
 public class Lidar implements BaseDistanceSensor {
+    @NotLogged
     private Counter counter;
+
+    @NotLogged
     private DigitalInput source;
 
     /**

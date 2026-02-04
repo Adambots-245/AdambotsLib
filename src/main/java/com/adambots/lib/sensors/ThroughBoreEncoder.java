@@ -6,6 +6,8 @@ package com.adambots.lib.sensors;
 
 import com.adambots.lib.utils.Utils;
 
+import edu.wpi.first.epilogue.Logged;
+import edu.wpi.first.epilogue.NotLogged;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.DutyCycleEncoder;
 import edu.wpi.first.units.measure.Angle;
@@ -54,7 +56,9 @@ import static edu.wpi.first.units.Units.*;
  * @see BaseAbsoluteEncoder
  * @see edu.wpi.first.wpilibj.DutyCycleEncoder
  */
+@Logged
 public class ThroughBoreEncoder implements BaseAbsoluteEncoder {
+    @NotLogged
     private DutyCycleEncoder encoder;
 
     public ThroughBoreEncoder(int encoderPort) {

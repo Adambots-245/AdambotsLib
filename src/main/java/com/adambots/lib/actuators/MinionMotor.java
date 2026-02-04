@@ -20,6 +20,8 @@ import com.ctre.phoenix6.configs.HardwareLimitSwitchConfigs;
 import com.ctre.phoenix6.configs.Slot0Configs;
 import com.ctre.phoenix6.configs.TalonFXSConfigurator;
 
+import edu.wpi.first.epilogue.Logged;
+import edu.wpi.first.epilogue.NotLogged;
 import static edu.wpi.first.units.Units.*;
 import edu.wpi.first.units.measure.*;
 
@@ -30,15 +32,33 @@ import edu.wpi.first.units.measure.*;
  * Ensure that any configuration setting is done only once during initialization
  * to avoid unnecessary delays during operation.
  */
+@Logged
 public class MinionMotor implements BaseMotor {
+    @NotLogged
     private final TalonFXS motor;
+
+    @NotLogged
     private final TalonFXSConfigurator configurator;
+
+    @NotLogged
     private final MotionMagicVoltage motionMagicRequest = new MotionMagicVoltage(0);
+
+    @NotLogged
     private final PositionVoltage positionRequest = new PositionVoltage(0);
+
+    @NotLogged
     private final VelocityVoltage velocityRequest = new VelocityVoltage(0);
+
+    @NotLogged
     private final VoltageOut voltageRequest = new VoltageOut(0);
+
+    @NotLogged
     private final DutyCycleOut percentRequest = new DutyCycleOut(0);
+
+    @NotLogged
     private final int maxRetries = 3; // Maximum retries for configuration
+
+    @NotLogged
     private boolean isInverted = false; // Track inversion state for follower mode
     
     /**

@@ -10,6 +10,8 @@ package com.adambots.lib.sensors;
 import com.adambots.lib.utils.Utils;
 import com.ctre.phoenix6.hardware.CANcoder;
 
+import edu.wpi.first.epilogue.Logged;
+import edu.wpi.first.epilogue.NotLogged;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.units.measure.Angle;
 import static edu.wpi.first.units.Units.*;
@@ -30,7 +32,9 @@ import static edu.wpi.first.units.Units.*;
  * Rotation2d rotation = encoder.getPositionRotation2d();
  * }</pre>
  */
+@Logged
 public class CANCoder implements BaseAbsoluteEncoder {
+    @NotLogged
     private CANcoder encoder;
 
     public CANCoder (int port){

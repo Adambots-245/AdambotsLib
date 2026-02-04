@@ -7,6 +7,8 @@ import com.ctre.phoenix6.controls.*;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.*;
 
+import edu.wpi.first.epilogue.Logged;
+import edu.wpi.first.epilogue.NotLogged;
 import static edu.wpi.first.units.Units.*;
 import edu.wpi.first.units.measure.*;
 
@@ -48,18 +50,37 @@ import edu.wpi.first.units.measure.*;
  * @see BaseMotor
  * @see com.ctre.phoenix6.hardware.TalonFX
  */
+@Logged
 public class TalonFXMotor implements BaseMotor {
+    @NotLogged
     private final TalonFX motor;
+
+    @NotLogged
     private final boolean isKraken;
+
+    @NotLogged
     private boolean focFlag = false;
+
+    @NotLogged
     private double feedForward = 0.0;
+
+    @NotLogged
     private boolean isInverted = false; // Track inversion state for follower mode
+
+    @NotLogged
     private final int maxRetries = 3; // Maximum retries for configuration
 
     // Reusable control request objects to avoid allocation overhead
+    @NotLogged
     private final VoltageOut voltageRequest = new VoltageOut(0);
+
+    @NotLogged
     private final PositionVoltage positionVoltageRequest = new PositionVoltage(0);
+
+    @NotLogged
     private final VelocityVoltage velocityVoltageRequest = new VelocityVoltage(0);
+
+    @NotLogged
     private final MotionMagicVoltage motionMagicVoltageRequest = new MotionMagicVoltage(0);
 
     /**

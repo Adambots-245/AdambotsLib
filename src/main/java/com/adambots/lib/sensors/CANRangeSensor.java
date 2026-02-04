@@ -4,6 +4,8 @@ import com.adambots.lib.utils.Utils;
 import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.hardware.CANrange;
 import com.ctre.phoenix6.sim.CANrangeSimState;
+import edu.wpi.first.epilogue.Logged;
+import edu.wpi.first.epilogue.NotLogged;
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.units.measure.Distance;
 import static edu.wpi.first.units.Units.*;
@@ -22,10 +24,15 @@ import static edu.wpi.first.units.Units.*;
  * double meters = distance.in(Meters);
  * }</pre>
  */
+@Logged
 public class CANRangeSensor implements BaseDistanceSensor {
-
+    @NotLogged
     private CANrange canRangeSensor;
+
+    @NotLogged
     private CANrangeSimState simState;
+
+    @NotLogged
     private final boolean isSim;
 
     /**

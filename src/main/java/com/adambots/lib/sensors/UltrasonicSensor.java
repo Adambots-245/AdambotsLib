@@ -6,6 +6,8 @@ package com.adambots.lib.sensors;
 
 import com.adambots.lib.utils.Utils;
 
+import edu.wpi.first.epilogue.Logged;
+import edu.wpi.first.epilogue.NotLogged;
 import edu.wpi.first.wpilibj.AnalogInput;
 import edu.wpi.first.units.measure.Distance;
 import static edu.wpi.first.units.Units.*;
@@ -13,12 +15,15 @@ import static edu.wpi.first.units.Units.*;
 /**
  * Generic UltrasonicSensor sensor to hide actual implementation and perform range finding
  */
+@Logged
 public class UltrasonicSensor implements BaseDistanceSensor {
     // The handle to access the sensor
+    @NotLogged
     private final AnalogInput rangefinder;
 
     // The scaling factor:  distance in cm = volts returned * SCALING_FACTOR
     // 5120 mm per 5V or 512 cm per 5V. The 24/23 is a correction factor to adjust the reading
+    @NotLogged
     private final double SCALING_FACTOR = 512/5*24/23;
 
     /** Creates a new ultrasonic sensor hooked up to <code>portNumber</code> on the analog breakout.

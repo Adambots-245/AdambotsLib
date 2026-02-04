@@ -11,17 +11,29 @@ import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
 import com.revrobotics.ResetMode;
 import com.revrobotics.PersistMode;
 
+import edu.wpi.first.epilogue.Logged;
+import edu.wpi.first.epilogue.NotLogged;
 import static edu.wpi.first.units.Units.*;
 import edu.wpi.first.units.measure.*;
 
 /**
  * Implementation for REV NEO and NEO Vortex motors using SPARK MAX controller
  */
+@Logged
 public class NEOMotor implements BaseMotor {
+    @NotLogged
     private final SparkMax motor;
+
+    @NotLogged
     private final RelativeEncoder encoder;
+
+    @NotLogged
     private final SparkClosedLoopController closedLoopController;
+
+    @NotLogged
     private final SparkMaxConfig config;
+
+    @NotLogged
     private double feedForward = 0.0;
 
     // Conversion constants for velocity units (NEO uses RPM, BaseMotor interface uses RPS)
