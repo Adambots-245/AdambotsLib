@@ -39,6 +39,16 @@ This folder contains utility classes that provide reusable solutions for common 
   - Command buttons for testing subsystems
   - Support for numbers, booleans, strings, and arrays
 
+### PID & Control
+
+- **[PIDAutoTuner](PIDAutoTuner.md)** - Automatic PID tuning utility
+  - Relay Feedback Method (Ziegler-Nichols) for automatic gain calculation
+  - Simple API with method references (`motor::getPosition`, `motor::setOutput`)
+  - Feedforward calculation (kV, kS) via step response analysis
+  - Safety features: range limits, timeouts, automatic motor stop
+  - Dashboard integration for result display
+  - Command-based for easy button binding
+
 ### General Utilities
 
 - **[Utils](Utils.md)** - Comprehensive utility functions for common FRC tasks
@@ -114,6 +124,19 @@ This folder contains utility classes that provide reusable solutions for common 
 - Debug command buttons (reset gyro, deploy intake, etc.)
 - Organize telemetry by subsystem across tabs
 - Monitor sensor values and motor currents
+
+### Use PIDAutoTuner When:
+- You need a starting point for PID gains on a new mechanism
+- Manual PID tuning is taking too long
+- You want reproducible tuning results
+- You're tuning velocity control and need feedforward values
+
+**Common Use Cases:**
+- Turret position control
+- Arm angle control
+- Elevator position control
+- Shooter flywheel velocity control
+- Conveyor velocity control
 
 ### Use Utils When:
 - You need alliance-specific logic (mirror poses, check colors)
