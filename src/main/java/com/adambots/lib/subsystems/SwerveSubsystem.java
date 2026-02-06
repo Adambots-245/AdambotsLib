@@ -39,6 +39,7 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.trajectory.Trajectory;
 import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.Commands;
@@ -561,6 +562,18 @@ public class SwerveSubsystem extends SubsystemBase {
    */
   public SwerveConfig getSwerveConfig() {
     return swerveConfig;
+  }
+
+  /**
+   * Get the {@link Field2d} object for field visualization.
+   *
+   * <p>This is useful for passing to vision systems that need to display
+   * detected targets on the field visualization.
+   *
+   * @return The Field2d object from the underlying SwerveDrive
+   */
+  public Field2d getField() {
+    return swerveDrive.field;
   }
 
   /**
