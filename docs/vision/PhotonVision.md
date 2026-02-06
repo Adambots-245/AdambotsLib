@@ -190,12 +190,13 @@ Each camera has:
 - Independent pose estimation
 - Configurable standard deviations
 - AprilTag filtering via `allowedTags()`
+- Distance-based filtering via `maxTagDistance()`
 - Purpose-based filtering (ODOMETRY, ALIGNMENT, BOTH)
 - Ambiguity-based quality scoring
 
 ### Camera Filtering
 
-Cameras can be configured to only process specific AprilTag IDs using `allowedTags()`:
+Cameras can be configured to only process specific AprilTag IDs using `allowedTags()` and limit detection range using `maxTagDistance()`:
 
 ```java
 .addCamera("Left")
@@ -204,6 +205,7 @@ Cameras can be configured to only process specific AprilTag IDs using `allowedTa
 
 .addCamera("Middle")
     .allowedTags(1, 2, 4, 5, 12, 13, 14, 15)  // Only process HP tags
+    .maxTagDistance(Meters.of(3.0))  // Reject tags beyond 3 meters
     .done()
 ```
 

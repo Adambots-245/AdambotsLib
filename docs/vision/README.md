@@ -31,6 +31,7 @@ VisionSystemConfig config = VisionConfigBuilder.create()
         .rotation(Degrees.of(0), Degrees.of(0), Degrees.of(-30))
         .purpose(CameraPurpose.ODOMETRY)
         .allowedTags(SCORING_TAGS)
+        .maxTagDistance(Meters.of(5.0))  // Optional: limit detection range
         .done()
     .ambiguityThreshold(0.25)
     .build();

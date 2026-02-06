@@ -1323,14 +1323,14 @@ public class SwerveSubsystem extends SubsystemBase {
    * @see #alignAndStrafeCommand(int, double, double, double)
    */
   public Command aimAtAprilTagCommand(int tagId, double tolerance) {
-    return Commands.run(() -> {
+    return run(() -> {
       ChassisSpeeds speeds = ChassisSpeeds.fromFieldRelativeSpeeds(0, 0,
           swerveDrive.swerveController.headingCalculate(
               getHeading().getRadians(),
               getAprilTagYaw(tagId).getRadians()),
           getHeading());
       drive(speeds);
-    }, this).until(() ->
+    }).until(() ->
         Math.abs(getAprilTagYaw(tagId).minus(getHeading()).getDegrees()) < tolerance
     ).withName("AimAtTag(" + tagId + ")");
   }
@@ -1408,7 +1408,7 @@ public class SwerveSubsystem extends SubsystemBase {
             }),
 
             // Drive sideways
-            Commands.run(() -> {
+            run(() -> {
               // Sign of strafeDistance determines direction (positive = left)
               double speedY = Math.copySign(strafeSpeed, strafeDistance);
               drive(
@@ -1416,7 +1416,7 @@ public class SwerveSubsystem extends SubsystemBase {
                   0, // No rotation
                   true // Field relative
               );
-            }, this)
+            })
                 .until(() -> {
                   // Calculate distance traveled sideways
                   double distanceTraveled = Math.abs(
@@ -1438,7 +1438,7 @@ public class SwerveSubsystem extends SubsystemBase {
    * @return Command that aims at best target from camera
    */
   public Command aimAtTargetCommand(VisionCameraInterface camera) {
-    return Commands.run(() -> {
+    return run(() -> {
       Optional<? extends VisionResult> resultO = camera.getBestResult();
       if (resultO.isPresent()) {
         var result = resultO.get();
@@ -1447,7 +1447,7 @@ public class SwerveSubsystem extends SubsystemBase {
               Rotation2d.fromDegrees(result.getBestTarget().getYaw())));
         }
       }
-    }, this).withName("AimAtTarget(" + camera.getName() + ")");
+    }).withName("AimAtTarget(" + camera.getName() + ")");
   }
 
   /**
@@ -1457,7 +1457,7 @@ public class SwerveSubsystem extends SubsystemBase {
    * @return Command that aims at best target from camera
    */
   public Command aimAtTargetCommand(String cameraName) {
-    return Commands.run(() -> {
+    return run(() -> {
       if (vision == null) return;
       VisionCameraInterface camera = vision.getCamera(cameraName);
       if (camera == null) return;
@@ -1470,7 +1470,7 @@ public class SwerveSubsystem extends SubsystemBase {
               Rotation2d.fromDegrees(result.getBestTarget().getYaw())));
         }
       }
-    }, this).withName("AimAtTarget(" + cameraName + ")");
+    }).withName("AimAtTarget(" + cameraName + ")");
   }
 
   /**
@@ -1480,7 +1480,7 @@ public class SwerveSubsystem extends SubsystemBase {
    * @return Command that drives to nearest pose with vision updates
    */
   public Command driveToNearestPoseWithVisionCommand(List<Pose2d> targetPoses) {
-    return Commands.run(() -> {
+    return run(() -> {
       if (vision == null) return;
 
       // Get current robot pose
@@ -1509,7 +1509,7 @@ public class SwerveSubsystem extends SubsystemBase {
       if (!hasVisibleTags) {
         CommandScheduler.getInstance().schedule(driveToPoseCommand(nearestPose));
       }
-    }, this)
+    })
         .until(() -> hasReachedPose(findNearestPose(targetPoses), 0.05, 5.0))
         .withName("DriveToNearestPoseWithVision");
   }
@@ -1553,9 +1553,9 @@ public class SwerveSubsystem extends SubsystemBase {
    * @see #setupVision(VisionSystem)
    */
   public Command enableVisionCommand() {
-    return Commands.runOnce(() -> {
+    return runOnce(() -> {
       if (vision != null) vision.enableAllCameras();
-    }, this).withName("EnableVision");
+    }).withName("EnableVision");
   }
 
   /**
@@ -1591,9 +1591,9 @@ public class SwerveSubsystem extends SubsystemBase {
    * @see #enableVisionCommand()
    */
   public Command disableVisionCommand() {
-    return Commands.runOnce(() -> {
+    return runOnce(() -> {
       if (vision != null) vision.disableAllCameras();
-    }, this).withName("DisableVision");
+    }).withName("DisableVision");
   }
 
   /**
@@ -1602,7 +1602,7 @@ public class SwerveSubsystem extends SubsystemBase {
    * @return Command that adds test vision pose
    */
   public Command addFakeVisionReadingCommand() {
-    return Commands.runOnce(() -> addFakeVisionReading(), this)
+    return runOnce(() -> addFakeVisionReading())
         .withName("AddFakeVisionReading");
   }
 
@@ -1778,7 +1778,7 @@ public class SwerveSubsystem extends SubsystemBase {
    * @return Aiming command, or empty command if target not found
    */
   public Command aimAtGameTargetCommand(String targetName, double toleranceDegrees) {
-    return Commands.run(() -> {
+    return run(() -> {
       Optional<Pose2d> targetPose = getTargetPose(targetName);
       if (targetPose.isEmpty()) return;
 
@@ -1795,7 +1795,7 @@ public class SwerveSubsystem extends SubsystemBase {
               targetYaw.getRadians()),
           getHeading());
       drive(speeds);
-    }, this).until(() -> {
+    }).until(() -> {
       Optional<Pose2d> targetPose = getTargetPose(targetName);
       if (targetPose.isEmpty()) return true;
 
@@ -1877,14 +1877,14 @@ public class SwerveSubsystem extends SubsystemBase {
    */
   public Command driveCommand(DoubleSupplier translationX, DoubleSupplier translationY,
                                DoubleSupplier angularRotationX) {
-    return Commands.run(() -> {
+    return run(() -> {
       swerveDrive.drive(SwerveMath.scaleTranslation(new Translation2d(
               translationX.getAsDouble() * swerveDrive.getMaximumChassisVelocity(),
               translationY.getAsDouble() * swerveDrive.getMaximumChassisVelocity()), 0.8),
           Math.pow(angularRotationX.getAsDouble(), 3) * swerveDrive.getMaximumChassisAngularVelocity(),
           true,
           false);
-    }, this).withName("TeleopDrive");
+    }).withName("TeleopDrive");
   }
 
   /**
@@ -1931,7 +1931,7 @@ public class SwerveSubsystem extends SubsystemBase {
    */
   public Command driveCommand(DoubleSupplier translationX, DoubleSupplier translationY,
                                DoubleSupplier headingX, DoubleSupplier headingY) {
-    return Commands.run(() -> {
+    return run(() -> {
       Translation2d scaledInputs = SwerveMath.scaleTranslation(
           new Translation2d(translationX.getAsDouble(), translationY.getAsDouble()), 0.8);
 
@@ -1942,7 +1942,7 @@ public class SwerveSubsystem extends SubsystemBase {
               headingY.getAsDouble(),
               swerveDrive.getOdometryHeading().getRadians(),
               swerveDrive.getMaximumChassisVelocity()));
-    }, this).withName("TeleopDriveHeading");
+    }).withName("TeleopDriveHeading");
   }
 
   /**
@@ -1990,7 +1990,7 @@ public class SwerveSubsystem extends SubsystemBase {
    * @see #driveCommand(DoubleSupplier, DoubleSupplier, DoubleSupplier)
    */
   public Command driveFieldOrientedCommand(Supplier<ChassisSpeeds> velocity) {
-    return Commands.run(() -> swerveDrive.driveFieldOriented(velocity.get()), this)
+    return run(() -> swerveDrive.driveFieldOriented(velocity.get()))
         .withName("DriveFieldOriented");
   }
 
@@ -2024,10 +2024,10 @@ public class SwerveSubsystem extends SubsystemBase {
    * @return Command that continuously sets all module angles to 0°
    */
   public Command centerModulesCommand() {
-    return Commands.run(() ->
+    return run(() ->
         java.util.Arrays.asList(swerveDrive.getModules())
             .forEach(it -> it.setAngle(0.0))
-    , this).withName("CenterModules");
+    ).withName("CenterModules");
   }
 
   // ==================== DISTANCE-BASED DRIVE COMMANDS ====================
@@ -2075,11 +2075,11 @@ public class SwerveSubsystem extends SubsystemBase {
    */
   public Command driveToDistanceCommand(double distanceInMeters, double speedInMetersPerSecond) {
     return Commands.sequence(
-        Commands.runOnce(() -> startPose = swerveDrive.getPose()),
-        Commands.run(() -> drive(new ChassisSpeeds(speedInMetersPerSecond, 0, 0)), this)
+        runOnce(() -> startPose = swerveDrive.getPose()),
+        run(() -> drive(new ChassisSpeeds(speedInMetersPerSecond, 0, 0)))
             .until(() -> swerveDrive.getPose().getTranslation()
                 .getDistance(startPose.getTranslation()) > distanceInMeters),
-        Commands.runOnce(() -> drive(new ChassisSpeeds(0, 0, 0)))
+        runOnce(() -> drive(new ChassisSpeeds(0, 0, 0)))
     ).withName("DriveDistance(" + distanceInMeters + "m)");
   }
 
@@ -2120,9 +2120,9 @@ public class SwerveSubsystem extends SubsystemBase {
    */
   public Command driveToDistanceFieldOrientedCommand(double distanceInMeters, double speedInMetersPerSecond) {
     return Commands.sequence(
-        Commands.runOnce(() -> startPose = swerveDrive.getPose()),
+        runOnce(() -> startPose = swerveDrive.getPose()),
 
-        Commands.run(() -> {
+        run(() -> {
           Rotation2d heading = getHeading();
           double speed = Math.abs(speedInMetersPerSecond);
           int direction = (speedInMetersPerSecond >= 0) ? 1 : -1;
@@ -2131,11 +2131,11 @@ public class SwerveSubsystem extends SubsystemBase {
           double yVel = direction * speed * Math.sin(heading.getRadians());
 
           driveFieldOriented(new ChassisSpeeds(xVel, yVel, 0));
-        }, this)
+        })
             .until(() -> swerveDrive.getPose().getTranslation()
                 .getDistance(startPose.getTranslation()) >= distanceInMeters),
 
-        Commands.runOnce(() -> drive(new Translation2d(), 0, true))
+        runOnce(() -> drive(new Translation2d(), 0, true))
     ).withName("DriveDistanceFieldOriented(" + distanceInMeters + "m)");
   }
 
@@ -2148,15 +2148,15 @@ public class SwerveSubsystem extends SubsystemBase {
    */
   public Command driveForwardDistanceCommand(double distanceInMeters, double speedInMetersPerSecond) {
     return Commands.sequence(
-        Commands.runOnce(() -> startPose = swerveDrive.getPose()),
-        Commands.run(() -> drive(
+        runOnce(() -> startPose = swerveDrive.getPose()),
+        run(() -> drive(
             ChassisSpeeds.fromFieldRelativeSpeeds(
                 new ChassisSpeeds(speedInMetersPerSecond, 0, 0),
                 swerveDrive.getOdometryHeading())
-        ), this)
+        ))
             .until(() -> swerveDrive.getPose().getTranslation()
                 .getDistance(startPose.getTranslation()) > distanceInMeters),
-        Commands.runOnce(() -> drive(new ChassisSpeeds(0, 0, 0)))
+        runOnce(() -> drive(new ChassisSpeeds(0, 0, 0)))
     ).withName("DriveForward(" + distanceInMeters + "m)");
   }
 
@@ -2254,14 +2254,14 @@ public class SwerveSubsystem extends SubsystemBase {
    * @see #isFacingHeadingTrigger(Rotation2d, double)
    */
   public Command turnToAngleCommand(Rotation2d targetAngle, double toleranceDegrees) {
-    return Commands.run(() -> {
+    return run(() -> {
       ChassisSpeeds speeds = ChassisSpeeds.fromFieldRelativeSpeeds(0, 0,
           swerveDrive.swerveController.headingCalculate(
               getHeading().getRadians(),
               targetAngle.getRadians()),
           getHeading());
       drive(speeds);
-    }, this).until(() ->
+    }).until(() ->
         Math.abs(targetAngle.minus(getHeading()).getDegrees()) < toleranceDegrees
     ).withName("TurnToAngle(" + targetAngle.getDegrees() + "°)");
   }
@@ -2310,9 +2310,9 @@ public class SwerveSubsystem extends SubsystemBase {
    */
   public Command strafeCommand(double distanceMeters, double speedMetersPerSecond) {
     return Commands.sequence(
-        Commands.runOnce(() -> startPose = swerveDrive.getPose()),
+        runOnce(() -> startPose = swerveDrive.getPose()),
 
-        Commands.run(() -> {
+        run(() -> {
           Rotation2d heading = getHeading();
           double speed = Math.abs(speedMetersPerSecond);
           int direction = (distanceMeters >= 0) ? 1 : -1;
@@ -2323,11 +2323,11 @@ public class SwerveSubsystem extends SubsystemBase {
           double yVel = direction * speed * Math.sin(strafeAngle);
 
           driveFieldOriented(new ChassisSpeeds(xVel, yVel, 0));
-        }, this)
+        })
             .until(() -> swerveDrive.getPose().getTranslation()
                 .getDistance(startPose.getTranslation()) >= Math.abs(distanceMeters)),
 
-        Commands.runOnce(() -> drive(new ChassisSpeeds(0, 0, 0)))
+        runOnce(() -> drive(new ChassisSpeeds(0, 0, 0)))
     ).withName("Strafe(" + distanceMeters + "m)");
   }
 
@@ -2406,7 +2406,7 @@ public class SwerveSubsystem extends SubsystemBase {
    * @see #creepForwardCommand()
    */
   public Command creepCommand(double speedMetersPerSecond) {
-    return Commands.run(() -> drive(new ChassisSpeeds(speedMetersPerSecond, 0, 0)), this)
+    return run(() -> drive(new ChassisSpeeds(speedMetersPerSecond, 0, 0)))
         .withName("Creep(" + speedMetersPerSecond + "m/s)");
   }
 
@@ -2458,7 +2458,7 @@ public class SwerveSubsystem extends SubsystemBase {
    */
   public Command driveToPositionWithHeadingCommand(Translation2d targetPosition, Rotation2d heading,
                                                    double positionToleranceMeters) {
-    return Commands.run(() -> {
+    return run(() -> {
       Translation2d currentPosition = getPose().getTranslation();
       Translation2d toTarget = targetPosition.minus(currentPosition);
       double distance = toTarget.getNorm();
@@ -2482,7 +2482,7 @@ public class SwerveSubsystem extends SubsystemBase {
           heading.getRadians());
 
       driveFieldOriented(new ChassisSpeeds(xVel, yVel, omega));
-    }, this).until(() -> {
+    }).until(() -> {
       double distance = getPose().getTranslation().getDistance(targetPosition);
       return distance < positionToleranceMeters;
     }).withName("DriveToPositionWithHeading(" + targetPosition + ")");

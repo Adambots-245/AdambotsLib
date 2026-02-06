@@ -22,6 +22,7 @@ The vision configuration system allows teams to fully customize their PhotonVisi
 - **Year-to-year reuse** - Configure cameras for each season's robot
 - **Easy customization** - Change positions, rotations, and filtering per camera
 - **Game-specific tag filtering** - Assign different tag groups to different cameras
+- **Distance-based filtering** - Limit maximum detection range per camera
 - **Purpose-based cameras** - Separate cameras for odometry vs alignment
 
 ---
@@ -137,6 +138,7 @@ public static final VisionSystemConfig VISION_CONFIG = VisionConfigBuilder.creat
         .rotation(Degrees.of(0), Degrees.of(-43), Degrees.of(177))
         .purpose(CameraPurpose.ALIGNMENT)
         .allowedTags(ALIGNMENT_TAGS)
+        .maxTagDistance(Meters.of(3.0))  // Limit to close-range tags
         .done()
     .ambiguityThreshold(0.25)
     .maxPoseJump(Meters.of(10.0))
@@ -182,6 +184,7 @@ Configuration for a single camera.
 | `singleTagStdDevs` | `VisionStdDevs` | Std devs for single-tag estimates |
 | `multiTagStdDevs` | `VisionStdDevs` | Std devs for multi-tag estimates |
 | `allowedTagIDs` | `int[]` | Tag filtering (empty = all tags) |
+| `maxTagDistanceMeters` | `double` | Max distance for single-tag estimates (default: 4.0) |
 
 ### VisionStdDevs
 
@@ -233,6 +236,7 @@ VisionConfigBuilder.create()           // Start building
     .multiTagStdDevs(Distance x, Distance y, Angle theta)   // Multi tag std devs
     .multiTagStdDevs(VisionStdDevs)                // Multi tag std devs (preset)
     .allowedTags(int... tagIDs)                    // Tag filtering
+    .maxTagDistance(Distance)                      // Max distance for single-tag (default: 4m)
     .done()                                        // Return to VisionConfigBuilder
 ```
 
@@ -256,7 +260,7 @@ Standard deviations control how much the pose estimator trusts vision measuremen
 The system automatically adjusts standard deviations based on:
 - **Number of tags visible** - More tags = lower std devs
 - **Average distance** - Farther = higher std devs
-- **Single tag at distance > 4m** - Rejected (MAX_VALUE std devs)
+- **Single tag beyond max distance** - Rejected (configurable via `maxTagDistance()`, default 4m)
 
 ### Tuning Process
 
@@ -380,12 +384,13 @@ VisionSystemConfig config = VisionConfigBuilder.create()
         .rotation(Degrees.of(0), Degrees.of(0), Degrees.of(45))
         .purpose(CameraPurpose.ODOMETRY)
         .done()
-    // Narrow camera for scoring alignment
+    // Narrow camera for scoring alignment with limited range
     .addCamera("ScoringCam")
         .position(Inches.of(14), Inches.of(0), Inches.of(24))
         .rotation(Degrees.of(0), Degrees.of(-30), Degrees.of(0))
         .purpose(CameraPurpose.ALIGNMENT)
         .allowedTags(SCORING_TAGS)
+        .maxTagDistance(Meters.of(3.0))  // Limit to close-range tags only
         .done()
     .ambiguityThreshold(0.2)
     .build();

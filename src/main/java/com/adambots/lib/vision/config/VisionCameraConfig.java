@@ -62,7 +62,8 @@ import edu.wpi.first.math.geometry.Translation3d;
  *     new Rotation3d(0, 0, Math.toRadians(-30)),  // Rotation
  *     VisionStdDevs.DEFAULT_SINGLE_TAG,
  *     VisionStdDevs.DEFAULT_MULTI_TAG,
- *     new int[]{6, 7, 8, 9, 10, 11}  // Allowed tags
+ *     new int[]{6, 7, 8, 9, 10, 11},  // Allowed tags
+ *     4.0  // Max tag distance (meters) - use default
  * );
  * }</pre>
  *
@@ -73,6 +74,7 @@ import edu.wpi.first.math.geometry.Translation3d;
  * @param singleTagStdDevs Standard deviations for single-tag pose estimates
  * @param multiTagStdDevs Standard deviations for multi-tag pose estimates
  * @param allowedTagIDs Array of AprilTag IDs this camera should process (empty = all tags)
+ * @param maxTagDistanceMeters Maximum distance (meters) for single-tag pose estimation (default 4.0)
  *
  * @see VisionStdDevs
  * @see VisionConfigBuilder
@@ -84,8 +86,15 @@ public record VisionCameraConfig(
     Rotation3d robotToCamRotation,
     VisionStdDevs singleTagStdDevs,
     VisionStdDevs multiTagStdDevs,
-    int[] allowedTagIDs
+    int[] allowedTagIDs,
+    double maxTagDistanceMeters
 ) {
+
+    /**
+     * Default maximum tag distance in meters for single-tag pose estimation.
+     * Tags beyond this distance are rejected when only one tag is visible.
+     */
+    public static final double DEFAULT_MAX_TAG_DISTANCE = 4.0;
 
     /**
      * Defines the purpose of a vision camera.

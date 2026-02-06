@@ -64,7 +64,8 @@ import edu.wpi.first.wpilibj.RobotBase;
  *     new Rotation3d(0, 0, Math.toRadians(-30)),
  *     VisionStdDevs.DEFAULT_SINGLE_TAG,
  *     VisionStdDevs.DEFAULT_MULTI_TAG,
- *     new int[]{6, 7, 8, 9, 10, 11}
+ *     new int[]{6, 7, 8, 9, 10, 11},
+ *     4.0  // Max tag distance in meters
  * );
  *
  * VisionCamera camera = new VisionCamera(config, fieldLayout);
@@ -592,7 +593,8 @@ public class VisionCamera implements VisionCameraInterface {
             }
 
             // Increase std devs based on distance
-            if (numTags == 1 && avgDist > 4) {
+            // Reject single-tag poses beyond the configured max distance
+            if (numTags == 1 && avgDist > config.maxTagDistanceMeters()) {
                 estStdDevs = VecBuilder.fill(Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE);
             } else {
                 estStdDevs = estStdDevs.times(1 + (avgDist * avgDist / 30));

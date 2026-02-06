@@ -49,6 +49,7 @@ import edu.wpi.first.units.measure.Distance;
  *         .rotation(Degrees.of(0), Degrees.of(-43), Degrees.of(177))
  *         .purpose(CameraPurpose.ALIGNMENT)
  *         .allowedTags(INTAKE_TAGS)
+ *         .maxTagDistance(Meters.of(3.0))  // Limit turret camera range
  *         .done()
  *     .ambiguityThreshold(0.25)
  *     .maxPoseJump(Meters.of(10.0))
@@ -170,6 +171,7 @@ public class VisionConfigBuilder {
         private VisionStdDevs singleTagStdDevs = VisionStdDevs.DEFAULT_SINGLE_TAG;
         private VisionStdDevs multiTagStdDevs = VisionStdDevs.DEFAULT_MULTI_TAG;
         private int[] allowedTagIDs = new int[0];
+        private double maxTagDistanceMeters = VisionCameraConfig.DEFAULT_MAX_TAG_DISTANCE;
 
         /**
          * Creates a new CameraBuilder.
@@ -309,6 +311,20 @@ public class VisionConfigBuilder {
         }
 
         /**
+         * Sets the maximum distance for single-tag pose estimation.
+         * <p>When only one AprilTag is visible, poses calculated from tags
+         * beyond this distance will be rejected as unreliable.
+         * <p>Default is 4.0 meters.
+         *
+         * @param distance Maximum distance for single-tag estimation
+         * @return This builder for chaining
+         */
+        public CameraBuilder maxTagDistance(Distance distance) {
+            this.maxTagDistanceMeters = distance.in(Meters);
+            return this;
+        }
+
+        /**
          * Completes this camera configuration and returns to the parent builder.
          *
          * @return The parent VisionConfigBuilder for chaining
@@ -333,7 +349,8 @@ public class VisionConfigBuilder {
                 rotation,
                 singleTagStdDevs,
                 multiTagStdDevs,
-                allowedTagIDs
+                allowedTagIDs,
+                maxTagDistanceMeters
             );
 
             parent.addCameraConfig(config);
