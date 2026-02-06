@@ -17,6 +17,7 @@ import org.photonvision.simulation.VisionSystemSim;
 import org.photonvision.targeting.PhotonPipelineResult;
 import org.photonvision.targeting.PhotonTrackedTarget;
 
+import com.adambots.lib.vision.adapters.PhotonVisionTargetAdapter;
 import com.adambots.lib.vision.config.VisionCameraConfig;
 import com.adambots.lib.vision.config.VisionCameraConfig.CameraPurpose;
 import com.adambots.lib.vision.config.VisionSystemConfig;
@@ -68,8 +69,9 @@ import swervelib.telemetry.SwerveDriveTelemetry;
  * <p><strong>Based on:</strong> Modified from Ironclad 2024's Vision class.
  * @see <a href="https://gitlab.com/ironclad_code/ironclad-2024/-/blob/master/src/main/java/frc/robot/vision/Vision.java">Ironclad Vision</a>
  * @see <a href="https://docs.photonvision.org/">PhotonVision Documentation</a>
+ * @see VisionSystem
  */
-public class PhotonVision {
+public class PhotonVision implements VisionSystem {
 
   /**
    * April Tag Field Layout of the year.
@@ -189,6 +191,7 @@ public class PhotonVision {
    *
    * @param swerveDrive {@link SwerveDrive} instance.
    */
+  @Override
   public void updatePoseEstimation(SwerveDrive swerveDrive) {
     if (SwerveDriveTelemetry.isSimulation && swerveDrive.getSimulationDriveTrainPose().isPresent()) {
       visionSim.update(swerveDrive.getSimulationDriveTrainPose().get());
@@ -227,6 +230,7 @@ public class PhotonVision {
    * @param id AprilTag ID
    * @return Distance in meters, or -1.0 if tag doesn't exist
    */
+  @Override
   public double getDistanceFromAprilTag(int id) {
     Optional<Pose3d> tag = fieldLayout.getTagPose(id);
     return tag.map(pose3d -> PhotonUtils.getDistanceToPose(currentPose.get(), pose3d.toPose2d())).orElse(-1.0);
@@ -238,6 +242,7 @@ public class PhotonVision {
    * @param id AprilTag ID
    * @return Transform from robot to tag
    */
+  @Override
   public Transform2d getTransformToAprilTag(int id) {
     Pose2d aprilTagPose = getAprilTagPose(id, new Transform2d());
     return aprilTagPose.minus(currentPose.get());
@@ -250,6 +255,7 @@ public class PhotonVision {
    * @param id AprilTag ID
    * @return Rotation2d representing yaw to the tag, or null if tag doesn't exist
    */
+  @Override
   public Rotation2d getYawToAprilTag(int id) {
     Optional<Pose3d> tag = fieldLayout.getTagPose(id);
     if (tag.isEmpty()) {
@@ -271,6 +277,7 @@ public class PhotonVision {
    *
    * @return The ID of the closest visible tag, or -1 if no tags are visible
    */
+  @Override
   public int getClosestVisibleTag() {
     int closestTagID = -1;
     double closestDistance = Double.MAX_VALUE;
@@ -313,6 +320,7 @@ public class PhotonVision {
    * @param tagID AprilTag ID to check
    * @return true if the tag is visible in any camera
    */
+  @Override
   public boolean isTagVisible(int tagID) {
     for (VisionCamera camera : cameras) {
       if (!camera.isEnabled()) continue;
@@ -357,10 +365,27 @@ public class PhotonVision {
   /**
    * Get the best (lowest ambiguity) target from a specific camera.
    *
+   * <p>This is the interface-compliant version that returns a {@link VisionTarget}.
+   * For direct PhotonVision access, use {@link #getBestPhotonTargetFromCamera(String)}.
+   *
+   * @param cameraName Name of the camera to check
+   * @return VisionTarget with lowest ambiguity, or empty if no targets
+   */
+  @Override
+  public Optional<? extends VisionTarget> getBestTargetFromCamera(String cameraName) {
+    PhotonTrackedTarget target = getBestPhotonTargetFromCamera(cameraName);
+    return target != null ? Optional.of(new PhotonVisionTargetAdapter(target)) : Optional.empty();
+  }
+
+  /**
+   * Get the best (lowest ambiguity) target from a specific camera.
+   *
+   * <p>This returns the raw PhotonVision type for direct access.
+   *
    * @param cameraName Name of the camera to check
    * @return PhotonTrackedTarget with lowest ambiguity, or null if no targets
    */
-  public PhotonTrackedTarget getBestTargetFromCamera(String cameraName) {
+  public PhotonTrackedTarget getBestPhotonTargetFromCamera(String cameraName) {
     VisionCamera camera = camerasByName.get(cameraName);
     if (camera == null || !camera.isEnabled()) {
       return null;
@@ -471,6 +496,7 @@ public class PhotonVision {
    *
    * @return true if any tag is visible in any enabled camera
    */
+  @Override
   public boolean hasTarget() {
     for (VisionCamera camera : cameras) {
       if (camera.isEnabled() && camera.hasTarget()) {
@@ -513,9 +539,10 @@ public class PhotonVision {
   /**
    * Gets all cameras.
    *
-   * @return List of VisionCamera instances
+   * @return List of VisionCameraInterface instances
    */
-  public List<VisionCamera> getCameras() {
+  @Override
+  public List<? extends VisionCameraInterface> getCameras() {
     return List.copyOf(cameras);
   }
 
@@ -523,10 +550,34 @@ public class PhotonVision {
    * Gets a specific camera by name.
    *
    * @param name The camera name
+   * @return The VisionCameraInterface, or null if not found
+   */
+  @Override
+  public VisionCameraInterface getCamera(String name) {
+    return camerasByName.get(name);
+  }
+
+  /**
+   * Gets a specific VisionCamera by name (PhotonVision-specific).
+   *
+   * <p>Use this when you need access to PhotonVision-specific features.
+   *
+   * @param name The camera name
    * @return The VisionCamera, or null if not found
    */
-  public VisionCamera getCamera(String name) {
+  public VisionCamera getVisionCamera(String name) {
     return camerasByName.get(name);
+  }
+
+  /**
+   * Gets all VisionCamera instances (PhotonVision-specific).
+   *
+   * <p>Use this when you need access to PhotonVision-specific features.
+   *
+   * @return List of VisionCamera instances
+   */
+  public List<VisionCamera> getVisionCameras() {
+    return List.copyOf(cameras);
   }
 
   /**
@@ -595,6 +646,7 @@ public class PhotonVision {
    * Disable all cameras from contributing to pose estimation.
    * Vision measurements will not be added to odometry.
    */
+  @Override
   public void disableAllCameras() {
     allCamerasDisabled = true;
   }
@@ -602,6 +654,7 @@ public class PhotonVision {
   /**
    * Enable all cameras to contribute to pose estimation.
    */
+  @Override
   public void enableAllCameras() {
     allCamerasDisabled = false;
   }

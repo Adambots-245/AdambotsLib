@@ -4,7 +4,18 @@ AprilTag vision integration for accurate robot localization and target tracking.
 
 ## Overview
 
-The vision package provides comprehensive PhotonVision integration for FRC robots, enabling vision-corrected odometry and intelligent target tracking with AprilTags.
+The vision package provides a flexible vision system abstraction for FRC robots, enabling vision-corrected odometry and intelligent target tracking with AprilTags. The default implementation uses PhotonVision, but the abstraction layer allows teams to integrate other vision systems (Limelight, custom solutions) without modifying subsystem code.
+
+## Architecture
+
+The vision system uses an interface-based abstraction:
+
+- **`VisionSystem`** - Main interface for vision functionality (pose estimation, tag detection)
+- **`VisionCameraInterface`** - Interface for individual cameras
+- **`VisionResult`** - Interface for vision processing results
+- **`VisionTarget`** - Interface for detected targets
+
+The `PhotonVision` class implements `VisionSystem` and provides the default PhotonVision integration.
 
 ## Configuration Guide
 
@@ -24,8 +35,9 @@ VisionSystemConfig config = VisionConfigBuilder.create()
     .ambiguityThreshold(0.25)
     .build();
 
-// Initialize in RobotContainer
-swerve.setupPhotonVision(config);
+// Create vision system and initialize in RobotContainer
+PhotonVision vision = new PhotonVision(config, swerve::getPose, swerve.getField());
+swerve.setupVision(vision);
 ```
 
 ## Available Classes
@@ -84,24 +96,30 @@ swerve.setupPhotonVision(config);
 ### 1. Basic Setup
 
 ```java
-public class SwerveSubsystem extends SubsystemBase {
-    private final PhotonVision vision;
+// In RobotContainer.java
+public class RobotContainer {
+    private final SwerveSubsystem swerve;
 
-    public SwerveSubsystem() {
-        // Create vision instance
-        vision = new PhotonVision(this::getPose, swerveDrive.field);
-    }
+    public RobotContainer() {
+        // Create swerve subsystem first
+        swerve = new SwerveSubsystem(
+            new File(Filesystem.getDeployDirectory(), "swerve/kraken")
+        );
 
-    @Override
-    public void periodic() {
-        // Update pose estimation with vision
-        vision.updatePoseEstimation(swerveDrive);
+        // Create vision system with reference to swerve
+        PhotonVision vision = new PhotonVision(
+            VisionConstants.CONFIG,
+            swerve::getPose,
+            swerve.getField()
+        );
 
-        // Update field visualization
-        vision.updateVisionField();
+        // Pass vision to swerve (handles circular dependency)
+        swerve.setupVision(vision);
     }
 }
 ```
+
+The SwerveSubsystem automatically calls `vision.updatePoseEstimation()` and `vision.updateVisionField()` in its `periodic()` method when vision is configured.
 
 ### 2. Basic Vision Queries
 
@@ -442,15 +460,16 @@ if (RobotBase.isSimulation()) {
 ### With Swerve Drive
 
 ```java
-public class SwerveSubsystem extends SubsystemBase {
-    private final PhotonVision vision;
+// In RobotContainer - setup vision with swerve
+PhotonVision vision = new PhotonVision(
+    VisionConstants.CONFIG,
+    swerve::getPose,
+    swerve.getField()
+);
+swerve.setupVision(vision);
 
-    @Override
-    public void periodic() {
-        vision.updatePoseEstimation(swerveDrive);
-        vision.updateVisionField();
-    }
-}
+// SwerveSubsystem automatically handles periodic updates
+// when vision is configured via setupVision()
 ```
 
 ### With LEDs

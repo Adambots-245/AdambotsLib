@@ -147,7 +147,12 @@ public static final VisionSystemConfig VISION_CONFIG = VisionConfigBuilder.creat
 
 ```java
 // In RobotContainer.java
-swerve.setupPhotonVision(VisionConstants.VISION_CONFIG);
+PhotonVision vision = new PhotonVision(
+    VisionConstants.VISION_CONFIG,
+    swerve::getPose,
+    swerve.getField()
+);
+swerve.setupVision(vision);
 ```
 
 ---

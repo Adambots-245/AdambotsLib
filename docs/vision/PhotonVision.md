@@ -19,7 +19,7 @@ PhotonVision integration for AprilTag-based vision pose estimation with multi-ca
 
 ## Overview
 
-The `PhotonVision` class provides comprehensive AprilTag vision functionality for FRC robots, including:
+The `PhotonVision` class implements the `VisionSystem` interface and provides comprehensive AprilTag vision functionality for FRC robots, including:
 
 - **Multi-camera support** - Manage multiple PhotonVision cameras independently
 - **Vision-corrected odometry** - Automatically update swerve drive pose estimates
@@ -28,7 +28,7 @@ The `PhotonVision` class provides comprehensive AprilTag vision functionality fo
 - **Distance and angle calculations** - Find distances, yaw angles, and closest tags
 - **Camera state management** - Dynamically enable/disable cameras during match
 
-This class is designed to integrate seamlessly with YAGSL's swerve drive and WPILib's pose estimation system.
+This class is designed to integrate seamlessly with YAGSL's swerve drive and WPILib's pose estimation system. The `VisionSystem` interface abstraction allows teams to swap in different vision implementations (e.g., Limelight) without modifying subsystem code.
 
 **Based on:** Modified from [Ironclad 2024's Vision class](https://gitlab.com/ironclad_code/ironclad-2024/-/blob/master/src/main/java/frc/robot/vision/Vision.java)
 
@@ -76,7 +76,12 @@ public static final class VisionConstants {
 
 ```java
 // In RobotContainer.java
-swerve.setupPhotonVision(VisionConstants.CONFIG);
+PhotonVision vision = new PhotonVision(
+    VisionConstants.CONFIG,
+    swerve::getPose,
+    swerve.getField()
+);
+swerve.setupVision(vision);
 ```
 
 ### Step 3: Control Cameras at Runtime
@@ -115,11 +120,16 @@ public static final VisionSystemConfig VISION_CONFIG = VisionConfigBuilder.creat
     .build();
 ```
 
-### 2. Initialize Vision in SwerveSubsystem
+### 2. Initialize Vision in RobotContainer
 
 ```java
 // In RobotContainer
-swerve.setupPhotonVision(VisionConstants.VISION_CONFIG);
+PhotonVision vision = new PhotonVision(
+    VisionConstants.VISION_CONFIG,
+    swerve::getPose,
+    swerve.getField()
+);
+swerve.setupVision(vision);
 ```
 
 ### 3. Update Pose Estimation
@@ -316,12 +326,12 @@ boolean hasTarget = vision.hasTarget();
 ### Target Tracking
 
 ```java
-// Get best target from specific camera
-PhotonTrackedTarget bestTarget = vision.getBestTargetFromCamera("Left");
-if (bestTarget != null) {
-    int tagID = bestTarget.getFiducialId();
-    double ambiguity = bestTarget.getPoseAmbiguity();
-}
+// Get best target from specific camera (returns VisionTarget interface)
+Optional<VisionTarget> bestTarget = vision.getBestTargetFromCamera("Left");
+bestTarget.ifPresent(target -> {
+    int tagID = target.getFiducialId();
+    double ambiguity = target.getPoseAmbiguity();
+});
 
 // Get specific target from camera
 PhotonTrackedTarget target = vision.getTargetFromId(7, "Left");
@@ -841,12 +851,17 @@ Get the target with the lowest ambiguity from a specific camera.
 **Parameters:**
 - `cameraName` - Name of the camera to check
 
-**Returns:** `PhotonTrackedTarget` with lowest ambiguity, or `null`
+**Returns:** `Optional<VisionTarget>` with lowest ambiguity
 
 **Example:**
 ```java
-PhotonTrackedTarget best = vision.getBestTargetFromCamera("Left");
+Optional<VisionTarget> best = vision.getBestTargetFromCamera("Left");
+best.ifPresent(target -> {
+    System.out.println("Best target: " + target.getFiducialId());
+});
 ```
+
+**Note:** If you need access to PhotonVision-specific target features, use `getBestPhotonTargetFromCamera()` instead.
 
 ---
 

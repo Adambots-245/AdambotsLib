@@ -1,6 +1,6 @@
 # SwerveSubsystem
 
-YAGSL-based swerve drive subsystem for holonomic drivetrain control with PhotonVision integration.
+YAGSL-based swerve drive subsystem for holonomic drivetrain control with vision system integration.
 
 ## Table of Contents
 
@@ -783,16 +783,16 @@ Command disableVision = swerve.disableVisionCommand();
 ---
 
 #### Camera Purpose Control
-Control cameras by their configured purpose using PhotonVision directly:
+Control cameras by their configured purpose using the VisionSystem interface:
 
 ```java
 // Enable/disable cameras by purpose
-swerve.vision.enableCamerasWithPurpose(CameraPurpose.ODOMETRY);
-swerve.vision.disableCamerasWithPurpose(CameraPurpose.ALIGNMENT);
+swerve.getVision().enableCamerasWithPurpose(CameraPurpose.ODOMETRY);
+swerve.getVision().disableCamerasWithPurpose(CameraPurpose.ALIGNMENT);
 
 // Enable/disable specific cameras by name
-swerve.vision.enableCamera("Left");
-swerve.vision.disableCamera("Middle");
+swerve.getVision().enableCamera("Left");
+swerve.getVision().disableCamera("Middle");
 ```
 
 **Use Case:** Switch camera focus based on robot location or operation mode.
@@ -1563,12 +1563,12 @@ private void configureBindings() {
   Trigger nearLoadingZone = swerve.inRegionTrigger(13, 16.5, 0, 8);
   nearLoadingZone
     .onTrue(Commands.runOnce(() -> {
-        swerve.vision.disableCamerasWithPurpose(CameraPurpose.ODOMETRY);
-        swerve.vision.enableCamerasWithPurpose(CameraPurpose.ALIGNMENT);
+        swerve.getVision().disableCamerasWithPurpose(CameraPurpose.ODOMETRY);
+        swerve.getVision().enableCamerasWithPurpose(CameraPurpose.ALIGNMENT);
     }))
     .onFalse(Commands.runOnce(() -> {
-        swerve.vision.enableCamerasWithPurpose(CameraPurpose.ODOMETRY);
-        swerve.vision.disableCamerasWithPurpose(CameraPurpose.ALIGNMENT);
+        swerve.getVision().enableCamerasWithPurpose(CameraPurpose.ODOMETRY);
+        swerve.getVision().disableCamerasWithPurpose(CameraPurpose.ALIGNMENT);
     }));
 }
 ```
@@ -1713,4 +1713,4 @@ Check console output to verify vision data.
 ---
 
 **Last Updated:** 2026-02-02
-**AdambotsLib Version:** 2026.2.0+
+**AdambotsLib Version:** 2026.2.3+

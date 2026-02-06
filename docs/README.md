@@ -25,7 +25,7 @@ Measure physical properties with validated, reliable interfaces:
 Pre-built command-based subsystems for common robot components:
 
 - **[Subsystems Overview](subsystems/README.md)** - Introduction to subsystem implementations
-- **[SwerveSubsystem](subsystems/SwerveSubsystem.md)** - YAGSL-based swerve drive with PhotonVision and PathPlanner
+- **[SwerveSubsystem](subsystems/SwerveSubsystem.md)** - YAGSL-based swerve drive with vision system integration and PathPlanner
 - **[CANdleSubsystem](subsystems/CANdleSubsystem.md)** - CTRE CANdle LED strip controller (Phoenix 6)
 - **[CANdleSubsystem Commands](subsystems/CANdleSubsystem-CommandFactory.md)** - Command factory methods for CANdle
 - **[CameraSubsystem](subsystems/CameraSubsystem.md)** - PhotonVision camera management
@@ -40,10 +40,10 @@ Game-specific target configuration for AprilTag-based positioning:
 - **Alliance-Aware** - Automatic blue/red target selection
 
 ### Vision
-Computer vision for AprilTag detection and pose estimation:
+Computer vision for AprilTag detection and pose estimation with a flexible abstraction layer:
 
-- **[Vision Overview](vision/README.md)** - Introduction to vision processing
-- **[PhotonVision](vision/PhotonVision.md)** - PhotonVision integration guide
+- **[Vision Overview](vision/README.md)** - Introduction to vision processing and VisionSystem interface
+- **[PhotonVision](vision/PhotonVision.md)** - PhotonVision integration guide (default implementation)
 - **[Vision Configuration](vision/VisionConfiguration.md)** - Camera and pipeline setup
 
 ### Utilities
@@ -69,7 +69,7 @@ repositories {
 }
 
 dependencies {
-    implementation "com.adambots:AdambotsLib:2026.2.0"
+    implementation "com.adambots:AdambotsLib:2026.2.3"
 }
 ```
 

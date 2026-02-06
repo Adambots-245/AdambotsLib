@@ -13,7 +13,7 @@ import java.util.function.Supplier;
 import static edu.wpi.first.units.Units.*;
 import edu.wpi.first.units.measure.*;
 
-import org.photonvision.targeting.PhotonPipelineResult;
+import java.util.Objects;
 
 import com.adambots.lib.Constants.DriveConstants;
 import com.adambots.lib.Constants.ModuleConstants;
@@ -21,9 +21,9 @@ import com.adambots.lib.targets.GameTarget;
 import com.adambots.lib.targets.GameTargetConfig;
 import com.adambots.lib.targets.GameTargetLoader;
 import com.adambots.lib.utils.Utils;
-import com.adambots.lib.vision.PhotonVision;
-import com.adambots.lib.vision.VisionCamera;
-import com.adambots.lib.vision.config.VisionSystemConfig;
+import com.adambots.lib.vision.VisionCameraInterface;
+import com.adambots.lib.vision.VisionResult;
+import com.adambots.lib.vision.VisionSystem;
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.commands.PathPlannerAuto;
 import com.pathplanner.lib.commands.PathfindingCommand;
@@ -65,7 +65,7 @@ import swervelib.telemetry.SwerveDriveTelemetry.TelemetryVerbosity;
  *
  * <p><strong>Features:</strong>
  * <ul>
- *   <li>PhotonVision integration for vision-corrected odometry</li>
+ *   <li>Vision system integration for vision-corrected odometry</li>
  *   <li>PathPlanner integration for autonomous path following</li>
  *   <li>Command factory methods for all drive operations</li>
  *   <li>Trigger methods for state-based command composition</li>
@@ -132,14 +132,19 @@ import swervelib.telemetry.SwerveDriveTelemetry.TelemetryVerbosity;
  *
  * @see <a href="https://docs.yagsl.com/">YAGSL Documentation</a>
  * @see <a href="https://github.com/BroncBotz3481/YAGSL">YAGSL GitHub Repository</a>
- * @see PhotonVision
+ * @see VisionSystem
  * @see com.pathplanner.lib.auto.AutoBuilder
  */
 public class SwerveSubsystem extends SubsystemBase {
 
   private final SwerveDrive swerveDrive;
   private final AprilTagFieldLayout aprilTagFieldLayout = AprilTagFieldLayout.loadField(AprilTagFields.kDefaultField);
-  private PhotonVision vision;
+
+  /**
+   * Vision system for pose estimation and target tracking.
+   * Nullable until setupVision() is called.
+   */
+  private VisionSystem vision;
 
   // Configuration
   private final SwerveConfig swerveConfig;
@@ -301,7 +306,7 @@ public class SwerveSubsystem extends SubsystemBase {
     // swerveDrive.pushOffsetsToEncoders();
 
     if (swerveConfig.useManualOdometry()) {
-      // Note: Vision must now be configured externally using setupPhotonVision(VisionSystemConfig)
+      // Note: Vision must now be configured externally using setupVision(VisionSystem)
       // Stop the odometry thread if we are using vision that way we can synchronize
       // updates better. Disable this in simulation (maple-sim) for proper odometry updates.
       swerveDrive.stopOdometryThread();
@@ -342,41 +347,38 @@ public class SwerveSubsystem extends SubsystemBase {
   }
 
   /**
-   * Setup the photon vision class with a custom configuration.
+   * Setup the vision system with a VisionSystem implementation.
    *
-   * <p>This method allows full customization of cameras, standard deviations,
-   * and filtering without modifying AdambotsLib source code.
+   * <p>This method allows using any vision system that implements the {@link VisionSystem}
+   * interface, such as PhotonVision, Limelight, or custom implementations.
    *
    * <p><strong>Usage Example:</strong>
    * <pre>{@code
-   * // In your robot project's Constants file
-   * public static final int[] SCORING_TAGS = {6, 7, 8, 9, 10, 11, 17, 18, 19, 20, 21, 22};
-   * public static final int[] INTAKE_TAGS = {1, 2, 4, 5, 12, 13, 14, 15};
+   * // In RobotContainer - handling circular dependency
+   * // 1. Create swerve first (can run basic odometry without vision)
+   * SwerveSubsystem swerve = new SwerveSubsystem(directory, config);
    *
-   * public static final VisionSystemConfig VISION_CONFIG = VisionConfigBuilder.create()
-   *     .addCamera("Left")
-   *         .positionInches(15, 11.75, 8)
-   *         .rotationDegrees(0, 0, -30)
-   *         .purpose(CameraPurpose.ODOMETRY)
-   *         .allowedTags(SCORING_TAGS)
-   *         .done()
-   *     .addCamera("Right")
-   *         .positionInches(15, -11.75, 8)
-   *         .rotationDegrees(0, 0, 30)
-   *         .purpose(CameraPurpose.ODOMETRY)
-   *         .allowedTags(SCORING_TAGS)
-   *         .done()
-   *     .ambiguityThreshold(0.25)
-   *     .build();
+   * // 2. Create vision with reference to swerve
+   * VisionSystem vision = createVisionSystem(visionConfig, swerve::getPose, swerve.getField());
    *
-   * // In RobotContainer
-   * swerve.setupPhotonVision(VisionConstants.VISION_CONFIG);
+   * // 3. Pass vision back to swerve
+   * swerve.setupVision(vision);
    * }</pre>
    *
-   * @param config The vision system configuration
+   * @param visionSystem The vision system to use for pose estimation
+   * @throws NullPointerException if visionSystem is null
    */
-  public void setupPhotonVision(VisionSystemConfig config) {
-    vision = new PhotonVision(config, swerveDrive::getPose, swerveDrive.field);
+  public void setupVision(VisionSystem visionSystem) {
+    this.vision = Objects.requireNonNull(visionSystem, "Vision system cannot be null");
+  }
+
+  /**
+   * Checks if vision is configured and available.
+   *
+   * @return true if vision system has been set up
+   */
+  public boolean isVisionAvailable() {
+    return vision != null;
   }
 
   private void setupPathPlanner() {
@@ -518,22 +520,19 @@ public class SwerveSubsystem extends SubsystemBase {
    * @return Distance to a specific AprilTag in meters.
    */
   public double getDistanceToAprilTag(int tagID) {
-
-    // Taken from PhotonUtils.getDistanceToPose
-    Pose3d speakerAprilTagPose = aprilTagFieldLayout.getTagPose(tagID).get();
-    return getPose().getTranslation().getDistance(speakerAprilTagPose.toPose2d().getTranslation());
+    Pose3d tagPose = aprilTagFieldLayout.getTagPose(tagID).get();
+    return getPose().getTranslation().getDistance(tagPose.toPose2d().getTranslation());
   }
 
   /**
    * Get the yaw to aim at an AprilTag.
-   * 
+   *
    * @param tagID The ID of the AprilTag to aim at.
    * @return {@link Rotation2d} of which you need to achieve.
    */
   public Rotation2d getAprilTagYaw(int tagID) {
-    // Taken from PhotonUtils.getYawToPose()
-    Pose3d speakerAprilTagPose = aprilTagFieldLayout.getTagPose(tagID).get();
-    Translation2d relativeTrl = speakerAprilTagPose.toPose2d().relativeTo(getPose()).getTranslation();
+    Pose3d tagPose = aprilTagFieldLayout.getTagPose(tagID).get();
+    Translation2d relativeTrl = tagPose.toPose2d().relativeTo(getPose()).getTranslation();
     return new Rotation2d(relativeTrl.getX(), relativeTrl.getY()).plus(swerveDrive.getOdometryHeading());
   }
 
@@ -724,11 +723,11 @@ public class SwerveSubsystem extends SubsystemBase {
   }
 
   /**
-   * Get the PhotonVision instance.
+   * Get the vision system instance.
    *
-   * @return The PhotonVision instance.
+   * @return The VisionSystem instance, or null if not configured.
    */
-  public PhotonVision getVision() {
+  public VisionSystem getVision() {
     return vision;
   }
 
@@ -849,7 +848,7 @@ public class SwerveSubsystem extends SubsystemBase {
    */
   public Trigger isAlignedWithTagTrigger(int tagID, Angle tolerance) {
     return new Trigger(() -> {
-      if (!vision.hasTarget()) return false;
+      if (vision == null || !vision.hasTarget()) return false;
       double error = Math.abs(getAprilTagYaw(tagID).minus(getHeading()).getDegrees());
       return error <= tolerance.in(Degrees);
     });
@@ -874,7 +873,7 @@ public class SwerveSubsystem extends SubsystemBase {
    * @return Trigger for vision target detection
    */
   public Trigger hasVisionTargetTrigger() {
-    return new Trigger(() -> vision.hasTarget());
+    return new Trigger(() -> vision != null && vision.hasTarget());
   }
 
   /**
@@ -887,6 +886,7 @@ public class SwerveSubsystem extends SubsystemBase {
    */
   public Trigger isInRangeOfTagTrigger(int tagID, double minDistance, double maxDistance) {
     return new Trigger(() -> {
+      if (vision == null) return false;
       double distance = vision.getDistanceFromAprilTag(tagID);
       return distance >= minDistance && distance <= maxDistance;
     });
@@ -1279,35 +1279,25 @@ public class SwerveSubsystem extends SubsystemBase {
    * the angular velocity needed to align the robot's heading with the AprilTag.
    * The command completes when the angular error is within the specified tolerance.
    *
-   * <p><strong>AprilTag IDs (2024 Crescendo):</strong>
-   * <ul>
-   *   <li>1-4: Red source tags</li>
-   *   <li>5: Red amp</li>
-   *   <li>6-7: Blue speaker</li>
-   *   <li>8: Blue amp</li>
-   *   <li>9-10: Red speaker</li>
-   *   <li>11-16: Stage tags</li>
-   * </ul>
-   *
    * <p><strong>Note:</strong> This command only rotates the robot. It does not
    * move toward or away from the tag. Combine with translation for full alignment.
    *
    * <p><strong>Usage Example:</strong>
    * <pre>{@code
-   * // Aim at speaker tag when button is held
+   * // Aim at target tag when button is held
    * Buttons.XboxLeftTriggerButton.whileTrue(swerve.aimAtAprilTagCommand(7, 2.0));
    *
-   * // Aim then shoot sequence
+   * // Aim then score sequence
    * Commands.sequence(
    *     swerve.aimAtAprilTagCommand(7, 1.0),  // Aim within 1 degree
-   *     shooter.shootCommand()
+   *     scorer.scoreCommand()
    * );
    *
    * // Continuous aiming while driving (combine with drive command)
    * Buttons.XboxRightTriggerButton.whileTrue(
    *     Commands.parallel(
    *         swerve.aimAtAprilTagCommand(7, 2.0),
-   *         shooter.spinUpCommand()
+   *         mechanism.prepareCommand()
    *     )
    * );
    * }</pre>
@@ -1316,7 +1306,7 @@ public class SwerveSubsystem extends SubsystemBase {
    * @param tolerance Angular tolerance in degrees (command ends when within this)
    * @return Command that rotates robot to face the specified AprilTag
    *
-   * @see #aimAtTargetCommand(VisionCamera)
+   * @see #aimAtTargetCommand(VisionCameraInterface)
    * @see #alignAndStrafeCommand(int, double, double, double)
    */
   public Command aimAtAprilTagCommand(int tagId, double tolerance) {
@@ -1339,11 +1329,12 @@ public class SwerveSubsystem extends SubsystemBase {
    * @return Command that logs distance
    */
   public Command getDistanceFromAprilTagCommand(int tagID) {
-    return Commands.runOnce(() ->
-        edu.wpi.first.wpilibj.DataLogManager.log("AprilTag " + tagID + " distance - X: " +
-            vision.getTransformToAprilTag(tagID).getX() +
-            " Y: " + vision.getTransformToAprilTag(tagID).getY())
-    ).withName("GetDistanceFromTag(" + tagID + ")");
+    return Commands.runOnce(() -> {
+      if (vision == null) return;
+      edu.wpi.first.wpilibj.DataLogManager.log("AprilTag " + tagID + " distance - X: " +
+          vision.getTransformToAprilTag(tagID).getX() +
+          " Y: " + vision.getTransformToAprilTag(tagID).getY());
+    }).withName("GetDistanceFromTag(" + tagID + ")");
   }
 
   /**
@@ -1370,15 +1361,15 @@ public class SwerveSubsystem extends SubsystemBase {
    *
    * <p><strong>Usage Example:</strong>
    * <pre>{@code
-   * // Align with speaker tag, then strafe 0.5m left to score position
+   * // Align with target tag, then strafe 0.5m left to score position
    * Buttons.XboxAButton.onTrue(
    *     swerve.alignAndStrafeCommand(7, 0.5, 1.0, 2.0)
    * );
    *
-   * // Align with amp tag, strafe right to scoring position
+   * // Align with tag, strafe right to scoring position
    * Commands.sequence(
    *     swerve.alignAndStrafeCommand(5, -0.3, 0.5, 1.0),
-   *     scorer.scoreAmpCommand()
+   *     scorer.scoreCommand()
    * );
    * }</pre>
    *
@@ -1428,14 +1419,14 @@ public class SwerveSubsystem extends SubsystemBase {
   }
 
   /**
-   * Command to aim robot at the best target from a specific VisionCamera.
+   * Command to aim robot at the best target from a specific camera.
    *
-   * @param camera VisionCamera to use
+   * @param camera VisionCameraInterface to use
    * @return Command that aims at best target from camera
    */
-  public Command aimAtTargetCommand(VisionCamera camera) {
+  public Command aimAtTargetCommand(VisionCameraInterface camera) {
     return Commands.run(() -> {
-      Optional<PhotonPipelineResult> resultO = camera.getBestResult();
+      Optional<? extends VisionResult> resultO = camera.getBestResult();
       if (resultO.isPresent()) {
         var result = resultO.get();
         if (result.hasTargets()) {
@@ -1454,10 +1445,11 @@ public class SwerveSubsystem extends SubsystemBase {
    */
   public Command aimAtTargetCommand(String cameraName) {
     return Commands.run(() -> {
-      VisionCamera camera = vision.getCamera(cameraName);
+      if (vision == null) return;
+      VisionCameraInterface camera = vision.getCamera(cameraName);
       if (camera == null) return;
 
-      Optional<PhotonPipelineResult> resultO = camera.getBestResult();
+      Optional<? extends VisionResult> resultO = camera.getBestResult();
       if (resultO.isPresent()) {
         var result = resultO.get();
         if (result.hasTargets()) {
@@ -1476,6 +1468,8 @@ public class SwerveSubsystem extends SubsystemBase {
    */
   public Command driveToNearestPoseWithVisionCommand(List<Pose2d> targetPoses) {
     return Commands.run(() -> {
+      if (vision == null) return;
+
       // Get current robot pose
       Pose2d currentPose = swerveDrive.getPose();
 
@@ -1484,7 +1478,7 @@ public class SwerveSubsystem extends SubsystemBase {
 
       // Get visible AprilTags and their poses
       boolean hasVisibleTags = false;
-      for (VisionCamera camera : vision.getCameras()) {
+      for (VisionCameraInterface camera : vision.getCameras()) {
         if (!camera.isEnabled()) continue;
         var result = camera.getLatestResult();
         if (result.isPresent() && result.get().hasTargets()) {
@@ -1512,7 +1506,7 @@ public class SwerveSubsystem extends SubsystemBase {
   /**
    * Command to enable vision-based pose estimation.
    *
-   * <p><strong>What This Does:</strong> Enables all configured PhotonVision cameras
+   * <p><strong>What This Does:</strong> Enables all configured vision cameras
    * to contribute pose estimates to the robot's odometry. When enabled, AprilTag
    * detections will correct accumulated odometry drift.
    *
@@ -1543,17 +1537,18 @@ public class SwerveSubsystem extends SubsystemBase {
    * @return Instant command that enables all vision cameras
    *
    * @see #disableVisionCommand()
-   * @see #setupPhotonVision(VisionSystemConfig)
+   * @see #setupVision(VisionSystem)
    */
   public Command enableVisionCommand() {
-    return Commands.runOnce(() -> vision.enableAllCameras(), this)
-        .withName("EnableVision");
+    return Commands.runOnce(() -> {
+      if (vision != null) vision.enableAllCameras();
+    }, this).withName("EnableVision");
   }
 
   /**
    * Command to disable vision-based pose estimation (odometry only).
    *
-   * <p><strong>What This Does:</strong> Disables all PhotonVision cameras from
+   * <p><strong>What This Does:</strong> Disables all vision cameras from
    * contributing to pose estimation. The robot will rely solely on wheel odometry
    * and gyro for position tracking.
    *
@@ -1583,8 +1578,9 @@ public class SwerveSubsystem extends SubsystemBase {
    * @see #enableVisionCommand()
    */
   public Command disableVisionCommand() {
-    return Commands.runOnce(() -> vision.disableAllCameras(), this)
-        .withName("DisableVision");
+    return Commands.runOnce(() -> {
+      if (vision != null) vision.disableAllCameras();
+    }, this).withName("DisableVision");
   }
 
   /**
@@ -2214,7 +2210,7 @@ public class SwerveSubsystem extends SubsystemBase {
    *
    * <p><strong>Use Cases:</strong>
    * <ul>
-   *   <li>Pre-positioning for shots (face speaker direction)</li>
+   *   <li>Pre-positioning for scoring (face target direction)</li>
    *   <li>Autonomous alignment to field-relative angles</li>
    *   <li>Resetting robot orientation during teleop</li>
    * </ul>
@@ -2224,10 +2220,10 @@ public class SwerveSubsystem extends SubsystemBase {
    * // Turn to face 0 degrees (toward red alliance wall)
    * swerve.turnToAngleCommand(Rotation2d.fromDegrees(0), 2.0).schedule();
    *
-   * // Turn to face speaker before shooting
+   * // Turn to face target before scoring
    * Commands.sequence(
    *     swerve.turnToAngleCommand(Rotation2d.fromDegrees(180), 1.0),
-   *     shooter.shootCommand()
+   *     scorer.scoreCommand()
    * );
    *
    * // Compose turn-then-drive sequence
@@ -2431,7 +2427,7 @@ public class SwerveSubsystem extends SubsystemBase {
    *     0.1
    * ).schedule();
    *
-   * // Approach speaker while facing it
+   * // Approach target while facing it
    * swerve.driveToPositionWithHeadingCommand(
    *     new Translation2d(1.5, 5.5),
    *     Rotation2d.fromDegrees(180),

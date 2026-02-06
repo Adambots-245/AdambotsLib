@@ -22,6 +22,7 @@ import org.photonvision.simulation.VisionSystemSim;
 import org.photonvision.targeting.PhotonPipelineResult;
 import org.photonvision.targeting.PhotonTrackedTarget;
 
+import com.adambots.lib.vision.adapters.PhotonVisionResultAdapter;
 import com.adambots.lib.vision.config.VisionCameraConfig;
 import com.adambots.lib.vision.config.VisionCameraConfig.CameraPurpose;
 
@@ -74,8 +75,9 @@ import edu.wpi.first.wpilibj.RobotBase;
  *
  * @see VisionCameraConfig
  * @see PhotonVision
+ * @see VisionCameraInterface
  */
-public class VisionCamera {
+public class VisionCamera implements VisionCameraInterface {
 
     private final VisionCameraConfig config;
     private final AprilTagFieldLayout fieldLayout;
@@ -346,9 +348,25 @@ public class VisionCamera {
      * Gets the result with the least ambiguity from the best tracked target
      * within the cache. This may not be the most recent result.
      *
+     * <p>This is the interface-compliant version that returns a {@link VisionResult}.
+     * For direct PhotonVision access, use {@link #getBestPhotonResult()}.
+     *
      * @return The result in the cache with the least ambiguous best tracked target
      */
-    public Optional<PhotonPipelineResult> getBestResult() {
+    @Override
+    public Optional<? extends VisionResult> getBestResult() {
+        return getBestPhotonResult().map(PhotonVisionResultAdapter::new);
+    }
+
+    /**
+     * Gets the result with the least ambiguity from the best tracked target
+     * within the cache. This may not be the most recent result.
+     *
+     * <p>This returns the raw PhotonVision type for direct access.
+     *
+     * @return The result in the cache with the least ambiguous best tracked target
+     */
+    public Optional<PhotonPipelineResult> getBestPhotonResult() {
         if (resultsList.isEmpty()) {
             return Optional.empty();
         }
@@ -376,9 +394,24 @@ public class VisionCamera {
     /**
      * Gets the latest result from the current cache.
      *
+     * <p>This is the interface-compliant version that returns a {@link VisionResult}.
+     * For direct PhotonVision access, use {@link #getLatestPhotonResult()}.
+     *
      * @return Empty optional if nothing is found, latest result if something is there
      */
-    public Optional<PhotonPipelineResult> getLatestResult() {
+    @Override
+    public Optional<? extends VisionResult> getLatestResult() {
+        return getLatestPhotonResult().map(PhotonVisionResultAdapter::new);
+    }
+
+    /**
+     * Gets the latest result from the current cache.
+     *
+     * <p>This returns the raw PhotonVision type for direct access.
+     *
+     * @return Empty optional if nothing is found, latest result if something is there
+     */
+    public Optional<PhotonPipelineResult> getLatestPhotonResult() {
         return resultsList.isEmpty() ? Optional.empty() : Optional.of(resultsList.get(0));
     }
 
