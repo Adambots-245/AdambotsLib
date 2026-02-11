@@ -7,6 +7,7 @@ package com.adambots.lib.subsystems;
 import java.io.File;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 
@@ -1333,6 +1334,91 @@ public class SwerveSubsystem extends SubsystemBase {
     }).until(() ->
         Math.abs(getAprilTagYaw(tagId).minus(getHeading()).getDegrees()) < tolerance
     ).withName("AimAtTag(" + tagId + ")");
+  }
+
+  /**
+   * Command to aim at the nearest AprilTag from a given set of tag IDs.
+   *
+   * <p><strong>What This Does:</strong> Finds the tag from the provided array that requires
+   * the smallest rotation to face, then rotates the robot to aim at that tag. The nearest
+   * tag is determined at command initialization time based on current yaw error.
+   *
+   * <p><strong>Use Cases:</strong>
+   * <ul>
+   *   <li>Aiming at any scoring position when multiple are available</li>
+   *   <li>Targeting the closest intake station</li>
+   *   <li>Generic alignment without hardcoding specific tag IDs</li>
+   * </ul>
+   *
+   * <p><strong>Usage Example:</strong>
+   * <pre>{@code
+   * // Define tag groups in Constants
+   * public static final int[] SCORING_TAGS = {6, 7, 8, 9, 10, 11};
+   * public static final int[] INTAKE_TAGS = {1, 2, 12, 13};
+   *
+   * // Aim at nearest scoring tag
+   * Buttons.XboxAButton.whileTrue(swerve.aimAtNearestTagCommand(SCORING_TAGS, 2.0));
+   *
+   * // Aim at nearest intake tag with tighter tolerance
+   * Buttons.XboxBButton.whileTrue(swerve.aimAtNearestTagCommand(INTAKE_TAGS, 1.0));
+   * }</pre>
+   *
+   * @param tagIds            Array of AprilTag IDs to consider
+   * @param toleranceDegrees  Angular tolerance in degrees for aim completion
+   * @return Command that aims at the nearest tag from the array
+   *
+   * @see #aimAtAprilTagCommand(int, double)
+   * @see #findNearestTag(int[])
+   */
+  public Command aimAtNearestTagCommand(int[] tagIds, double toleranceDegrees) {
+    return Commands.defer(() -> {
+      int nearest = findNearestTag(tagIds);
+      if (nearest == -1) {
+        // No valid tag found, return a command that does nothing
+        return Commands.none();
+      }
+      return aimAtAprilTagCommand(nearest, toleranceDegrees);
+    }, Set.of(this)).withName("AimAtNearestTag");
+  }
+
+  /**
+   * Finds the AprilTag from the given array that requires the smallest rotation to face.
+   *
+   * <p>This method calculates the yaw error (difference between current heading and the
+   * direction to each tag) and returns the tag ID with the smallest absolute error.
+   *
+   * @param tagIds Array of AprilTag IDs to consider
+   * @return The tag ID with the smallest yaw error, or -1 if no valid tags found
+   *
+   * @see #getAprilTagYaw(int)
+   */
+  public int findNearestTag(int[] tagIds) {
+    if (tagIds == null || tagIds.length == 0) {
+      return -1;
+    }
+
+    int nearestTag = -1;
+    double smallestError = Double.MAX_VALUE;
+
+    for (int tagId : tagIds) {
+      try {
+        // Check if tag exists in field layout
+        if (aprilTagFieldLayout.getTagPose(tagId).isEmpty()) {
+          continue;
+        }
+
+        double error = Math.abs(getAprilTagYaw(tagId).minus(getHeading()).getDegrees());
+        if (error < smallestError) {
+          smallestError = error;
+          nearestTag = tagId;
+        }
+      } catch (Exception e) {
+        // Skip tags that cause errors (e.g., invalid IDs)
+        continue;
+      }
+    }
+
+    return nearestTag;
   }
 
   /**

@@ -16,16 +16,17 @@ import com.adambots.lib.vision.config.VisionCameraConfig.CameraPurpose;
  *
  * <p><strong>Usage Example:</strong>
  * <pre>{@code
+ * // import static edu.wpi.first.units.Units.*
  * VisionSystemConfig config = VisionConfigBuilder.create()
  *     .addCamera("Left")
- *         .positionInches(15, 11.75, 8)
- *         .rotationDegrees(0, 0, -30)
+ *         .position(Inches.of(15), Inches.of(11.75), Inches.of(8))
+ *         .rotation(Degrees.of(0), Degrees.of(0), Degrees.of(-30))
  *         .purpose(CameraPurpose.ODOMETRY)
  *         .allowedTags(6, 7, 8, 9, 10, 11)
  *         .done()
  *     .addCamera("Right")
- *         .positionInches(15, -11.75, 8)
- *         .rotationDegrees(0, 0, 30)
+ *         .position(Inches.of(15), Inches.of(-11.75), Inches.of(8))
+ *         .rotation(Degrees.of(0), Degrees.of(0), Degrees.of(30))
  *         .purpose(CameraPurpose.ODOMETRY)
  *         .done()
  *     .ambiguityThreshold(0.25)

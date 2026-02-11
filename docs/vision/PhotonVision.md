@@ -43,6 +43,8 @@ This class is designed to integrate seamlessly with YAGSL's swerve drive and WPI
 In your robot project's Constants file:
 
 ```java
+import static edu.wpi.first.units.Units.*;
+
 public static final class VisionConstants {
     // Game-specific tag groups
     public static final int[] SCORING_TAGS = {6, 7, 8, 9, 10, 11, 17, 18, 19, 20, 21, 22};
@@ -50,20 +52,20 @@ public static final class VisionConstants {
 
     public static final VisionSystemConfig CONFIG = VisionConfigBuilder.create()
         .addCamera("Left")
-            .positionInches(15, 11.75, 8)
-            .rotationDegrees(0, 0, -30)
+            .position(Inches.of(15), Inches.of(11.75), Inches.of(8))
+            .rotation(Degrees.of(0), Degrees.of(0), Degrees.of(-30))
             .purpose(CameraPurpose.ODOMETRY)
             .allowedTags(SCORING_TAGS)
             .done()
         .addCamera("Right")
-            .positionInches(15, -11.75, 8)
-            .rotationDegrees(0, 0, 30)
+            .position(Inches.of(15), Inches.of(-11.75), Inches.of(8))
+            .rotation(Degrees.of(0), Degrees.of(0), Degrees.of(30))
             .purpose(CameraPurpose.ODOMETRY)
             .allowedTags(SCORING_TAGS)
             .done()
         .addCamera("Middle")
-            .positionInches(8, 0, 41)
-            .rotationDegrees(0, -43, 177)
+            .position(Inches.of(8), Inches.of(0), Inches.of(41))
+            .rotation(Degrees.of(0), Degrees.of(-43), Degrees.of(177))
             .purpose(CameraPurpose.ALIGNMENT)
             .allowedTags(ALIGNMENT_TAGS)
             .done()
@@ -109,10 +111,12 @@ For complete configuration documentation, see **[VisionConfiguration.md](VisionC
 
 ```java
 // In your Constants file
+import static edu.wpi.first.units.Units.*;
+
 public static final VisionSystemConfig VISION_CONFIG = VisionConfigBuilder.create()
     .addCamera("Left")
-        .positionInches(15, 11.75, 8)
-        .rotationDegrees(0, 0, -30)
+        .position(Inches.of(15), Inches.of(11.75), Inches.of(8))
+        .rotation(Degrees.of(0), Degrees.of(0), Degrees.of(-30))
         .purpose(CameraPurpose.ODOMETRY)
         .allowedTags(6, 7, 8, 9, 10, 11)
         .done()
@@ -172,14 +176,14 @@ PhotonVision supports multiple cameras configured via `VisionConfigBuilder`:
 ```java
 VisionConfigBuilder.create()
     .addCamera("Left")
-        .positionInches(15, 11.75, 8)
-        .rotationDegrees(0, 0, -30)
+        .position(Inches.of(15), Inches.of(11.75), Inches.of(8))
+        .rotation(Degrees.of(0), Degrees.of(0), Degrees.of(-30))
         .purpose(CameraPurpose.ODOMETRY)
         .allowedTags(SCORING_TAGS)
         .done()
     .addCamera("Right")
-        .positionInches(15, -11.75, 8)
-        .rotationDegrees(0, 0, 30)
+        .position(Inches.of(15), Inches.of(-11.75), Inches.of(8))
+        .rotation(Degrees.of(0), Degrees.of(0), Degrees.of(30))
         .purpose(CameraPurpose.ODOMETRY)
         .allowedTags(SCORING_TAGS)
         .done()

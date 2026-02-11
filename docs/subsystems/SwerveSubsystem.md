@@ -694,7 +694,7 @@ Repeat for all four modules.
 
 ## Command Factories
 
-`SwerveSubsystem` provides 17 command factory methods for all drive operations. These replace the old `DriveCommands` utility class.
+`SwerveSubsystem` provides 18 command factory methods for all drive operations. These replace the old `DriveCommands` utility class.
 
 ### Vision-Based Commands
 
@@ -711,6 +711,31 @@ Command aimCommand = swerve.aimAtAprilTagCommand(4, 2.0);
 - `tolerance` - Angle tolerance in degrees (command ends when within tolerance)
 
 **Use Case:** Aligning with game pieces or scoring positions.
+
+---
+
+#### aimAtNearestTagCommand(int[] tagIds, double toleranceDegrees)
+Rotates robot to aim at the nearest AprilTag from a given set of tag IDs. The nearest tag is determined by which one requires the smallest rotation to face.
+
+```java
+// Define tag groups in Constants
+public static final int[] SCORING_TAGS = {6, 7, 8, 9, 10, 11};
+public static final int[] INTAKE_TAGS = {1, 2, 12, 13};
+
+// Aim at nearest scoring tag with 2° tolerance
+Buttons.XboxAButton.whileTrue(swerve.aimAtNearestTagCommand(SCORING_TAGS, 2.0));
+
+// Aim at nearest intake tag with tighter tolerance
+Buttons.XboxBButton.whileTrue(swerve.aimAtNearestTagCommand(INTAKE_TAGS, 1.0));
+```
+
+**Parameters:**
+- `tagIds` - Array of AprilTag IDs to consider
+- `toleranceDegrees` - Angle tolerance in degrees (command ends when within tolerance)
+
+**Use Case:** Generic alignment when multiple targets are available (e.g., any scoring position, any intake station).
+
+**Related Method:** `findNearestTag(int[] tagIds)` - Returns the tag ID with smallest yaw error.
 
 ---
 
