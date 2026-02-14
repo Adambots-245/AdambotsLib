@@ -18,7 +18,9 @@ import com.ctre.phoenix6.configs.SoftwareLimitSwitchConfigs;
 import com.ctre.phoenix6.configs.MotorOutputConfigs;
 import com.ctre.phoenix6.configs.HardwareLimitSwitchConfigs;
 import com.ctre.phoenix6.configs.Slot0Configs;
+import com.ctre.phoenix6.configs.CommutationConfigs;
 import com.ctre.phoenix6.configs.TalonFXSConfigurator;
+import com.ctre.phoenix6.signals.MotorArrangementValue;
 
 import edu.wpi.first.epilogue.Logged;
 import edu.wpi.first.epilogue.NotLogged;
@@ -78,6 +80,11 @@ public class MinionMotor implements BaseMotor {
         motor = new TalonFXS(deviceID);
         configurator = motor.getConfigurator();
 
+        // Tell the TalonFXS a Minion motor is connected via JST
+        CommutationConfigs commutationConfigs = new CommutationConfigs();
+        commutationConfigs.MotorArrangement = MotorArrangementValue.Minion_JST;
+        configurator.apply(commutationConfigs);
+
         // Configure status frame periods for efficiency
         motor.getVelocity().setUpdateFrequency(50);
         motor.getPosition().setUpdateFrequency(50);
@@ -97,6 +104,11 @@ public class MinionMotor implements BaseMotor {
     public MinionMotor(int deviceID, String canBus) {
         motor = new TalonFXS(deviceID, new CANBus(canBus));
         configurator = motor.getConfigurator();
+
+        // Tell the TalonFXS a Minion motor is connected via JST
+        CommutationConfigs commutationConfigs = new CommutationConfigs();
+        commutationConfigs.MotorArrangement = MotorArrangementValue.Minion_JST;
+        configurator.apply(commutationConfigs);
 
         // Configure status frame periods for efficiency
         motor.getVelocity().setUpdateFrequency(50);
