@@ -274,7 +274,7 @@ public class Dash {
      */
     public static GenericEntry addTunable(String name, double defaultValue) {
         return currentTab.add(name, defaultValue)
-            .withWidget(BuiltInWidgets.kNumberSlider)
+            .withWidget(BuiltInWidgets.kTextView)
             .getEntry();
     }
 
