@@ -103,6 +103,32 @@ public interface BaseMotor extends BaseActuator{
     }
 
     /**
+     * Gravity compensation types for closed-loop control.
+     *
+     * <p>Used with kG feedforward gain to counteract gravity on mechanisms.
+     * Must be configured alongside kG (set via the extended setPID method)
+     * for the compensation to take effect.
+     *
+     * <p><strong>Usage:</strong>
+     * <pre>{@code
+     * // For an arm mechanism
+     * motor.configureGravity(GravityType.ARM_COSINE);
+     * motor.setPID(0, kP, 0, kD, kV, kS, kA, kG);
+     *
+     * // For an elevator mechanism
+     * motor.configureGravity(GravityType.ELEVATOR_STATIC);
+     * }</pre>
+     */
+    public enum GravityType {
+        /** No gravity compensation (default). */
+        NONE,
+        /** Constant gravity output regardless of position. Use for elevators. */
+        ELEVATOR_STATIC,
+        /** Cosine-scaled gravity output based on arm angle. Use for rotating arms. */
+        ARM_COSINE
+    }
+
+    /**
      * Sets the motor control mode and output value.
      *
      * <p>The interpretation of the value parameter depends on the selected control mode:
@@ -523,6 +549,37 @@ public interface BaseMotor extends BaseActuator{
      */
     void configureHardLimits(boolean enableForward, boolean enableReverse,
                             double forwardResetValueRotations, double reverseResetValueRotations);
+
+    /**
+     * Configures gravity compensation for the motor's closed-loop control.
+     *
+     * <p>For arms, use {@link GravityType#ARM_COSINE} - the motor controller will automatically
+     * scale the kG output by cos(current_angle), providing maximum compensation when
+     * horizontal and zero when vertical.
+     *
+     * <p>For elevators, use {@link GravityType#ELEVATOR_STATIC} - constant kG output
+     * regardless of position.
+     *
+     * <p><strong>Requires:</strong> kG must be set via the extended setPID method.
+     * The kG value should be the voltage needed to hold the mechanism at its
+     * maximum gravity position (horizontal for arms, any position for elevators).
+     *
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * // Arm with gravity compensation
+     * motor.configureGravity(GravityType.ARM_COSINE);
+     * motor.setPID(0, 100, 0, 2.0, 0, 0.35, 0, 0.2);
+     *
+     * // Elevator with gravity compensation
+     * motor.configureGravity(GravityType.ELEVATOR_STATIC);
+     * }</pre>
+     *
+     * @param type The gravity compensation type
+     * @see GravityType
+     */
+    default void configureGravity(GravityType type) {
+        // Default no-op - motors that don't support gravity can ignore this
+    }
 
     /**
      * Creates a configuration builder for this motor.

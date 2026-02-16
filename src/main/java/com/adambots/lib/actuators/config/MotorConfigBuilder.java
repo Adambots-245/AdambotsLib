@@ -49,6 +49,7 @@ public class MotorConfigBuilder {
     private Boolean brakeMode;
     private Boolean voltageCompensation;
     private double voltageCompensationValue = 12.0;
+    private BaseMotor.GravityType gravityType;
 
     /**
      * Creates a new motor configuration builder.
@@ -205,6 +206,28 @@ public class MotorConfigBuilder {
     }
 
     /**
+     * Configures gravity compensation type.
+     *
+     * <p>Must be used with kG set via the extended setPID method for the
+     * compensation to take effect.
+     *
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * motor.configure()
+     *     .gravity(BaseMotor.GravityType.ARM_COSINE)
+     *     .brakeMode(true)
+     *     .apply();
+     * }</pre>
+     *
+     * @param type ARM_COSINE for arms, ELEVATOR_STATIC for elevators
+     * @return This builder for chaining
+     */
+    public MotorConfigBuilder gravity(BaseMotor.GravityType type) {
+        this.gravityType = type;
+        return this;
+    }
+
+    /**
      * Applies all configured settings to the motor.
      *
      * <p>This method should be called last in the builder chain. It applies all the
@@ -242,6 +265,9 @@ public class MotorConfigBuilder {
         }
         if (voltageCompensation != null && voltageCompensation) {
             motor.enableVoltageCompensation(Volts.of(voltageCompensationValue));
+        }
+        if (gravityType != null) {
+            motor.configureGravity(gravityType);
         }
     }
 }

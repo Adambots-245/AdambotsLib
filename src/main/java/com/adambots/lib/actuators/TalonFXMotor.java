@@ -838,6 +838,37 @@ public class TalonFXMotor implements BaseMotor {
         simState.setReverseLimit(enableReverse);
     }
 
+    @Override
+    public void configureGravity(GravityType type) {
+        var slot0Configs = new Slot0Configs();
+
+        StatusCode refreshStatus = motor.getConfigurator().refresh(slot0Configs);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "TalonFXMotor: Failed to refresh config before configureGravity (Status: " + refreshStatus +
+                "). Configuration may be factory defaulted!", true);
+        }
+
+        switch (type) {
+            case ARM_COSINE:
+                slot0Configs.GravityType = GravityTypeValue.Arm_Cosine;
+                break;
+            case ELEVATOR_STATIC:
+                slot0Configs.GravityType = GravityTypeValue.Elevator_Static;
+                break;
+            case NONE:
+            default:
+                slot0Configs.kG = 0;
+                break;
+        }
+
+        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(slot0Configs));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "TalonFXMotor: Failed to apply gravity configuration after retries", false);
+        }
+    }
+
     /**
      * Applies a configuration with automatic retries.
      *

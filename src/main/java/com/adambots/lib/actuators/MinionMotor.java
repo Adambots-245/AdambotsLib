@@ -20,6 +20,7 @@ import com.ctre.phoenix6.configs.HardwareLimitSwitchConfigs;
 import com.ctre.phoenix6.configs.Slot0Configs;
 import com.ctre.phoenix6.configs.CommutationConfigs;
 import com.ctre.phoenix6.configs.TalonFXSConfigurator;
+import com.ctre.phoenix6.signals.GravityTypeValue;
 import com.ctre.phoenix6.signals.MotorArrangementValue;
 
 import edu.wpi.first.epilogue.Logged;
@@ -187,6 +188,87 @@ public class MinionMotor implements BaseMotor {
         if (!success) {
             edu.wpi.first.wpilibj.DriverStation.reportError(
                 "MinionMotor: Failed to apply PID configuration after retries", false);
+        }
+    }
+
+    /**
+     * Sets PID and feedforward gains with full Phoenix 6 support.
+     *
+     * <p>Phoenix 6 provides separate feedforward gains for different control scenarios:
+     * <ul>
+     *   <li>kS - Static feedforward to overcome friction</li>
+     *   <li>kV - Velocity feedforward (output per unit velocity)</li>
+     *   <li>kA - Acceleration feedforward (output per unit acceleration)</li>
+     *   <li>kG - Gravity feedforward (for elevator/arm mechanisms)</li>
+     * </ul>
+     *
+     * <p><strong>Important:</strong> When using kG, you must also call
+     * {@link #configureGravity(GravityType)} to set the gravity compensation type.
+     * Without it, kG defaults to Elevator_Static behavior.
+     *
+     * @param slotIdx The PID slot index to configure (0 only for MinionMotor)
+     * @param kP Proportional gain
+     * @param kI Integral gain
+     * @param kD Derivative gain
+     * @param kV Velocity feedforward
+     * @param kS Static feedforward (overcomes friction)
+     * @param kA Acceleration feedforward
+     * @param kG Gravity feedforward
+     */
+    public void setPID(int slotIdx, double kP, double kI, double kD,
+                       double kV, double kS, double kA, double kG) {
+        Slot0Configs slot0Configs = new Slot0Configs();
+
+        StatusCode refreshStatus = configurator.refresh(slot0Configs);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "MinionMotor: Failed to refresh config before setPID (Status: " + refreshStatus +
+                "). Configuration may be factory defaulted!", true);
+        }
+
+        slot0Configs.kP = kP;
+        slot0Configs.kI = kI;
+        slot0Configs.kD = kD;
+        slot0Configs.kV = kV;
+        slot0Configs.kS = kS;
+        slot0Configs.kA = kA;
+        slot0Configs.kG = kG;
+
+        boolean success = applyConfigWithRetry(() -> configurator.apply(slot0Configs));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "MinionMotor: Failed to apply extended PID configuration after retries", false);
+        }
+    }
+
+    @Override
+    public void configureGravity(GravityType type) {
+        Slot0Configs slot0Configs = new Slot0Configs();
+
+        StatusCode refreshStatus = configurator.refresh(slot0Configs);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "MinionMotor: Failed to refresh config before configureGravity (Status: " + refreshStatus +
+                "). Configuration may be factory defaulted!", true);
+        }
+
+        switch (type) {
+            case ARM_COSINE:
+                slot0Configs.GravityType = GravityTypeValue.Arm_Cosine;
+                break;
+            case ELEVATOR_STATIC:
+                slot0Configs.GravityType = GravityTypeValue.Elevator_Static;
+                break;
+            case NONE:
+            default:
+                slot0Configs.kG = 0;
+                break;
+        }
+
+        boolean success = applyConfigWithRetry(() -> configurator.apply(slot0Configs));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "MinionMotor: Failed to apply gravity configuration after retries", false);
         }
     }
 
