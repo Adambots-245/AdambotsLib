@@ -138,6 +138,78 @@ motor.setPID(0, 0.5, 0.0001, 0.1, 0.0);
 
 ---
 
+### Extended PID with Feedforward (v2026.2.6+)
+
+```java
+default void setPID(int slotIdx, double kP, double kI, double kD,
+                    double kV, double kS, double kA, double kG)
+```
+
+**Description:** Configures PID and extended feedforward gains for closed-loop control. Supported by TalonFXMotor and MinionMotor. Motors that don't support it (e.g., NEOMotor) fall back to basic setPID using kV as kF.
+
+**Parameters:**
+- `slotIdx` - PID gain slot index (0-2)
+- `kP` - Proportional gain
+- `kI` - Integral gain
+- `kD` - Derivative gain
+- `kV` - Velocity feedforward (output per unit velocity)
+- `kS` - Static feedforward (minimum output to overcome friction)
+- `kA` - Acceleration feedforward (output per unit acceleration)
+- `kG` - Gravity feedforward (requires `configureGravity()` to set type)
+
+**Examples:**
+```java
+// Arm with gravity compensation
+motor.configureGravity(BaseMotor.GravityType.ARM_COSINE);
+motor.setPID(0, 100, 0, 2.0, 0, 0.35, 0, 0.2);
+
+// Velocity control with friction compensation
+motor.setPID(0, 0.1, 0, 0.01, 0.12, 0.25, 0.01, 0);
+```
+
+---
+
+### Gravity Compensation (v2026.2.6+)
+
+```java
+default void configureGravity(GravityType type)
+```
+
+**Description:** Configures gravity compensation type for the motor's closed-loop control. Must be used alongside kG set via the extended `setPID` method.
+
+**GravityType values:**
+- `NONE` - No gravity compensation (default)
+- `ARM_COSINE` - Output = kG × cos(angle). Use for rotating arms. Maximum at horizontal, zero at vertical.
+- `ELEVATOR_STATIC` - Constant kG output regardless of position. Use for elevators.
+
+**Tuning kG for arms:**
+1. Position the arm horizontally (parallel to ground)
+2. In Phoenix Tuner X, slowly increase voltage until the arm just holds steady
+3. That voltage = your kG value
+4. The controller automatically scales by cos(angle) at all other positions
+
+**Tuning order:** kG first → kS → kP → kD → Motion Magic → kI (almost never needed)
+
+**Examples:**
+```java
+// Arm with gravity compensation
+motor.configureGravity(BaseMotor.GravityType.ARM_COSINE);
+motor.setPID(0, 100, 0, 2.0, 0, 0.35, 0, 0.2);
+
+// Elevator with gravity compensation
+motor.configureGravity(BaseMotor.GravityType.ELEVATOR_STATIC);
+motor.setPID(0, 10, 0, 0.5, 0, 0.1, 0, 0.3);
+
+// Using the builder pattern
+motor.configure()
+    .gravity(BaseMotor.GravityType.ARM_COSINE)
+    .brakeMode(true)
+    .apply();
+motor.setPID(0, 100, 0, 2.0, 0, 0.35, 0, 0.2);
+```
+
+---
+
 ### Motion Magic Configuration
 
 ```java

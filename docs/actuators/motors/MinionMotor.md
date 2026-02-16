@@ -436,6 +436,51 @@ double kV_adjusted = kV * 0.8;  // ≈ 0.0129
 3. **Keep kI minimal** (avoid windup on light mechanisms)
 4. **Test current limits** (ensure you're not hitting limits)
 
+## Extended Feedforward and Gravity Compensation (v2026.2.6+)
+
+MinionMotor supports the extended `setPID` with kS, kA, and kG feedforward gains, as well as `configureGravity()` for arm/elevator gravity compensation.
+
+### Arm with Gravity Compensation
+
+```java
+// Configure gravity type FIRST, then set PID with kG
+motor.configureGravity(BaseMotor.GravityType.ARM_COSINE);
+motor.setPID(0,
+    100,   // kP - proportional
+    0,     // kI - integral
+    2.0,   // kD - derivative
+    0,     // kV - velocity feedforward
+    0.35,  // kS - static friction
+    0,     // kA - acceleration feedforward
+    0.2    // kG - gravity feedforward
+);
+
+motor.configureMotionMagic(
+    RotationsPerSecond.of(2.0),
+    RotationsPerSecondPerSecond.of(1.0),
+    0
+);
+motor.setBrakeMode(true);
+```
+
+### Elevator with Gravity Compensation
+
+```java
+motor.configureGravity(BaseMotor.GravityType.ELEVATOR_STATIC);
+motor.setPID(0, 10, 0, 0.5, 0, 0.1, 0, 0.3);
+```
+
+### Tuning kG for Arms
+
+1. Position the arm horizontally (parallel to ground)
+2. In Phoenix Tuner X, slowly increase voltage until the arm just holds steady
+3. That voltage = your kG value
+4. The controller automatically scales by cos(angle) at all other positions
+
+**Tuning order:** kG → kS → kP → kD → Motion Magic → kI (almost never needed with proper kG)
+
+---
+
 ## Voltage Compensation (Phoenix 6)
 
 **Important:** Phoenix 6 voltage compensation works differently than Phoenix 5.
