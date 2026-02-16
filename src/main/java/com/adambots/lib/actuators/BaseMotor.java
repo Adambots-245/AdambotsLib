@@ -191,6 +191,52 @@ public interface BaseMotor extends BaseActuator{
     void setPID(int slotIdx, double kP, double kI, double kD, double kF);
 
     /**
+     * Configures PID and extended feedforward gains for closed-loop control.
+     *
+     * <p>Phoenix 6 motor controllers (TalonFX, TalonFXS) provide separate feedforward
+     * gains for different control scenarios. This method exposes all of them through
+     * the BaseMotor interface.
+     *
+     * <p><strong>Feedforward Gains:</strong>
+     * <ul>
+     *   <li><strong>kV:</strong> Velocity feedforward - output per unit velocity</li>
+     *   <li><strong>kS:</strong> Static feedforward - minimum output to overcome friction</li>
+     *   <li><strong>kA:</strong> Acceleration feedforward - output per unit acceleration</li>
+     *   <li><strong>kG:</strong> Gravity feedforward - output to counteract gravity
+     *       (requires {@link #configureGravity(GravityType)} to set compensation type)</li>
+     * </ul>
+     *
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * // Arm with gravity compensation
+     * motor.configureGravity(GravityType.ARM_COSINE);
+     * motor.setPID(0, 100, 0, 2.0, 0, 0.35, 0, 0.2);
+     *
+     * // Velocity control with friction compensation
+     * motor.setPID(0, 0.1, 0, 0.01, 0.12, 0.25, 0.01, 0);
+     * }</pre>
+     *
+     * <p><strong>Note:</strong> Motors that don't support extended feedforward (e.g., NEOMotor)
+     * will fall back to the basic setPID using kV as kF and ignore kS, kA, kG.
+     *
+     * @param slotIdx PID gain slot index (typically 0-2, varies by motor controller)
+     * @param kP Proportional gain
+     * @param kI Integral gain
+     * @param kD Derivative gain
+     * @param kV Velocity feedforward
+     * @param kS Static feedforward (overcomes friction)
+     * @param kA Acceleration feedforward
+     * @param kG Gravity feedforward
+     *
+     * @see #configureGravity(GravityType)
+     */
+    default void setPID(int slotIdx, double kP, double kI, double kD,
+                        double kV, double kS, double kA, double kG) {
+        // Default: fall back to basic setPID using kV as kF, ignoring kS/kA/kG
+        setPID(slotIdx, kP, kI, kD, kV);
+    }
+
+    /**
      * Configures Motion Magic motion profiling parameters.
      *
      * <p>Motion Magic generates smooth trapezoidal motion profiles that respect maximum
