@@ -2,8 +2,6 @@ package com.adambots.lib;
 
 import com.ctre.phoenix6.signals.StripTypeValue;
 
-import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
@@ -37,31 +35,7 @@ public final class Constants {
     }
 
     public static final class VisionConstants {
-        public static final Pose2d aprilTagRedPose2d = new Pose2d(new Translation2d(1.23, 2.55), new Rotation2d());
-        // public static final String noteLimelite = "limelight-noteii";
-        // public static final String noteLimelite = "limelight-aprilgg";
-
-        // public static final String aprilLimelite = "limelight-aprilgg";
         public static final String defaultAprilLimelite = "limelight-aprilgg";
-
-        // public static final String defaultAprilLimelite = "limelight-gg";
-
-
-        // public static final double kPThetaController = 5; 
-        // public static final double kDThetaController = 0.08;
-
-        // public static final double kPOdomThetaController = 4.7; 
-        // public static final double kDOdomThetaController = 0.25;
-
-        // public static final double kPTranslateController = 0.05; 
-        // public static final double kDTranslateController = 0.0001;
-
-        // public static final Translation2d blueTargetPoint = new Translation2d(0.0, 5.32);
-        // public static final Translation2d redTargetPoint = new Translation2d(16.6, 5.32);
-
-        public static final Translation2d aprilTagPos = new Translation2d(0.0, 5.55);
-
-        public static final double kFieldWidth = 16.6;
     }
 
     public static final class DriveConstants {
@@ -136,83 +110,4 @@ public final class Constants {
         public static final double kDModuleTurningController = 0;
     }
 
-    public static final class AutoConstants {
-        // PD values for auton X, Y translational movement
-        // public static final double kPTranslationController = 5; 
-        // public static final double kITranslationController = 0; 
-        // public static final double kDTranslationController = 0.11;
-
-        public static final double kPTranslationController = 3; 
-        public static final double kITranslationController = 0; 
-        public static final double kDTranslationController = 0.05;
-
-        // PD values for auton rotational movement
-        public static final double kPThetaController = 1; 
-        public static final double kIThetaController = 0; 
-        public static final double kDThetaController = 0.06;
-
-        public static final double kPWaypointTranslation = 5; 
-        public static final double kDWaypointTranslation = 0.55;
-
-        public static final double kMaxWaypointTranslateSpeed = 2;
-        public static final double kMinWaypointTranslateSpeed = 0.7;
-
-        // Game-specific starting poses and distances should be defined in robot project
-    }
-
-    // Subystem Constants go here
-    // Game-specific intake constants should be defined in robot project
-    public final static class IntakeConstants {
-        public static final double kMaxSpeed = -0.14;
-        public static final double kMaxPIDTarget = 9; // PID Max Velocity
-        public static final double kLowSpeed = .5;
-        public static final double kReverseSpeed = 0.1;
-        public static final Distance kDistanceToDetect = Centimeters.of(10);
-        public static final Time kTimerThreshold = Seconds.of(0.0); // time to wait before stopping
-    }
-
-    public static final class HangConstants{
-        public static final Angle kRobotAngleStopHang = Degrees.of(30);
-    }
-
-    // Game-specific elevator and wrist positions should be defined in robot project
-    public final static class ElevatorConstants {
-
-        // PID Constants
-        public static final int kPIDSlot = 0;
-        public static final double kElevatorSpeed = 0.2; // only for free movement and not for positional control
-        public static final double kElevatorPositionIncrement = 0.9;
-        public static final double kElevatorPositionTolerance = 0.5;
-        public static final double kWristPositionTolerance = 2.0;
-
-        public static final double kPElevatorController = 1;
-        public static final double kIElevatorController = 0.000;
-        public static final double kDElevatorController = 0.04;
-        public static final double kFElevatorController = 0.0;
-
-        public static final double kWristPositionIncrement = 3.7;
-        public static final double kPWristController = 0.03;
-        public static final double kIWristController = 0.00;
-        public static final double kDWristController = 0.0001;
-
-        // Default elevator limits - override in robot project
-        public static final double kElevatorMaxHeight = 100;
-        public static final double kElevatorMinHeight = 0;
-
-        // Default wrist limits - override in robot project
-        public static final double kWristMinAngle = 0;
-        public static final double kWristMaxAngle = 360;
-
-        // Gear Ratio and Other Elevator Constants
-        public static final double stateFirstChangeDelay = 0.15;
-        public static final double stateChangeDelay = 0.6;
-        public static final double kGearRatio = 10/1.0; // 10:1
-        public static final double kDrumCircumference = 2.0; // inches
-        public static final double kInchesPerRotation = kDrumCircumference / kGearRatio;
-        public static double kVelocityFeedforward = 0.45;
-        public static double kElevatorCruiseVelocity = 400;
-        public static double kElevatorAcceleration = 1000.0;
-        public static double kElevatorJerk = 4000.0;
-    }
-    // Command Constants go here
 }
