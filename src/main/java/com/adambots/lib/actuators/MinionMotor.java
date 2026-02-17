@@ -19,6 +19,7 @@ import com.ctre.phoenix6.configs.MotorOutputConfigs;
 import com.ctre.phoenix6.configs.HardwareLimitSwitchConfigs;
 import com.ctre.phoenix6.configs.Slot0Configs;
 import com.ctre.phoenix6.configs.CommutationConfigs;
+import com.ctre.phoenix6.configs.ExternalFeedbackConfigs;
 import com.ctre.phoenix6.configs.TalonFXSConfiguration;
 import com.ctre.phoenix6.configs.TalonFXSConfigurator;
 import com.ctre.phoenix6.signals.GravityTypeValue;
@@ -67,7 +68,15 @@ public class MinionMotor implements BaseMotor {
 
     @NotLogged
     private boolean isBrakeMode = false; // Track brake mode for atomic config apply
-    
+
+    // Local tracking for Slot0Configs — single source of truth (eliminates refresh-failure risk)
+    @NotLogged
+    private double slot0_kP = 0, slot0_kI = 0, slot0_kD = 0, slot0_kV = 0;
+    @NotLogged
+    private double slot0_kS = 0, slot0_kA = 0, slot0_kG = 0;
+    @NotLogged
+    private GravityTypeValue slot0_gravityType = GravityTypeValue.Elevator_Static;
+
     /**
      * Functional interface for applying a configuration and returning a StatusCode.
      */
@@ -177,30 +186,8 @@ public class MinionMotor implements BaseMotor {
 
     @Override
     public void setPID(int slotIdx, double kP, double kI, double kD, double kF) {
-        // In Phoenix 6, slot configuration is done differently
-        Slot0Configs slot0Configs = new Slot0Configs();
-
-        // CRITICAL: Check if refresh fails - failed refresh causes config apply to factory default
-        StatusCode refreshStatus = configurator.refresh(slot0Configs);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "MinionMotor: Failed to refresh config before setPID (Status: " + refreshStatus +
-                "). Configuration may be factory defaulted!", true);
-            // Continue anyway to attempt configuration, but user is warned
-        }
-
-        // Update PID values
-        slot0Configs.kP = kP;
-        slot0Configs.kI = kI;
-        slot0Configs.kD = kD;
-        slot0Configs.kV = kF;  // kV is the feed forward in Phoenix 6
-
-        // Apply configuration - check return value
-        boolean success = applyConfigWithRetry(() -> configurator.apply(slot0Configs));
-        if (!success) {
-            edu.wpi.first.wpilibj.DriverStation.reportError(
-                "MinionMotor: Failed to apply PID configuration after retries", false);
-        }
+        slot0_kP = kP; slot0_kI = kI; slot0_kD = kD; slot0_kV = kF;
+        applySlot0();
     }
 
     /**
@@ -229,58 +216,46 @@ public class MinionMotor implements BaseMotor {
      */
     public void setPID(int slotIdx, double kP, double kI, double kD,
                        double kV, double kS, double kA, double kG) {
-        Slot0Configs slot0Configs = new Slot0Configs();
-
-        StatusCode refreshStatus = configurator.refresh(slot0Configs);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "MinionMotor: Failed to refresh config before setPID (Status: " + refreshStatus +
-                "). Configuration may be factory defaulted!", true);
-        }
-
-        slot0Configs.kP = kP;
-        slot0Configs.kI = kI;
-        slot0Configs.kD = kD;
-        slot0Configs.kV = kV;
-        slot0Configs.kS = kS;
-        slot0Configs.kA = kA;
-        slot0Configs.kG = kG;
-
-        boolean success = applyConfigWithRetry(() -> configurator.apply(slot0Configs));
-        if (!success) {
-            edu.wpi.first.wpilibj.DriverStation.reportError(
-                "MinionMotor: Failed to apply extended PID configuration after retries", false);
-        }
+        slot0_kP = kP; slot0_kI = kI; slot0_kD = kD;
+        slot0_kV = kV; slot0_kS = kS; slot0_kA = kA; slot0_kG = kG;
+        applySlot0();
     }
 
     @Override
     public void configureGravity(GravityType type) {
-        Slot0Configs slot0Configs = new Slot0Configs();
-
-        StatusCode refreshStatus = configurator.refresh(slot0Configs);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "MinionMotor: Failed to refresh config before configureGravity (Status: " + refreshStatus +
-                "). Configuration may be factory defaulted!", true);
-        }
-
         switch (type) {
             case ARM_COSINE:
-                slot0Configs.GravityType = GravityTypeValue.Arm_Cosine;
+                slot0_gravityType = GravityTypeValue.Arm_Cosine;
                 break;
             case ELEVATOR_STATIC:
-                slot0Configs.GravityType = GravityTypeValue.Elevator_Static;
+                slot0_gravityType = GravityTypeValue.Elevator_Static;
                 break;
             case NONE:
             default:
-                slot0Configs.kG = 0;
+                slot0_gravityType = GravityTypeValue.Elevator_Static;
+                slot0_kG = 0;
                 break;
         }
+        applySlot0();
+    }
 
-        boolean success = applyConfigWithRetry(() -> configurator.apply(slot0Configs));
+    @Override
+    public void configureSensorToMechanismRatio(double ratio) {
+        var config = new ExternalFeedbackConfigs();
+
+        StatusCode refreshStatus = configurator.refresh(config);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "MinionMotor: Failed to refresh ExternalFeedbackConfigs (Status: " + refreshStatus +
+                "). Other feedback fields may be factory defaulted.", false);
+        }
+
+        config.SensorToMechanismRatio = ratio;
+
+        boolean success = applyConfigWithRetry(() -> configurator.apply(config));
         if (!success) {
             edu.wpi.first.wpilibj.DriverStation.reportError(
-                "MinionMotor: Failed to apply gravity configuration after retries", false);
+                "MinionMotor: Failed to apply SensorToMechanismRatio after retries", false);
         }
     }
 
@@ -403,11 +378,20 @@ public class MinionMotor implements BaseMotor {
     public void setInverted(boolean inverted) {
         this.isInverted = inverted;
 
-        var config = new MotorOutputConfigs()
-            .withInverted(isInverted ? com.ctre.phoenix6.signals.InvertedValue.Clockwise_Positive :
-                                      com.ctre.phoenix6.signals.InvertedValue.CounterClockwise_Positive)
-            .withNeutralMode(isBrakeMode ? com.ctre.phoenix6.signals.NeutralModeValue.Brake :
-                                          com.ctre.phoenix6.signals.NeutralModeValue.Coast);
+        var config = new MotorOutputConfigs();
+
+        // Refresh to preserve PeakVoltage and other MotorOutputConfigs fields
+        StatusCode refreshStatus = configurator.refresh(config);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "MinionMotor: Failed to refresh MotorOutputConfigs (Status: " + refreshStatus +
+                "). Factory defaults will be used for PeakVoltage fields.", false);
+        }
+
+        config.withInverted(isInverted ? com.ctre.phoenix6.signals.InvertedValue.Clockwise_Positive :
+                                          com.ctre.phoenix6.signals.InvertedValue.CounterClockwise_Positive)
+              .withNeutralMode(isBrakeMode ? com.ctre.phoenix6.signals.NeutralModeValue.Brake :
+                                              com.ctre.phoenix6.signals.NeutralModeValue.Coast);
 
         boolean success = applyConfigWithRetry(() -> configurator.apply(config));
         if (!success) {
@@ -592,6 +576,26 @@ public class MinionMotor implements BaseMotor {
     @Override
     public void set(double speed) {
         set(ControlMode.PERCENT_OUTPUT, speed);
+    }
+
+    /**
+     * Builds Slot0Configs from local state and applies it. No refresh needed — we own the full state.
+     */
+    private void applySlot0() {
+        var config = new Slot0Configs();
+        config.kP = slot0_kP;
+        config.kI = slot0_kI;
+        config.kD = slot0_kD;
+        config.kV = slot0_kV;
+        config.kS = slot0_kS;
+        config.kA = slot0_kA;
+        config.kG = slot0_kG;
+        config.GravityType = slot0_gravityType;
+        boolean success = applyConfigWithRetry(() -> configurator.apply(config));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "MinionMotor: Failed to apply Slot0 config after retries", false);
+        }
     }
 
     /**

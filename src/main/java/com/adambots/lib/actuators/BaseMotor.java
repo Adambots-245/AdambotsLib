@@ -628,6 +628,35 @@ public interface BaseMotor extends BaseActuator{
     }
 
     /**
+     * Configures the sensor-to-mechanism ratio for closed-loop control.
+     *
+     * <p>This ratio tells the motor controller how many sensor rotations correspond
+     * to one mechanism rotation. For motors with an internal rotor sensor (TalonFX,
+     * TalonFXS), this is equivalent to the gear ratio if the sensor is on the motor
+     * shaft (before the gearbox). If the sensor is after the gearbox, set this to 1.0.
+     *
+     * <p>When configured, all closed-loop control (Position, Velocity, Motion Magic)
+     * operates in mechanism rotations rather than raw sensor rotations. For example,
+     * with a 50:1 gearbox, commanding position 1.0 moves the output shaft one full
+     * rotation (50 motor rotations).
+     *
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * // Intake arm with 50:1 gearbox, sensor on motor shaft
+     * motor.configureSensorToMechanismRatio(50.0);
+     * motor.set(ControlMode.MOTION_MAGIC, 0.25);  // Move to 0.25 mechanism rotations (90°)
+     *
+     * // Sensor mounted on mechanism output (after gearbox)
+     * motor.configureSensorToMechanismRatio(1.0);  // 1:1, no conversion needed
+     * }</pre>
+     *
+     * @param ratio The ratio of sensor rotations to mechanism rotations (greater than 1 is a reduction)
+     */
+    default void configureSensorToMechanismRatio(double ratio) {
+        // Default no-op - motors that don't support this can ignore it
+    }
+
+    /**
      * Creates a configuration builder for this motor.
      *
      * <p>The builder pattern provides a fluent API for configuring motors with multiple

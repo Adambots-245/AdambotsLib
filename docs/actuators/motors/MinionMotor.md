@@ -622,9 +622,8 @@ motor.configureCurrentLimits(30, 50, 3000);
 ## Migration from TalonFX
 
 ```java
-// TalonFX (Falcon/Kraken)
+// TalonFX (Falcon/Kraken) — FOC enabled by default
 TalonFXMotor falcon = new TalonFXMotor(1, false, 40, false);
-falcon.enableFOC();
 falcon.set(ControlMode.VELOCITY, 50.0);
 
 // MinionMotor (same API, different hardware)

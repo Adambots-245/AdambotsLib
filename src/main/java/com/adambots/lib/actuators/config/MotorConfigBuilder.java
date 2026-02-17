@@ -51,6 +51,7 @@ public class MotorConfigBuilder {
     private double voltageCompensationValue = 12.0;
     private BaseMotor.GravityType gravityType;
     private Boolean inverted;
+    private Double sensorToMechanismRatio;
 
     /**
      * Creates a new motor configuration builder.
@@ -248,6 +249,29 @@ public class MotorConfigBuilder {
         return this;
     }
 
+    /**
+     * Configures the sensor-to-mechanism gear ratio.
+     *
+     * <p>This ratio tells the motor controller how many sensor rotations equal
+     * one mechanism rotation. With this set, all closed-loop control operates
+     * in mechanism rotations.
+     *
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * motor.configure()
+     *     .sensorToMechanismRatio(50.0)  // 50:1 gearbox
+     *     .motionMagic(2.0, 4.0, 0)
+     *     .apply();
+     * }</pre>
+     *
+     * @param ratio Sensor rotations per mechanism rotation (greater than 1 is a reduction)
+     * @return This builder for chaining
+     */
+    public MotorConfigBuilder sensorToMechanismRatio(double ratio) {
+        this.sensorToMechanismRatio = ratio;
+        return this;
+    }
+
     public MotorConfigBuilder gravity(BaseMotor.GravityType type) {
         this.gravityType = type;
         return this;
@@ -269,6 +293,9 @@ public class MotorConfigBuilder {
      * }</pre>
      */
     public void apply() {
+        if (sensorToMechanismRatio != null) {
+            motor.configureSensorToMechanismRatio(sensorToMechanismRatio);
+        }
         if (pidConfig != null) {
             motor.setPID(pidConfig.slot(), pidConfig.kP(), pidConfig.kI(), pidConfig.kD(), pidConfig.kF());
         }

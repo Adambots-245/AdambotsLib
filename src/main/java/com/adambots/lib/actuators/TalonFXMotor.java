@@ -59,7 +59,7 @@ public class TalonFXMotor implements BaseMotor {
     private final boolean isKraken;
 
     @NotLogged
-    private boolean focFlag = false;
+    private boolean focFlag = true; // Safe without Pro license — ignored if unlicensed, enables FOC if licensed
 
     @NotLogged
     private double feedForward = 0.0;
@@ -72,6 +72,26 @@ public class TalonFXMotor implements BaseMotor {
 
     @NotLogged
     private final int maxRetries = 3; // Maximum retries for configuration
+
+    // Local tracking for Slot0Configs — single source of truth (eliminates refresh-failure risk)
+    @NotLogged
+    private double slot0_kP = 0, slot0_kI = 0, slot0_kD = 0, slot0_kV = 0;
+    @NotLogged
+    private double slot0_kS = 0, slot0_kA = 0, slot0_kG = 0;
+    @NotLogged
+    private GravityTypeValue slot0_gravityType = GravityTypeValue.Elevator_Static;
+
+    // Local tracking for Slot1Configs
+    @NotLogged
+    private double slot1_kP = 0, slot1_kI = 0, slot1_kD = 0, slot1_kV = 0;
+    @NotLogged
+    private double slot1_kS = 0, slot1_kA = 0, slot1_kG = 0;
+
+    // Local tracking for Slot2Configs
+    @NotLogged
+    private double slot2_kP = 0, slot2_kI = 0, slot2_kD = 0, slot2_kV = 0;
+    @NotLogged
+    private double slot2_kS = 0, slot2_kA = 0, slot2_kG = 0;
 
     // Reusable control request objects to avoid allocation overhead
     @NotLogged
@@ -210,10 +230,6 @@ public class TalonFXMotor implements BaseMotor {
         }
     }
 
-    public void enableFOC() {
-        focFlag = true;
-    }
-
     public void setFeedForward(double value) {
         feedForward = value;
     }
@@ -248,76 +264,19 @@ public class TalonFXMotor implements BaseMotor {
     public void setPID(int slotIdx, double kP, double kI, double kD, double kF) {
         switch (slotIdx) {
             case 0:
-                var slot0Config = new Slot0Configs();
-
-                // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
-                StatusCode refreshStatus0 = motor.getConfigurator().refresh(slot0Config);
-                if (!refreshStatus0.isOK()) {
-                    edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                        "TalonFXMotor: Failed to refresh slot 0 PID config (Status: " + refreshStatus0 +
-                        "). Configuration may be factory defaulted!", true);
-                }
-
-                slot0Config.kP = kP;
-                slot0Config.kI = kI;
-                slot0Config.kD = kD;
-                slot0Config.kV = kF;
-
-                boolean success0 = applyConfigWithRetry(() -> motor.getConfigurator().apply(slot0Config));
-                if (!success0) {
-                    edu.wpi.first.wpilibj.DriverStation.reportError(
-                        "TalonFXMotor: Failed to apply slot 0 PID after retries", false);
-                }
+                slot0_kP = kP; slot0_kI = kI; slot0_kD = kD; slot0_kV = kF;
+                applySlot0();
                 break;
-
             case 1:
-                var slot1Config = new Slot1Configs();
-
-                // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
-                StatusCode refreshStatus1 = motor.getConfigurator().refresh(slot1Config);
-                if (!refreshStatus1.isOK()) {
-                    edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                        "TalonFXMotor: Failed to refresh slot 1 PID config (Status: " + refreshStatus1 +
-                        "). Configuration may be factory defaulted!", true);
-                }
-
-                slot1Config.kP = kP;
-                slot1Config.kI = kI;
-                slot1Config.kD = kD;
-                slot1Config.kV = kF;
-
-                boolean success1 = applyConfigWithRetry(() -> motor.getConfigurator().apply(slot1Config));
-                if (!success1) {
-                    edu.wpi.first.wpilibj.DriverStation.reportError(
-                        "TalonFXMotor: Failed to apply slot 1 PID after retries", false);
-                }
+                slot1_kP = kP; slot1_kI = kI; slot1_kD = kD; slot1_kV = kF;
+                applySlot1();
                 break;
-
             case 2:
-                var slot2Config = new Slot2Configs();
-
-                // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
-                StatusCode refreshStatus2 = motor.getConfigurator().refresh(slot2Config);
-                if (!refreshStatus2.isOK()) {
-                    edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                        "TalonFXMotor: Failed to refresh slot 2 PID config (Status: " + refreshStatus2 +
-                        "). Configuration may be factory defaulted!", true);
-                }
-
-                slot2Config.kP = kP;
-                slot2Config.kI = kI;
-                slot2Config.kD = kD;
-                slot2Config.kV = kF;
-
-                boolean success2 = applyConfigWithRetry(() -> motor.getConfigurator().apply(slot2Config));
-                if (!success2) {
-                    edu.wpi.first.wpilibj.DriverStation.reportError(
-                        "TalonFXMotor: Failed to apply slot 2 PID after retries", false);
-                }
+                slot2_kP = kP; slot2_kI = kI; slot2_kD = kD; slot2_kV = kF;
+                applySlot2();
                 break;
-
             default:
-                throw new IllegalArgumentException("Invalid slot index. Must be between 0 and 3.");
+                throw new IllegalArgumentException("Invalid slot index. Must be between 0 and 2.");
         }
     }
 
@@ -346,80 +305,20 @@ public class TalonFXMotor implements BaseMotor {
                        double kV, double kS, double kA, double kG) {
         switch (slotIdx) {
             case 0:
-                var slot0Config = new Slot0Configs();
-
-                StatusCode refreshStatus0 = motor.getConfigurator().refresh(slot0Config);
-                if (!refreshStatus0.isOK()) {
-                    edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                        "TalonFXMotor: Failed to refresh slot 0 PID config (Status: " + refreshStatus0 +
-                        "). Configuration may be factory defaulted!", true);
-                }
-
-                slot0Config.kP = kP;
-                slot0Config.kI = kI;
-                slot0Config.kD = kD;
-                slot0Config.kV = kV;
-                slot0Config.kS = kS;
-                slot0Config.kA = kA;
-                slot0Config.kG = kG;
-
-                boolean success0 = applyConfigWithRetry(() -> motor.getConfigurator().apply(slot0Config));
-                if (!success0) {
-                    edu.wpi.first.wpilibj.DriverStation.reportError(
-                        "TalonFXMotor: Failed to apply slot 0 PID after retries", false);
-                }
+                slot0_kP = kP; slot0_kI = kI; slot0_kD = kD;
+                slot0_kV = kV; slot0_kS = kS; slot0_kA = kA; slot0_kG = kG;
+                applySlot0();
                 break;
-
             case 1:
-                var slot1Config = new Slot1Configs();
-
-                StatusCode refreshStatus1 = motor.getConfigurator().refresh(slot1Config);
-                if (!refreshStatus1.isOK()) {
-                    edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                        "TalonFXMotor: Failed to refresh slot 1 PID config (Status: " + refreshStatus1 +
-                        "). Configuration may be factory defaulted!", true);
-                }
-
-                slot1Config.kP = kP;
-                slot1Config.kI = kI;
-                slot1Config.kD = kD;
-                slot1Config.kV = kV;
-                slot1Config.kS = kS;
-                slot1Config.kA = kA;
-                slot1Config.kG = kG;
-
-                boolean success1 = applyConfigWithRetry(() -> motor.getConfigurator().apply(slot1Config));
-                if (!success1) {
-                    edu.wpi.first.wpilibj.DriverStation.reportError(
-                        "TalonFXMotor: Failed to apply slot 1 PID after retries", false);
-                }
+                slot1_kP = kP; slot1_kI = kI; slot1_kD = kD;
+                slot1_kV = kV; slot1_kS = kS; slot1_kA = kA; slot1_kG = kG;
+                applySlot1();
                 break;
-
             case 2:
-                var slot2Config = new Slot2Configs();
-
-                StatusCode refreshStatus2 = motor.getConfigurator().refresh(slot2Config);
-                if (!refreshStatus2.isOK()) {
-                    edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                        "TalonFXMotor: Failed to refresh slot 2 PID config (Status: " + refreshStatus2 +
-                        "). Configuration may be factory defaulted!", true);
-                }
-
-                slot2Config.kP = kP;
-                slot2Config.kI = kI;
-                slot2Config.kD = kD;
-                slot2Config.kV = kV;
-                slot2Config.kS = kS;
-                slot2Config.kA = kA;
-                slot2Config.kG = kG;
-
-                boolean success2 = applyConfigWithRetry(() -> motor.getConfigurator().apply(slot2Config));
-                if (!success2) {
-                    edu.wpi.first.wpilibj.DriverStation.reportError(
-                        "TalonFXMotor: Failed to apply slot 2 PID after retries", false);
-                }
+                slot2_kP = kP; slot2_kI = kI; slot2_kD = kD;
+                slot2_kV = kV; slot2_kS = kS; slot2_kA = kA; slot2_kG = kG;
+                applySlot2();
                 break;
-
             default:
                 throw new IllegalArgumentException("Invalid slot index. Must be between 0 and 2.");
         }
@@ -561,12 +460,18 @@ public class TalonFXMotor implements BaseMotor {
     public void setInverted(boolean inverted) {
         this.isInverted = inverted;
 
-        // Apply MotorOutputConfigs directly without refresh - matches CTRE quickstart pattern.
-        // Only sets the Inverted field; other MotorOutputConfigs fields use factory defaults
-        // which are appropriate (PeakForwardDutyCycle=1.0, PeakReverseDutyCycle=-1.0, etc.)
-        var config = new MotorOutputConfigs()
-            .withInverted(isInverted ? InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive)
-            .withNeutralMode(isBrakeMode ? NeutralModeValue.Brake : NeutralModeValue.Coast);
+        var config = new MotorOutputConfigs();
+
+        // Refresh to preserve PeakVoltage and other MotorOutputConfigs fields
+        StatusCode refreshStatus = motor.getConfigurator().refresh(config);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "TalonFXMotor: Failed to refresh MotorOutputConfigs (Status: " + refreshStatus +
+                "). Factory defaults will be used for PeakVoltage fields.", false);
+        }
+
+        config.withInverted(isInverted ? InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive)
+              .withNeutralMode(isBrakeMode ? NeutralModeValue.Brake : NeutralModeValue.Coast);
 
         boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
         if (!success) {
@@ -825,32 +730,97 @@ public class TalonFXMotor implements BaseMotor {
 
     @Override
     public void configureGravity(GravityType type) {
-        var slot0Configs = new Slot0Configs();
-
-        StatusCode refreshStatus = motor.getConfigurator().refresh(slot0Configs);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "TalonFXMotor: Failed to refresh config before configureGravity (Status: " + refreshStatus +
-                "). Configuration may be factory defaulted!", true);
-        }
-
         switch (type) {
             case ARM_COSINE:
-                slot0Configs.GravityType = GravityTypeValue.Arm_Cosine;
+                slot0_gravityType = GravityTypeValue.Arm_Cosine;
                 break;
             case ELEVATOR_STATIC:
-                slot0Configs.GravityType = GravityTypeValue.Elevator_Static;
+                slot0_gravityType = GravityTypeValue.Elevator_Static;
                 break;
             case NONE:
             default:
-                slot0Configs.kG = 0;
+                slot0_gravityType = GravityTypeValue.Elevator_Static;
+                slot0_kG = 0;
                 break;
         }
+        applySlot0();
+    }
 
-        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(slot0Configs));
+    @Override
+    public void configureSensorToMechanismRatio(double ratio) {
+        var config = new FeedbackConfigs();
+
+        StatusCode refreshStatus = motor.getConfigurator().refresh(config);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "TalonFXMotor: Failed to refresh FeedbackConfigs (Status: " + refreshStatus +
+                "). Other feedback fields may be factory defaulted.", false);
+        }
+
+        config.SensorToMechanismRatio = ratio;
+
+        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
         if (!success) {
             edu.wpi.first.wpilibj.DriverStation.reportError(
-                "TalonFXMotor: Failed to apply gravity configuration after retries", false);
+                "TalonFXMotor: Failed to apply SensorToMechanismRatio after retries", false);
+        }
+    }
+
+    /**
+     * Builds Slot0Configs from local state and applies it. No refresh needed — we own the full state.
+     */
+    private void applySlot0() {
+        var config = new Slot0Configs();
+        config.kP = slot0_kP;
+        config.kI = slot0_kI;
+        config.kD = slot0_kD;
+        config.kV = slot0_kV;
+        config.kS = slot0_kS;
+        config.kA = slot0_kA;
+        config.kG = slot0_kG;
+        config.GravityType = slot0_gravityType;
+        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "TalonFXMotor: Failed to apply Slot0 config after retries", false);
+        }
+    }
+
+    /**
+     * Builds Slot1Configs from local state and applies it. No refresh needed — we own the full state.
+     */
+    private void applySlot1() {
+        var config = new Slot1Configs();
+        config.kP = slot1_kP;
+        config.kI = slot1_kI;
+        config.kD = slot1_kD;
+        config.kV = slot1_kV;
+        config.kS = slot1_kS;
+        config.kA = slot1_kA;
+        config.kG = slot1_kG;
+        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "TalonFXMotor: Failed to apply Slot1 config after retries", false);
+        }
+    }
+
+    /**
+     * Builds Slot2Configs from local state and applies it. No refresh needed — we own the full state.
+     */
+    private void applySlot2() {
+        var config = new Slot2Configs();
+        config.kP = slot2_kP;
+        config.kI = slot2_kI;
+        config.kD = slot2_kD;
+        config.kV = slot2_kV;
+        config.kS = slot2_kS;
+        config.kA = slot2_kA;
+        config.kG = slot2_kG;
+        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "TalonFXMotor: Failed to apply Slot2 config after retries", false);
         }
     }
 

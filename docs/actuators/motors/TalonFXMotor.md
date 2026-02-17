@@ -68,18 +68,17 @@ BaseMotor drive = new TalonFXMotor(2, false, 80, false);
 
 ### Field-Oriented Control (FOC)
 
-Both Falcon 500 and Kraken X60 support FOC for improved efficiency and torque delivery.
+Both Falcon 500 and Kraken X60 support FOC for improved efficiency and torque delivery. **FOC is enabled by default** — it requires a Phoenix Pro license to take effect, but is safely ignored without one (no-op).
 
 ```java
 TalonFXMotor motor = new TalonFXMotor(1, false, 40, false);
-motor.enableFOC();  // Enable FOC for all control modes
 
-// FOC is now active for all modes:
+// FOC is active for all control modes by default:
 motor.set(ControlMode.PERCENT_OUTPUT, 0.5);  // Uses FOC
 motor.set(ControlMode.VELOCITY, 50.0);       // Uses FOC
 ```
 
-**FOC Benefits:**
+**FOC Benefits (with Phoenix Pro license):**
 - ~10-15% efficiency improvement
 - Smoother low-speed operation
 - Better torque control
@@ -181,9 +180,8 @@ public class Shooter {
     private final TalonFXMotor shooterMotor;
 
     public Shooter() {
-        // Kraken X60 on CANivore with FOC
+        // Kraken X60 on CANivore (FOC enabled by default)
         shooterMotor = new TalonFXMotor(5, true, 60, true);
-        shooterMotor.enableFOC();
 
         // Velocity PID with feed-forward
         shooterMotor.setPID(0, 0.05, 0.0, 0.0, 0.01);
@@ -269,18 +267,16 @@ public class SwerveModule {
     private final TalonFXMotor steerMotor;
 
     public SwerveModule(int driveID, int steerID, boolean onCANivore) {
-        // Kraken X60 for drive with FOC
+        // Kraken X60 for drive (FOC enabled by default)
         driveMotor = new TalonFXMotor(driveID, onCANivore, 60, true);
-        driveMotor.enableFOC();
         driveMotor.configure()
             .pid(0.1, 0.0, 0.01, 0.0)
             .currentLimits(60, 80, 5000)
             .brakeMode(true)
             .apply();
 
-        // Falcon 500 for steering
+        // Falcon 500 for steering (FOC enabled by default)
         steerMotor = new TalonFXMotor(steerID, onCANivore, 40, false);
-        steerMotor.enableFOC();
         steerMotor.configure()
             .pid(0.2, 0.0, 0.02, 0.0)
             .currentLimits(40, 60, 3000)
@@ -318,9 +314,8 @@ public class Drivetrain {
         leftFollower.setStrictFollower(1);
         rightFollower.setStrictFollower(3);
 
-        // Configure leaders only (followers mirror)
+        // Configure leaders only (followers mirror, FOC enabled by default)
         for (TalonFXMotor leader : List.of(leftLeader, rightLeader)) {
-            leader.enableFOC();
             leader.configure()
                 .currentLimits(60, 80, 5000)
                 .brakeMode(false)  // Coast for drive
@@ -402,8 +397,7 @@ motor.configureSoftLimits(100.0, 0.0, true);
 motor.setBrakeMode(true);
 motor.configureCurrentLimits(40, 60, 3000);
 
-// Velocity control with FOC
-motor.enableFOC();
+// Velocity control (FOC enabled by default)
 motor.setPID(0, 0.05, 0.0, 0.0, 0.01);
 motor.setBrakeMode(false);
 motor.configureCurrentLimits(60, 120, 3000);
