@@ -61,7 +61,8 @@ BaseMotor drive = new TalonFXMotor(2, false, 80, false);
 - **Motion Profiling:** Motion Magic with jerk control
 - **Status Frames:** Optimized update frequencies (50 Hz position/velocity, 25 Hz limits)
 - **Firmware:** Phoenix 6 API
-- **Configuration:** Automatic retry with refresh-before-apply pattern
+- **Configuration:** Factory reset on init, automatic retry
+- **Initialization:** Applies factory reset (`TalonFXConfiguration`) to clear any stale configs persisted in flash memory
 
 ## Key Features
 
@@ -132,19 +133,20 @@ double rps = rpm / 60.0;
 
 TalonFXMotor follows Phoenix 6 best practices:
 
-**CRITICAL: Refresh Before Apply**
-```java
-// WRONG - May factory default other config fields
-var config = new CurrentLimitsConfigs();
-config.withSupplyCurrentLimit(40.0);
-motor.getConfigurator().apply(config);  // ❌ Dangerous!
+**Factory Reset on Initialization (v2026.2.9+)**
 
-// CORRECT - Refresh first to preserve existing config
-var config = new CurrentLimitsConfigs();
-motor.getConfigurator().refresh(config);  // ✓ Get current settings
-config.withSupplyCurrentLimit(40.0);
-motor.getConfigurator().apply(config);  // ✓ Safe
+TalonFX motor controllers persist their configuration in flash memory across power cycles. This can cause unexpected behavior when motor configs from previous code deployments or testing sessions remain active. TalonFXMotor automatically applies a factory reset on construction before applying any library configurations:
+
+```java
+// Handled automatically in the TalonFXMotor constructor
+motor.getConfigurator().apply(new TalonFXConfiguration(), 0.050);
+// All subsequent configuration starts from a clean slate
 ```
+
+This ensures:
+- No stale inversion, brake mode, or PID settings carry over
+- Consistent behavior regardless of what was previously deployed
+- Eliminates hard-to-debug issues from persistent flash configs
 
 **Automatic Retry Logic**
 
@@ -379,6 +381,7 @@ motor.configure()
     .motionMagic(50.0, 150.0, 500.0)
     .currentLimits(40, 60, 5000)
     .softLimits(100.0, 0.0, true)
+    .inverted(true)
     .brakeMode(true)
     .apply();
 

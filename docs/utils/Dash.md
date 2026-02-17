@@ -44,7 +44,6 @@ Simple, clean API for adding telemetry data to Shuffleboard without dealing with
 
 ❌ **Don't use Dash when:**
 - You need complex custom widgets
-- You need precise widget positioning (use Shuffleboard API directly)
 - You're building a custom dashboard (not Shuffleboard)
 
 ---
@@ -249,6 +248,67 @@ ShuffleboardTab tab = Dash.getCurrentTab();
 
 // Focus current tab in Shuffleboard UI
 Dash.selectCurrentTab();
+```
+
+---
+
+## Widget Positioning (v2026.3.0+)
+
+All `add`, `addTunable`, `addDoubleArray`, `addStringArray`, and `addCommand` methods have overloads that accept `column` and `row` parameters for precise grid placement on Shuffleboard.
+
+### Basic Positioning
+
+```java
+// Place widgets at specific grid positions (column, row are 0-indexed)
+Dash.add("Speed", () -> swerve.getSpeed(), 0, 0);         // Top-left
+Dash.add("Heading", () -> swerve.getHeading(), 1, 0);      // Next to it
+Dash.add("At Target", () -> swerve.isAtTarget(), 0, 1);    // Below speed
+```
+
+### Organized Dashboard Layout
+
+```java
+Dash.useTab("Shooter");
+
+// Row 0: Velocity readings
+Dash.add("Left Velocity", () -> leftShooter.getVelocity(), 0, 0);
+Dash.add("Right Velocity", () -> rightShooter.getVelocity(), 1, 0);
+Dash.add("At Speed", () -> shooter.isAtSpeed(), 2, 0);
+
+// Row 1: Tunable PID
+kP = Dash.addTunable("kP", 0.1, 0, 1);
+kI = Dash.addTunable("kI", 0.0, 1, 1);
+kD = Dash.addTunable("kD", 0.01, 2, 1);
+
+// Row 2: Commands
+Dash.addCommand("Spin Up", shooter.spinUpCommand(), 0, 2);
+Dash.addCommand("Stop", shooter.stopCommand(), 1, 2);
+
+Dash.useDefaultTab();
+```
+
+### Positioning Methods
+
+All positioning overloads follow the same pattern — add `column` and `row` as the last two parameters:
+
+```java
+// Values
+Dash.add("name", doubleSupplier, column, row);
+Dash.add("name", longSupplier, column, row);
+Dash.add("name", booleanSupplier, column, row);
+Dash.add("name", stringSupplier, column, row);
+
+// Arrays
+Dash.addDoubleArray("name", arraySupplier, column, row);
+Dash.addStringArray("name", arraySupplier, column, row);
+
+// Tunables
+Dash.addTunable("name", defaultDouble, column, row);
+Dash.addTunable("name", defaultBool, column, row);
+Dash.addTunable("name", defaultString, column, row);
+
+// Commands
+Dash.addCommand("name", command, column, row);
 ```
 
 ---
@@ -773,13 +833,15 @@ Remove all widgets from the current tab. **Warning**: Clears ALL widgets, not ju
 
 ```java
 static void add(String name, DoubleSupplier supplier)
+static void add(String name, DoubleSupplier supplier, int column, int row)
 ```
-Add auto-updating double value.
+Add auto-updating double value. Position overload places widget at specific grid location.
 
 ---
 
 ```java
 static void add(String name, LongSupplier supplier)
+static void add(String name, LongSupplier supplier, int column, int row)
 ```
 Add auto-updating long/integer value.
 
@@ -787,6 +849,7 @@ Add auto-updating long/integer value.
 
 ```java
 static void add(String name, BooleanSupplier supplier)
+static void add(String name, BooleanSupplier supplier, int column, int row)
 ```
 Add auto-updating boolean value.
 
@@ -794,6 +857,7 @@ Add auto-updating boolean value.
 
 ```java
 static void add(String name, Supplier<String> supplier)
+static void add(String name, Supplier<String> supplier, int column, int row)
 ```
 Add auto-updating String value.
 
@@ -801,6 +865,7 @@ Add auto-updating String value.
 
 ```java
 static void addDoubleArray(String name, Supplier<double[]> supplier)
+static void addDoubleArray(String name, Supplier<double[]> supplier, int column, int row)
 ```
 Add auto-updating double array.
 
@@ -808,6 +873,7 @@ Add auto-updating double array.
 
 ```java
 static void addStringArray(String name, Supplier<String[]> supplier)
+static void addStringArray(String name, Supplier<String[]> supplier, int column, int row)
 ```
 Add auto-updating String array.
 
@@ -817,13 +883,15 @@ Add auto-updating String array.
 
 ```java
 static GenericEntry addTunable(String name, double defaultValue)
+static GenericEntry addTunable(String name, double defaultValue, int column, int row)
 ```
-Add tunable number (editable slider on Shuffleboard). Returns `GenericEntry` to read current value.
+Add tunable number (editable text view on Shuffleboard). Returns `GenericEntry` to read current value.
 
 ---
 
 ```java
 static GenericEntry addTunable(String name, boolean defaultValue)
+static GenericEntry addTunable(String name, boolean defaultValue, int column, int row)
 ```
 Add tunable boolean (toggle button on Shuffleboard). Returns `GenericEntry` to read current value.
 
@@ -831,6 +899,7 @@ Add tunable boolean (toggle button on Shuffleboard). Returns `GenericEntry` to r
 
 ```java
 static GenericEntry addTunable(String name, String defaultValue)
+static GenericEntry addTunable(String name, String defaultValue, int column, int row)
 ```
 Add tunable String (text field on Shuffleboard). Returns `GenericEntry` to read current value.
 
@@ -840,6 +909,7 @@ Add tunable String (text field on Shuffleboard). Returns `GenericEntry` to read 
 
 ```java
 static void addCommand(String name, Command command)
+static void addCommand(String name, Command command, int column, int row)
 ```
 Add command button to Shuffleboard. Button runs the command when pressed.
 
@@ -1059,4 +1129,4 @@ public class MySubsystem extends SubsystemBase {
 
 ---
 
-**Last Updated:** 2026-01-14
+**Last Updated:** 2026-02-17

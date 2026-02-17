@@ -56,7 +56,8 @@ BaseMotor roller = new MinionMotor(12, "*");
 - **Control Modes:** Most BaseMotor modes (see compatibility below)
 - **Motion Profiling:** Motion Magic with jerk control
 - **Firmware:** Phoenix 6 API
-- **Configuration:** Automatic retry with refresh-before-apply pattern
+- **Configuration:** Factory reset on init, automatic retry
+- **Initialization:** Applies factory reset (`TalonFXSConfiguration`) to clear any stale configs persisted in flash memory
 
 ## Key Features
 
@@ -113,15 +114,20 @@ double rps = rpm / 60.0;
 
 MinionMotor follows Phoenix 6 best practices:
 
-**CRITICAL: Refresh Before Apply**
+**Factory Reset on Initialization (v2026.2.9+)**
+
+TalonFXS motor controllers persist their configuration in flash memory across power cycles. This can cause unexpected behavior when motor configs from previous code deployments or testing sessions remain active. MinionMotor automatically applies a factory reset on construction before applying any library configurations:
+
 ```java
-// Configuration automatically handles refresh
-motor.setPID(0, 0.1, 0.0, 0.01, 0.0);
-// Internally:
-// 1. Refresh current config
-// 2. Update PID values
-// 3. Apply with retry
+// Handled automatically in the MinionMotor constructor
+configurator.apply(new TalonFXSConfiguration(), 0.050);
+// All subsequent configuration starts from a clean slate
 ```
+
+This ensures:
+- No stale inversion, brake mode, or PID settings carry over
+- Consistent behavior regardless of what was previously deployed
+- Eliminates hard-to-debug issues from persistent flash configs
 
 **Automatic Retry Logic**
 
@@ -372,6 +378,7 @@ motor.configure()
     .motionMagic(30.0, 60.0, 120.0)
     .currentLimits(20, 40, 2000)
     .softLimits(50.0, 0.0, true)
+    .inverted(true)
     .brakeMode(true)
     .apply();
 

@@ -159,6 +159,18 @@ public class Dash {
     }
 
     /**
+     * Add a double value at a specific grid position.
+     *
+     * @param name Display name on Shuffleboard
+     * @param supplier Supplier that provides the current value
+     * @param column Column position (0-indexed from left)
+     * @param row Row position (0-indexed from top)
+     */
+    public static void add(String name, DoubleSupplier supplier, int column, int row) {
+        currentTab.addDouble(name, supplier).withPosition(column, row);
+    }
+
+    /**
      * Add a long/integer value that auto-updates every robot loop.
      *
      * <p><strong>Example:</strong>
@@ -172,6 +184,18 @@ public class Dash {
      */
     public static void add(String name, LongSupplier supplier) {
         currentTab.addInteger(name, supplier);
+    }
+
+    /**
+     * Add a long/integer value at a specific grid position.
+     *
+     * @param name Display name on Shuffleboard
+     * @param supplier Supplier that provides the current value
+     * @param column Column position (0-indexed from left)
+     * @param row Row position (0-indexed from top)
+     */
+    public static void add(String name, LongSupplier supplier, int column, int row) {
+        currentTab.addInteger(name, supplier).withPosition(column, row);
     }
 
     /**
@@ -191,6 +215,18 @@ public class Dash {
     }
 
     /**
+     * Add a boolean value at a specific grid position.
+     *
+     * @param name Display name on Shuffleboard
+     * @param supplier Supplier that provides the current value
+     * @param column Column position (0-indexed from left)
+     * @param row Row position (0-indexed from top)
+     */
+    public static void add(String name, BooleanSupplier supplier, int column, int row) {
+        currentTab.addBoolean(name, supplier).withPosition(column, row);
+    }
+
+    /**
      * Add a String value that auto-updates every robot loop.
      *
      * <p><strong>Example:</strong>
@@ -204,6 +240,18 @@ public class Dash {
      */
     public static void add(String name, Supplier<String> supplier) {
         currentTab.addString(name, supplier);
+    }
+
+    /**
+     * Add a String value at a specific grid position.
+     *
+     * @param name Display name on Shuffleboard
+     * @param supplier Supplier that provides the current value
+     * @param column Column position (0-indexed from left)
+     * @param row Row position (0-indexed from top)
+     */
+    public static void add(String name, Supplier<String> supplier, int column, int row) {
+        currentTab.addString(name, supplier).withPosition(column, row);
     }
 
     /**
@@ -227,6 +275,18 @@ public class Dash {
     }
 
     /**
+     * Add a double array at a specific grid position.
+     *
+     * @param name Display name on Shuffleboard
+     * @param supplier Supplier that provides the current array
+     * @param column Column position (0-indexed from left)
+     * @param row Row position (0-indexed from top)
+     */
+    public static void addDoubleArray(String name, Supplier<double[]> supplier, int column, int row) {
+        currentTab.addDoubleArray(name, supplier).withPosition(column, row);
+    }
+
+    /**
      * Add a String array that auto-updates every robot loop.
      *
      * <p><strong>Example:</strong>
@@ -243,6 +303,18 @@ public class Dash {
      */
     public static void addStringArray(String name, Supplier<String[]> supplier) {
         currentTab.addStringArray(name, supplier);
+    }
+
+    /**
+     * Add a String array at a specific grid position.
+     *
+     * @param name Display name on Shuffleboard
+     * @param supplier Supplier that provides the current array
+     * @param column Column position (0-indexed from left)
+     * @param row Row position (0-indexed from top)
+     */
+    public static void addStringArray(String name, Supplier<String[]> supplier, int column, int row) {
+        currentTab.addStringArray(name, supplier).withPosition(column, row);
     }
 
     // ======================== TUNABLE VALUES ========================
@@ -279,6 +351,22 @@ public class Dash {
     }
 
     /**
+     * Add a tunable number at a specific grid position.
+     *
+     * @param name Display name on Shuffleboard
+     * @param defaultValue Initial/default value
+     * @param column Column position (0-indexed from left)
+     * @param row Row position (0-indexed from top)
+     * @return GenericEntry that can be read to get the current value
+     */
+    public static GenericEntry addTunable(String name, double defaultValue, int column, int row) {
+        return currentTab.add(name, defaultValue)
+            .withWidget(BuiltInWidgets.kTextView)
+            .withPosition(column, row)
+            .getEntry();
+    }
+
+    /**
      * Add a tunable boolean (checkbox on Shuffleboard).
      *
      * <p><strong>Example:</strong>
@@ -299,6 +387,22 @@ public class Dash {
     public static GenericEntry addTunable(String name, boolean defaultValue) {
         return currentTab.add(name, defaultValue)
             .withWidget(BuiltInWidgets.kToggleButton)
+            .getEntry();
+    }
+
+    /**
+     * Add a tunable boolean at a specific grid position.
+     *
+     * @param name Display name on Shuffleboard
+     * @param defaultValue Initial/default value
+     * @param column Column position (0-indexed from left)
+     * @param row Row position (0-indexed from top)
+     * @return GenericEntry that can be read to get the current value
+     */
+    public static GenericEntry addTunable(String name, boolean defaultValue, int column, int row) {
+        return currentTab.add(name, defaultValue)
+            .withWidget(BuiltInWidgets.kToggleButton)
+            .withPosition(column, row)
             .getEntry();
     }
 
@@ -325,6 +429,22 @@ public class Dash {
             .getEntry();
     }
 
+    /**
+     * Add a tunable String at a specific grid position.
+     *
+     * @param name Display name on Shuffleboard
+     * @param defaultValue Initial/default value
+     * @param column Column position (0-indexed from left)
+     * @param row Row position (0-indexed from top)
+     * @return GenericEntry that can be read to get the current value
+     */
+    public static GenericEntry addTunable(String name, String defaultValue, int column, int row) {
+        return currentTab.add(name, defaultValue)
+            .withWidget(BuiltInWidgets.kTextView)
+            .withPosition(column, row)
+            .getEntry();
+    }
+
     // ======================== COMMANDS ========================
 
     /**
@@ -346,6 +466,18 @@ public class Dash {
      */
     public static void addCommand(String name, Command command) {
         currentTab.add(name, command);
+    }
+
+    /**
+     * Add a command button at a specific grid position.
+     *
+     * @param name Button label on Shuffleboard
+     * @param command Command to run when button is pressed
+     * @param column Column position (0-indexed from left)
+     * @param row Row position (0-indexed from top)
+     */
+    public static void addCommand(String name, Command command, int column, int row) {
+        currentTab.add(name, command).withPosition(column, row);
     }
 
     // ======================== UTILITY METHODS ========================
