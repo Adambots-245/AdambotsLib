@@ -19,6 +19,7 @@ import com.ctre.phoenix6.configs.MotorOutputConfigs;
 import com.ctre.phoenix6.configs.HardwareLimitSwitchConfigs;
 import com.ctre.phoenix6.configs.Slot0Configs;
 import com.ctre.phoenix6.configs.CommutationConfigs;
+import com.ctre.phoenix6.configs.TalonFXSConfiguration;
 import com.ctre.phoenix6.configs.TalonFXSConfigurator;
 import com.ctre.phoenix6.signals.GravityTypeValue;
 import com.ctre.phoenix6.signals.MotorArrangementValue;
@@ -84,6 +85,10 @@ public class MinionMotor implements BaseMotor {
         motor = new TalonFXS(deviceID);
         configurator = motor.getConfigurator();
 
+        // Factory reset to ensure a clean baseline — TalonFXS persists configs in flash,
+        // so stale settings from previous code deploys or Phoenix Tuner can cause issues
+        configurator.apply(new TalonFXSConfiguration(), 0.050);
+
         // Tell the TalonFXS a Minion motor is connected via JST
         CommutationConfigs commutationConfigs = new CommutationConfigs();
         commutationConfigs.MotorArrangement = MotorArrangementValue.Minion_JST;
@@ -108,6 +113,10 @@ public class MinionMotor implements BaseMotor {
     public MinionMotor(int deviceID, String canBus) {
         motor = new TalonFXS(deviceID, new CANBus(canBus));
         configurator = motor.getConfigurator();
+
+        // Factory reset to ensure a clean baseline — TalonFXS persists configs in flash,
+        // so stale settings from previous code deploys or Phoenix Tuner can cause issues
+        configurator.apply(new TalonFXSConfiguration(), 0.050);
 
         // Tell the TalonFXS a Minion motor is connected via JST
         CommutationConfigs commutationConfigs = new CommutationConfigs();

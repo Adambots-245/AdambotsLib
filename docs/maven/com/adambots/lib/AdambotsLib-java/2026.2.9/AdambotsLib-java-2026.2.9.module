@@ -1,0 +1,279 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.adambots.lib",
+    "module": "AdambotsLib-java",
+    "version": "2026.2.9",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "8.11"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 17,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api"
+      },
+      "files": [
+        {
+          "name": "AdambotsLib-java-2026.2.9.jar",
+          "url": "AdambotsLib-java-2026.2.9.jar",
+          "size": 27847782,
+          "sha512": "2230c0fb46a7e818273bd22b64b99be441ddca60a9a0df8afa6aa5451c009c70046860358a995241609ccb2b02fe1bac8f92168c49713274abe2eb8fac44b9f8",
+          "sha256": "8c3182d537a5c476180949557673da6d687b041ce9bae73813e503ea4ec87f8d",
+          "sha1": "9340192bda7b464abd346be19b66799408dcb13e",
+          "md5": "2c8cf94eb729dda4f92b0b481df181c6"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 17,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "edu.wpi.first.wpilibj",
+          "module": "wpilibj-java",
+          "version": {
+            "requires": "2026.2.1"
+          }
+        },
+        {
+          "group": "edu.wpi.first.wpimath",
+          "module": "wpimath-java",
+          "version": {
+            "requires": "2026.2.1"
+          }
+        },
+        {
+          "group": "edu.wpi.first.ntcore",
+          "module": "ntcore-java",
+          "version": {
+            "requires": "2026.2.1"
+          }
+        },
+        {
+          "group": "edu.wpi.first.cscore",
+          "module": "cscore-java",
+          "version": {
+            "requires": "2026.2.1"
+          }
+        },
+        {
+          "group": "edu.wpi.first.cameraserver",
+          "module": "cameraserver-java",
+          "version": {
+            "requires": "2026.2.1"
+          }
+        },
+        {
+          "group": "edu.wpi.first.hal",
+          "module": "hal-java",
+          "version": {
+            "requires": "2026.2.1"
+          }
+        },
+        {
+          "group": "edu.wpi.first.wpinet",
+          "module": "wpinet-java",
+          "version": {
+            "requires": "2026.2.1"
+          }
+        },
+        {
+          "group": "edu.wpi.first.wpiutil",
+          "module": "wpiutil-java",
+          "version": {
+            "requires": "2026.2.1"
+          }
+        },
+        {
+          "group": "edu.wpi.first.apriltag",
+          "module": "apriltag-java",
+          "version": {
+            "requires": "2026.2.1"
+          }
+        },
+        {
+          "group": "edu.wpi.first.wpiunits",
+          "module": "wpiunits-java",
+          "version": {
+            "requires": "2026.2.1"
+          }
+        },
+        {
+          "group": "edu.wpi.first.epilogue",
+          "module": "epilogue-runtime-java",
+          "version": {
+            "requires": "2026.2.1"
+          }
+        },
+        {
+          "group": "edu.wpi.first.thirdparty.frc2025.opencv",
+          "module": "opencv-java",
+          "version": {
+            "requires": "4.10.0-3"
+          }
+        },
+        {
+          "group": "org.ejml",
+          "module": "ejml-simple",
+          "version": {
+            "requires": "0.44.0"
+          }
+        },
+        {
+          "group": "com.fasterxml.jackson.core",
+          "module": "jackson-annotations",
+          "version": {
+            "requires": "2.19.2"
+          }
+        },
+        {
+          "group": "com.fasterxml.jackson.core",
+          "module": "jackson-core",
+          "version": {
+            "requires": "2.19.2"
+          }
+        },
+        {
+          "group": "com.fasterxml.jackson.core",
+          "module": "jackson-databind",
+          "version": {
+            "requires": "2.19.2"
+          }
+        },
+        {
+          "group": "us.hebi.quickbuf",
+          "module": "quickbuf-runtime",
+          "version": {
+            "requires": "1.4"
+          }
+        },
+        {
+          "group": "edu.wpi.first.wpilibNewCommands",
+          "module": "wpilibNewCommands-java",
+          "version": {
+            "requires": "2026.2.1"
+          }
+        },
+        {
+          "group": "com.reduxrobotics.frc",
+          "module": "ReduxLib-java",
+          "version": {
+            "requires": "2026.1.1"
+          }
+        },
+        {
+          "group": "com.pathplanner.lib",
+          "module": "PathplannerLib-java",
+          "version": {
+            "requires": "2026.1.2"
+          }
+        },
+        {
+          "group": "swervelib",
+          "module": "YAGSL-java",
+          "version": {
+            "requires": "2026.2.3.1"
+          }
+        },
+        {
+          "group": "org.dyn4j",
+          "module": "dyn4j",
+          "version": {
+            "requires": "5.0.2"
+          }
+        },
+        {
+          "group": "com.revrobotics.frc",
+          "module": "REVLib-java",
+          "version": {
+            "requires": "2026.0.1"
+          }
+        },
+        {
+          "group": "org.photonvision",
+          "module": "photonlib-java",
+          "version": {
+            "requires": "v2025.3.1"
+          }
+        },
+        {
+          "group": "org.photonvision",
+          "module": "photontargeting-java",
+          "version": {
+            "requires": "v2025.3.1"
+          }
+        },
+        {
+          "group": "com.thethriftybot.frc",
+          "module": "ThriftyLib-java",
+          "version": {
+            "requires": "2026.0.1"
+          }
+        },
+        {
+          "group": "org.ironmaple",
+          "module": "maplesim-java",
+          "version": {
+            "requires": "0.3.14"
+          }
+        },
+        {
+          "group": "com.studica.frc",
+          "module": "Studica-java",
+          "version": {
+            "requires": "2026.0.0"
+          }
+        },
+        {
+          "group": "com.ctre.phoenix6",
+          "module": "wpiapi-java",
+          "version": {
+            "requires": "26.1.1"
+          }
+        },
+        {
+          "group": "com.ctre.phoenix",
+          "module": "api-java",
+          "version": {
+            "requires": "5.36.0"
+          }
+        },
+        {
+          "group": "com.ctre.phoenix",
+          "module": "wpiapi-java",
+          "version": {
+            "requires": "5.36.0"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "AdambotsLib-java-2026.2.9.jar",
+          "url": "AdambotsLib-java-2026.2.9.jar",
+          "size": 27847782,
+          "sha512": "2230c0fb46a7e818273bd22b64b99be441ddca60a9a0df8afa6aa5451c009c70046860358a995241609ccb2b02fe1bac8f92168c49713274abe2eb8fac44b9f8",
+          "sha256": "8c3182d537a5c476180949557673da6d687b041ce9bae73813e503ea4ec87f8d",
+          "sha1": "9340192bda7b464abd346be19b66799408dcb13e",
+          "md5": "2c8cf94eb729dda4f92b0b481df181c6"
+        }
+      ]
+    }
+  ]
+}

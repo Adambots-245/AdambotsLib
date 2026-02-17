@@ -114,17 +114,12 @@ public class TalonFXMotor implements BaseMotor {
             motor = new TalonFX(portNum);
         }
 
+        // Factory reset to ensure a clean baseline — TalonFX persists configs in flash,
+        // so stale settings from previous code deploys or Phoenix Tuner can cause issues
+        motor.getConfigurator().apply(new TalonFXConfiguration(), 0.050);
+
         // Configure default current limits
         var currentLimits = new CurrentLimitsConfigs();
-
-        // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
-        StatusCode refreshStatus = motor.getConfigurator().refresh(currentLimits);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "TalonFXMotor: Failed to refresh current limits config (Status: " + refreshStatus +
-                "). Configuration may be factory defaulted!", true);
-        }
-
         currentLimits.SupplyCurrentLimit = supplyCurrentLimit;
         currentLimits.SupplyCurrentLimitEnable = true;
 
