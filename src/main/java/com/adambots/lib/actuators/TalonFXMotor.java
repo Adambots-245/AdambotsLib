@@ -555,14 +555,29 @@ public class TalonFXMotor implements BaseMotor {
 
     /**
      * Sets the inversion state of the motor.
-     * 
+     *
+     * <p>Uses the Phoenix 6 MotorOutputConfigs to configure motor direction.
+     * This matches the CTRE quickstart pattern of direct config apply without refresh.
+     *
      * @param inverted true to invert the motor (Clockwise is positive),
      *                 false for normal operation (CounterClockwise is positive)
      */
     @Override
     public void setInverted(boolean inverted) {
         this.isInverted = inverted;
-        applyMotorOutputConfig();
+
+        // Apply MotorOutputConfigs directly without refresh - matches CTRE quickstart pattern.
+        // Only sets the Inverted field; other MotorOutputConfigs fields use factory defaults
+        // which are appropriate (PeakForwardDutyCycle=1.0, PeakReverseDutyCycle=-1.0, etc.)
+        var config = new MotorOutputConfigs()
+            .withInverted(isInverted ? InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive)
+            .withNeutralMode(isBrakeMode ? NeutralModeValue.Brake : NeutralModeValue.Coast);
+
+        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "TalonFXMotor: Failed to apply motor inversion after retries", false);
+        }
     }
 
     /**
@@ -570,41 +585,15 @@ public class TalonFXMotor implements BaseMotor {
      * In brake mode, the motor actively resists motion when not driven.
      * In coast mode, the motor spins freely when not driven.
      *
+     * <p>Uses the TalonFX direct {@code setNeutralMode()} method, which is independent
+     * of MotorOutputConfigs and avoids any interaction with the Inverted config.
+     *
      * @param brake true to enable brake mode, false for coast mode
      */
     @Override
     public void setBrakeMode(boolean brake) {
         this.isBrakeMode = brake;
-        applyMotorOutputConfig();
-    }
-
-    /**
-     * Applies both inversion and brake mode together to avoid one overwriting the other.
-     *
-     * <p>Both setInverted and setBrakeMode share the same MotorOutputConfigs object.
-     * Applying them separately risks the second call overwriting the first if the
-     * refresh returns stale data. This method applies both fields atomically.
-     */
-    private void applyMotorOutputConfig() {
-        var config = new MotorOutputConfigs();
-
-        // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
-        StatusCode refreshStatus = motor.getConfigurator().refresh(config);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "TalonFXMotor: Failed to refresh motor output config (Status: " + refreshStatus +
-                "). Configuration may be factory defaulted!", true);
-        }
-
-        // Always set both fields to avoid one overwriting the other
-        config.Inverted = isInverted ? InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive;
-        config.NeutralMode = isBrakeMode ? NeutralModeValue.Brake : NeutralModeValue.Coast;
-
-        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
-        if (!success) {
-            edu.wpi.first.wpilibj.DriverStation.reportError(
-                "TalonFXMotor: Failed to apply motor output config after retries", false);
-        }
+        motor.setNeutralMode(brake ? NeutralModeValue.Brake : NeutralModeValue.Coast);
     }
 
     /**

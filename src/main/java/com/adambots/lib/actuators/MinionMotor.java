@@ -381,48 +381,47 @@ public class MinionMotor implements BaseMotor {
         }
     }
 
+    /**
+     * Sets the inversion state of the motor.
+     *
+     * <p>Uses the Phoenix 6 MotorOutputConfigs to configure motor direction.
+     * Applies directly without refresh to match the CTRE quickstart pattern.
+     *
+     * @param inverted true to invert the motor (Clockwise is positive),
+     *                 false for normal operation (CounterClockwise is positive)
+     */
     @Override
     public void setInverted(boolean inverted) {
         this.isInverted = inverted;
-        applyMotorOutputConfig();
-    }
 
-    @Override
-    public void setBrakeMode(boolean brake) {
-        this.isBrakeMode = brake;
-        applyMotorOutputConfig();
+        var config = new MotorOutputConfigs()
+            .withInverted(isInverted ? com.ctre.phoenix6.signals.InvertedValue.Clockwise_Positive :
+                                      com.ctre.phoenix6.signals.InvertedValue.CounterClockwise_Positive)
+            .withNeutralMode(isBrakeMode ? com.ctre.phoenix6.signals.NeutralModeValue.Brake :
+                                          com.ctre.phoenix6.signals.NeutralModeValue.Coast);
+
+        boolean success = applyConfigWithRetry(() -> configurator.apply(config));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "MinionMotor: Failed to apply motor inversion after retries", false);
+        }
     }
 
     /**
-     * Applies both inversion and brake mode together to avoid one overwriting the other.
+     * Sets the neutral mode of the motor to either brake or coast.
+     * In brake mode, the motor actively resists motion when not driven.
+     * In coast mode, the motor spins freely when not driven.
      *
-     * <p>Both setInverted and setBrakeMode share the same MotorOutputConfigs object.
-     * Applying them separately risks the second call overwriting the first if the
-     * refresh returns stale data. This method applies both fields atomically.
+     * <p>Uses the TalonFXS direct {@code setNeutralMode()} method, which is independent
+     * of MotorOutputConfigs and avoids any interaction with the Inverted config.
+     *
+     * @param brake true to enable brake mode, false for coast mode
      */
-    private void applyMotorOutputConfig() {
-        MotorOutputConfigs configs = new MotorOutputConfigs();
-
-        // CRITICAL: Check if refresh fails
-        StatusCode refreshStatus = configurator.refresh(configs);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "MinionMotor: Failed to refresh motor output config (Status: " + refreshStatus +
-                "). Configuration may be factory defaulted!", true);
-        }
-
-        // Always set both fields to avoid one overwriting the other
-        configs.Inverted = isInverted ? com.ctre.phoenix6.signals.InvertedValue.Clockwise_Positive :
-                                       com.ctre.phoenix6.signals.InvertedValue.CounterClockwise_Positive;
-        configs.NeutralMode = isBrakeMode ? com.ctre.phoenix6.signals.NeutralModeValue.Brake :
-                                           com.ctre.phoenix6.signals.NeutralModeValue.Coast;
-
-        // Apply configuration - check return value
-        boolean success = applyConfigWithRetry(() -> configurator.apply(configs));
-        if (!success) {
-            edu.wpi.first.wpilibj.DriverStation.reportError(
-                "MinionMotor: Failed to apply motor output config after retries", false);
-        }
+    @Override
+    public void setBrakeMode(boolean brake) {
+        this.isBrakeMode = brake;
+        motor.setNeutralMode(brake ? com.ctre.phoenix6.signals.NeutralModeValue.Brake :
+                                    com.ctre.phoenix6.signals.NeutralModeValue.Coast);
     }
 
     @Override
