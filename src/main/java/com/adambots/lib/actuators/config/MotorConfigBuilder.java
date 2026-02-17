@@ -50,6 +50,7 @@ public class MotorConfigBuilder {
     private Boolean voltageCompensation;
     private double voltageCompensationValue = 12.0;
     private BaseMotor.GravityType gravityType;
+    private Boolean inverted;
 
     /**
      * Creates a new motor configuration builder.
@@ -222,6 +223,31 @@ public class MotorConfigBuilder {
      * @param type ARM_COSINE for arms, ELEVATOR_STATIC for elevators
      * @return This builder for chaining
      */
+    /**
+     * Configures motor direction inversion.
+     *
+     * <p><strong>When to use:</strong>
+     * <ul>
+     *   <li>When the motor needs to spin in the opposite direction from default</li>
+     *   <li>To match motor direction with mechanism movement direction</li>
+     * </ul>
+     *
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * motor.configure()
+     *     .inverted(true)
+     *     .brakeMode(true)
+     *     .apply();
+     * }</pre>
+     *
+     * @param inverted True to invert motor direction, false for default direction
+     * @return This builder for chaining
+     */
+    public MotorConfigBuilder inverted(boolean inverted) {
+        this.inverted = inverted;
+        return this;
+    }
+
     public MotorConfigBuilder gravity(BaseMotor.GravityType type) {
         this.gravityType = type;
         return this;
@@ -259,6 +285,9 @@ public class MotorConfigBuilder {
                 motionMagicConfig.acceleration(),
                 motionMagicConfig.jerkRPSPerSecPerSec()
             );
+        }
+        if (inverted != null) {
+            motor.setInverted(inverted);
         }
         if (brakeMode != null) {
             motor.setBrakeMode(brakeMode);

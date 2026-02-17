@@ -63,6 +63,9 @@ public class MinionMotor implements BaseMotor {
 
     @NotLogged
     private boolean isInverted = false; // Track inversion state for follower mode
+
+    @NotLogged
+    private boolean isBrakeMode = false; // Track brake mode for atomic config apply
     
     /**
      * Functional interface for applying a configuration and returning a StatusCode.
@@ -381,49 +384,44 @@ public class MinionMotor implements BaseMotor {
     @Override
     public void setInverted(boolean inverted) {
         this.isInverted = inverted;
-        MotorOutputConfigs configs = new MotorOutputConfigs();
-
-        // CRITICAL: Check if refresh fails
-        StatusCode refreshStatus = configurator.refresh(configs);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "MinionMotor: Failed to refresh config before setInverted (Status: " + refreshStatus +
-                "). Configuration may be factory defaulted!", true);
-        }
-
-        // Update inversion setting
-        configs.Inverted = inverted ? com.ctre.phoenix6.signals.InvertedValue.Clockwise_Positive :
-                                     com.ctre.phoenix6.signals.InvertedValue.CounterClockwise_Positive;
-
-        // Apply configuration - check return value
-        boolean success = applyConfigWithRetry(() -> configurator.apply(configs));
-        if (!success) {
-            edu.wpi.first.wpilibj.DriverStation.reportError(
-                "MinionMotor: Failed to apply inversion configuration after retries", false);
-        }
+        applyMotorOutputConfig();
     }
 
     @Override
     public void setBrakeMode(boolean brake) {
+        this.isBrakeMode = brake;
+        applyMotorOutputConfig();
+    }
+
+    /**
+     * Applies both inversion and brake mode together to avoid one overwriting the other.
+     *
+     * <p>Both setInverted and setBrakeMode share the same MotorOutputConfigs object.
+     * Applying them separately risks the second call overwriting the first if the
+     * refresh returns stale data. This method applies both fields atomically.
+     */
+    private void applyMotorOutputConfig() {
         MotorOutputConfigs configs = new MotorOutputConfigs();
 
         // CRITICAL: Check if refresh fails
         StatusCode refreshStatus = configurator.refresh(configs);
         if (!refreshStatus.isOK()) {
             edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "MinionMotor: Failed to refresh config before setBrakeMode (Status: " + refreshStatus +
+                "MinionMotor: Failed to refresh motor output config (Status: " + refreshStatus +
                 "). Configuration may be factory defaulted!", true);
         }
 
-        // Update neutral mode setting
-        configs.NeutralMode = brake ? com.ctre.phoenix6.signals.NeutralModeValue.Brake :
-                                     com.ctre.phoenix6.signals.NeutralModeValue.Coast;
+        // Always set both fields to avoid one overwriting the other
+        configs.Inverted = isInverted ? com.ctre.phoenix6.signals.InvertedValue.Clockwise_Positive :
+                                       com.ctre.phoenix6.signals.InvertedValue.CounterClockwise_Positive;
+        configs.NeutralMode = isBrakeMode ? com.ctre.phoenix6.signals.NeutralModeValue.Brake :
+                                           com.ctre.phoenix6.signals.NeutralModeValue.Coast;
 
         // Apply configuration - check return value
         boolean success = applyConfigWithRetry(() -> configurator.apply(configs));
         if (!success) {
             edu.wpi.first.wpilibj.DriverStation.reportError(
-                "MinionMotor: Failed to apply brake mode configuration after retries", false);
+                "MinionMotor: Failed to apply motor output config after retries", false);
         }
     }
 

@@ -68,6 +68,9 @@ public class TalonFXMotor implements BaseMotor {
     private boolean isInverted = false; // Track inversion state for follower mode
 
     @NotLogged
+    private boolean isBrakeMode = false; // Track brake mode for atomic config apply
+
+    @NotLogged
     private final int maxRetries = 3; // Maximum retries for configuration
 
     // Reusable control request objects to avoid allocation overhead
@@ -559,23 +562,7 @@ public class TalonFXMotor implements BaseMotor {
     @Override
     public void setInverted(boolean inverted) {
         this.isInverted = inverted;
-        var config = new MotorOutputConfigs();
-
-        // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
-        StatusCode refreshStatus = motor.getConfigurator().refresh(config);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "TalonFXMotor: Failed to refresh motor output config (Status: " + refreshStatus +
-                "). Configuration may be factory defaulted!", true);
-        }
-
-        config.Inverted = inverted ? InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive;
-
-        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
-        if (!success) {
-            edu.wpi.first.wpilibj.DriverStation.reportError(
-                "TalonFXMotor: Failed to apply motor inversion after retries", false);
-        }
+        applyMotorOutputConfig();
     }
 
     /**
@@ -587,22 +574,36 @@ public class TalonFXMotor implements BaseMotor {
      */
     @Override
     public void setBrakeMode(boolean brake) {
+        this.isBrakeMode = brake;
+        applyMotorOutputConfig();
+    }
+
+    /**
+     * Applies both inversion and brake mode together to avoid one overwriting the other.
+     *
+     * <p>Both setInverted and setBrakeMode share the same MotorOutputConfigs object.
+     * Applying them separately risks the second call overwriting the first if the
+     * refresh returns stale data. This method applies both fields atomically.
+     */
+    private void applyMotorOutputConfig() {
         var config = new MotorOutputConfigs();
 
         // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
         StatusCode refreshStatus = motor.getConfigurator().refresh(config);
         if (!refreshStatus.isOK()) {
             edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "TalonFXMotor: Failed to refresh brake mode config (Status: " + refreshStatus +
+                "TalonFXMotor: Failed to refresh motor output config (Status: " + refreshStatus +
                 "). Configuration may be factory defaulted!", true);
         }
 
-        config.NeutralMode = brake ? NeutralModeValue.Brake : NeutralModeValue.Coast;
+        // Always set both fields to avoid one overwriting the other
+        config.Inverted = isInverted ? InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive;
+        config.NeutralMode = isBrakeMode ? NeutralModeValue.Brake : NeutralModeValue.Coast;
 
         boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
         if (!success) {
             edu.wpi.first.wpilibj.DriverStation.reportError(
-                "TalonFXMotor: Failed to apply brake mode after retries", false);
+                "TalonFXMotor: Failed to apply motor output config after retries", false);
         }
     }
 
