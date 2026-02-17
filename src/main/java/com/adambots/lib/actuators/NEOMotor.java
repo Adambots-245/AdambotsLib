@@ -11,8 +11,12 @@ import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
 import com.revrobotics.ResetMode;
 import com.revrobotics.PersistMode;
 
+import com.revrobotics.spark.SparkSim;
+
 import edu.wpi.first.epilogue.Logged;
 import edu.wpi.first.epilogue.NotLogged;
+import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.wpilibj.RobotBase;
 import static edu.wpi.first.units.Units.*;
 import edu.wpi.first.units.measure.*;
 
@@ -35,6 +39,9 @@ public class NEOMotor implements BaseMotor {
 
     @NotLogged
     private double feedForward = 0.0;
+
+    @NotLogged
+    private SparkSim sparkSim; // null when not in sim
 
     // Conversion constants for velocity units (NEO uses RPM, BaseMotor interface uses RPS)
     private static final double RPM_TO_RPS = 1.0 / 60.0;
@@ -84,6 +91,11 @@ public class NEOMotor implements BaseMotor {
 
         // PERSIST on initial setup only (survive brownouts)
         motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+
+        // Cache sim object for simulation support
+        if (RobotBase.isSimulation()) {
+            sparkSim = new SparkSim(motor, DCMotor.getNEO(1));
+        }
     }
 
     /**
@@ -401,5 +413,25 @@ public class NEOMotor implements BaseMotor {
     @Override
     public String getMotorType() {
         return "NEOMotor (SPARK MAX)";
+    }
+
+    @Override
+    public double getSimMotorVoltage() {
+        return sparkSim != null ? sparkSim.getAppliedOutput() * sparkSim.getBusVoltage() : 0.0;
+    }
+
+    @Override
+    public void setSimPosition(double rotorRotations) {
+        if (sparkSim != null) sparkSim.iterate(0, sparkSim.getBusVoltage(), 0.020);
+    }
+
+    @Override
+    public void setSimVelocity(double rotorRPS) {
+        if (sparkSim != null) sparkSim.iterate(rotorRPS * 60.0, sparkSim.getBusVoltage(), 0.020);
+    }
+
+    @Override
+    public void setSimSupplyVoltage(double volts) {
+        if (sparkSim != null) sparkSim.setBusVoltage(volts);
     }
 }

@@ -61,6 +61,24 @@ public NEOMotor(int portNum, boolean brushed)
 
 ## Key Features
 
+### Simulation Support
+
+NEOMotor exposes simulation methods using REV's `SparkSim`. The sim object is created on construction when running in simulation.
+
+**Key Difference from CTRE:** REV's `SparkSim` uses `iterate(velocityRPM, busVoltage, dt)` as the primary update mechanism rather than setting position/velocity directly. `setSimVelocity()` drives `iterate()` with the given velocity, and `setSimPosition()` calls `iterate()` with zero velocity. This structural difference means NEO sim works best for velocity-driven simulations.
+
+```java
+@Override
+public void simulationPeriodic() {
+    motor.setSimSupplyVoltage(RobotController.getBatteryVoltage());
+
+    sim.setInputVoltage(motor.getSimMotorVoltage());
+    sim.update(0.020);
+
+    motor.setSimVelocity(sim.getVelocityRadPerSec() / (2 * Math.PI));
+}
+```
+
 ### CRITICAL: Current Limiting
 
 NEO motors have low internal resistance and can draw very high currents. **Always configure current limits to prevent:**

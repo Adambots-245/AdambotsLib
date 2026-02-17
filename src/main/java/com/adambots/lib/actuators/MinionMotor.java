@@ -25,8 +25,11 @@ import com.ctre.phoenix6.configs.TalonFXSConfigurator;
 import com.ctre.phoenix6.signals.GravityTypeValue;
 import com.ctre.phoenix6.signals.MotorArrangementValue;
 
+import com.ctre.phoenix6.sim.TalonFXSSimState;
+
 import edu.wpi.first.epilogue.Logged;
 import edu.wpi.first.epilogue.NotLogged;
+import edu.wpi.first.wpilibj.RobotBase;
 import static edu.wpi.first.units.Units.*;
 import edu.wpi.first.units.measure.*;
 
@@ -68,6 +71,9 @@ public class MinionMotor implements BaseMotor {
 
     @NotLogged
     private boolean isBrakeMode = false; // Track brake mode for atomic config apply
+
+    @NotLogged
+    private TalonFXSSimState simState; // null when not in sim
 
     // Local tracking for Slot0Configs — single source of truth (eliminates refresh-failure risk)
     @NotLogged
@@ -111,8 +117,13 @@ public class MinionMotor implements BaseMotor {
 
         // Optimize CAN bus usage
         motor.optimizeBusUtilization();
+
+        // Cache sim state for simulation support
+        if (RobotBase.isSimulation()) {
+            simState = motor.getSimState();
+        }
     }
-    
+
     /**
      * Constructor for MinionMotor using TalonFXS with specific CAN bus
      *
@@ -140,6 +151,11 @@ public class MinionMotor implements BaseMotor {
 
         // Optimize CAN bus usage
         motor.optimizeBusUtilization();
+
+        // Cache sim state for simulation support
+        if (RobotBase.isSimulation()) {
+            simState = motor.getSimState();
+        }
     }
 
     @Override
@@ -642,6 +658,26 @@ public class MinionMotor implements BaseMotor {
     @Override
     public String getMotorType() {
         return "MinionMotor (TalonFXS)";
+    }
+
+    @Override
+    public double getSimMotorVoltage() {
+        return simState != null ? simState.getMotorVoltage() : 0.0;
+    }
+
+    @Override
+    public void setSimPosition(double rotorRotations) {
+        if (simState != null) simState.setRawRotorPosition(rotorRotations);
+    }
+
+    @Override
+    public void setSimVelocity(double rotorRPS) {
+        if (simState != null) simState.setRotorVelocity(rotorRPS);
+    }
+
+    @Override
+    public void setSimSupplyVoltage(double volts) {
+        if (simState != null) simState.setSupplyVoltage(volts);
     }
 
 }

@@ -741,4 +741,49 @@ public interface BaseMotor extends BaseActuator{
         return this.getClass().getSimpleName();
     }
 
+    // --- Simulation support ---
+
+    /**
+     * Returns the voltage the motor controller is commanding to the motor.
+     *
+     * <p>Use this in {@code simulationPeriodic()} to feed the commanded voltage
+     * into a WPILib physics simulation (e.g., {@code SingleJointedArmSim},
+     * {@code ElevatorSim}).
+     *
+     * @return Commanded motor voltage in volts (0.0 if not in simulation or not overridden)
+     */
+    default double getSimMotorVoltage() { return 0.0; }
+
+    /**
+     * Sets the simulated rotor position.
+     *
+     * <p><strong>Units:</strong> Raw rotor rotations (before any gear ratio).
+     * If you have configured {@link #configureSensorToMechanismRatio(double)},
+     * multiply your mechanism rotations by the gear ratio before passing them here.
+     *
+     * @param rotorRotations Rotor position in rotations
+     */
+    default void setSimPosition(double rotorRotations) { }
+
+    /**
+     * Sets the simulated rotor velocity.
+     *
+     * <p><strong>Units:</strong> Raw rotor rotations per second (before any gear ratio).
+     * If you have configured {@link #configureSensorToMechanismRatio(double)},
+     * multiply your mechanism RPS by the gear ratio before passing them here.
+     *
+     * @param rotorRPS Rotor velocity in rotations per second
+     */
+    default void setSimVelocity(double rotorRPS) { }
+
+    /**
+     * Sets the simulated supply (battery) voltage.
+     *
+     * <p>Typically called with {@code RobotController.getBatteryVoltage()} in
+     * {@code simulationPeriodic()}.
+     *
+     * @param volts Supply voltage in volts
+     */
+    default void setSimSupplyVoltage(double volts) { }
+
 }

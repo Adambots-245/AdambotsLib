@@ -128,6 +128,54 @@ double rps = rpm / 60.0;
 | **MOTION_MAGIC_FOC_TORQUE** | ✓ Full | ✓ Full | Motion Magic with FOC torque |
 | **FOLLOWER** | ✓ Full | ✓ Full | Follow another TalonFX |
 
+### Simulation Support
+
+TalonFXMotor exposes simulation methods for use with WPILib physics simulations. The sim state is cached on construction (only when running in simulation) and provides access to the underlying `TalonFXSimState`.
+
+**Sim Loop Pattern (Arm Example):**
+
+```java
+import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.wpilibj.RobotController;
+import edu.wpi.first.wpilibj.simulation.SingleJointedArmSim;
+
+public class ArmSubsystem extends SubsystemBase {
+    private final BaseMotor motor;
+    private final SingleJointedArmSim armSim;
+    private static final double GEAR_RATIO = 50.0;
+
+    public ArmSubsystem() {
+        motor = new TalonFXMotor(1, false, 40, false);
+        motor.configureSensorToMechanismRatio(GEAR_RATIO);
+
+        armSim = new SingleJointedArmSim(
+            DCMotor.getFalcon500(1),
+            GEAR_RATIO,
+            1.0,  // MOI kg*m^2
+            0.5,  // arm length meters
+            -Math.PI / 2, Math.PI / 2,
+            true, 0
+        );
+    }
+
+    @Override
+    public void simulationPeriodic() {
+        // 1. Feed battery voltage into the sim state
+        motor.setSimSupplyVoltage(RobotController.getBatteryVoltage());
+
+        // 2. Get commanded voltage and feed into physics sim
+        armSim.setInputVoltage(motor.getSimMotorVoltage());
+        armSim.update(0.020);
+
+        // 3. Write physics results back (rotor units = mechanism * gear ratio)
+        motor.setSimPosition(armSim.getAngleRads() / (2 * Math.PI) * GEAR_RATIO);
+        motor.setSimVelocity(armSim.getVelocityRadPerSec() / (2 * Math.PI) * GEAR_RATIO);
+    }
+}
+```
+
+**Important:** `setSimPosition` and `setSimVelocity` use **rotor** units (before gear ratio). If you've configured `configureSensorToMechanismRatio()`, multiply mechanism values by the gear ratio.
+
 ### Phoenix 6 Configuration Best Practices
 
 TalonFXMotor follows Phoenix 6 best practices:

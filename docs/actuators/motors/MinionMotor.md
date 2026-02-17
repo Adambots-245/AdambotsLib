@@ -110,6 +110,25 @@ double rps = rpm / 60.0;
 - No direct current control (TorqueCurrentFOC)
 - Single PID slot (slot 0 only)
 
+### Simulation Support
+
+MinionMotor exposes simulation methods using `TalonFXSSimState`, which has the same core API as `TalonFXSimState`. The sim state is cached on construction when running in simulation.
+
+```java
+@Override
+public void simulationPeriodic() {
+    motor.setSimSupplyVoltage(RobotController.getBatteryVoltage());
+
+    sim.setInputVoltage(motor.getSimMotorVoltage());
+    sim.update(0.020);
+
+    motor.setSimPosition(sim.getAngleRads() / (2 * Math.PI) * GEAR_RATIO);
+    motor.setSimVelocity(sim.getVelocityRadPerSec() / (2 * Math.PI) * GEAR_RATIO);
+}
+```
+
+**Important:** `setSimPosition` and `setSimVelocity` use **rotor** units (before gear ratio). If you've configured `configureSensorToMechanismRatio()`, multiply mechanism values by the gear ratio.
+
 ### Phoenix 6 Configuration Best Practices
 
 MinionMotor follows Phoenix 6 best practices:

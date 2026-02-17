@@ -7,8 +7,11 @@ import com.ctre.phoenix6.controls.*;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.*;
 
+import com.ctre.phoenix6.sim.TalonFXSimState;
+
 import edu.wpi.first.epilogue.Logged;
 import edu.wpi.first.epilogue.NotLogged;
+import edu.wpi.first.wpilibj.RobotBase;
 import static edu.wpi.first.units.Units.*;
 import edu.wpi.first.units.measure.*;
 
@@ -69,6 +72,9 @@ public class TalonFXMotor implements BaseMotor {
 
     @NotLogged
     private boolean isBrakeMode = false; // Track brake mode for atomic config apply
+
+    @NotLogged
+    private TalonFXSimState simState; // null when not in sim
 
     @NotLogged
     private final int maxRetries = 3; // Maximum retries for configuration
@@ -157,6 +163,11 @@ public class TalonFXMotor implements BaseMotor {
 
         // Optimize CAN bus usage
         motor.optimizeBusUtilization();
+
+        // Cache sim state for simulation support
+        if (RobotBase.isSimulation()) {
+            simState = motor.getSimState();
+        }
     }
 
     /**
@@ -868,5 +879,25 @@ public class TalonFXMotor implements BaseMotor {
     @Override
     public String getMotorType() {
         return isKraken ? "TalonFXMotor (Kraken X60)" : "TalonFXMotor (Falcon 500)";
+    }
+
+    @Override
+    public double getSimMotorVoltage() {
+        return simState != null ? simState.getMotorVoltage() : 0.0;
+    }
+
+    @Override
+    public void setSimPosition(double rotorRotations) {
+        if (simState != null) simState.setRawRotorPosition(rotorRotations);
+    }
+
+    @Override
+    public void setSimVelocity(double rotorRPS) {
+        if (simState != null) simState.setRotorVelocity(rotorRPS);
+    }
+
+    @Override
+    public void setSimSupplyVoltage(double volts) {
+        if (simState != null) simState.setSupplyVoltage(volts);
     }
 }
