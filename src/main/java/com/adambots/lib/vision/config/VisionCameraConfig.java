@@ -4,6 +4,8 @@
 
 package com.adambots.lib.vision.config;
 
+import org.photonvision.PhotonPoseEstimator.PoseStrategy;
+
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Translation3d;
 
@@ -63,7 +65,8 @@ import edu.wpi.first.math.geometry.Translation3d;
  *     VisionStdDevs.DEFAULT_SINGLE_TAG,
  *     VisionStdDevs.DEFAULT_MULTI_TAG,
  *     new int[]{6, 7, 8, 9, 10, 11},  // Allowed tags
- *     4.0  // Max tag distance (meters) - use default
+ *     4.0,  // Max tag distance (meters) - use default
+ *     PoseStrategy.MULTI_TAG_PNP_ON_COPROCESSOR  // Pose strategy
  * );
  * }</pre>
  *
@@ -75,6 +78,7 @@ import edu.wpi.first.math.geometry.Translation3d;
  * @param multiTagStdDevs Standard deviations for multi-tag pose estimates
  * @param allowedTagIDs Array of AprilTag IDs this camera should process (empty = all tags)
  * @param maxTagDistanceMeters Maximum distance (meters) for single-tag pose estimation (default 4.0)
+ * @param poseStrategy PhotonVision pose estimation strategy (default MULTI_TAG_PNP_ON_COPROCESSOR)
  *
  * @see VisionStdDevs
  * @see VisionConfigBuilder
@@ -87,7 +91,8 @@ public record VisionCameraConfig(
     VisionStdDevs singleTagStdDevs,
     VisionStdDevs multiTagStdDevs,
     int[] allowedTagIDs,
-    double maxTagDistanceMeters
+    double maxTagDistanceMeters,
+    PoseStrategy poseStrategy
 ) {
 
     /**
@@ -95,6 +100,13 @@ public record VisionCameraConfig(
      * Tags beyond this distance are rejected when only one tag is visible.
      */
     public static final double DEFAULT_MAX_TAG_DISTANCE = 4.0;
+
+    /**
+     * Default pose estimation strategy.
+     * MULTI_TAG_PNP_ON_COPROCESSOR is more robust than AVERAGE_BEST_TARGETS,
+     * which naively averages headings and breaks near +/-180 degrees.
+     */
+    public static final PoseStrategy DEFAULT_POSE_STRATEGY = PoseStrategy.MULTI_TAG_PNP_ON_COPROCESSOR;
 
     /**
      * Defines the purpose of a vision camera.

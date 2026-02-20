@@ -65,7 +65,8 @@ import edu.wpi.first.wpilibj.RobotBase;
  *     VisionStdDevs.DEFAULT_SINGLE_TAG,
  *     VisionStdDevs.DEFAULT_MULTI_TAG,
  *     new int[]{6, 7, 8, 9, 10, 11},
- *     4.0  // Max tag distance in meters
+ *     4.0,  // Max tag distance in meters
+ *     PoseStrategy.MULTI_TAG_PNP_ON_COPROCESSOR
  * );
  *
  * VisionCamera camera = new VisionCamera(config, fieldLayout);
@@ -159,7 +160,7 @@ public class VisionCamera implements VisionCameraInterface {
 
         poseEstimator = new PhotonPoseEstimator(
             fieldLayout,
-            PoseStrategy.AVERAGE_BEST_TARGETS,
+            config.poseStrategy(),
             robotToCamTransform
         );
         poseEstimator.setMultiTagFallbackStrategy(PoseStrategy.LOWEST_AMBIGUITY);
@@ -413,7 +414,7 @@ public class VisionCamera implements VisionCameraInterface {
      * @return Empty optional if nothing is found, latest result if something is there
      */
     public Optional<PhotonPipelineResult> getLatestPhotonResult() {
-        return resultsList.isEmpty() ? Optional.empty() : Optional.of(resultsList.get(0));
+        return resultsList.isEmpty() ? Optional.empty() : Optional.of(resultsList.get(resultsList.size() - 1));
     }
 
     /**
@@ -489,7 +490,7 @@ public class VisionCamera implements VisionCameraInterface {
             });
 
             if (!resultsList.isEmpty()) {
-                if (resultsList.get(0).targets.size() > 0) {
+                if (resultsList.get(resultsList.size() - 1).targets.size() > 0) {
                     hasTarget = true;
                 }
                 updateEstimatedGlobalPose();

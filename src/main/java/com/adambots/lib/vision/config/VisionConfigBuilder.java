@@ -7,6 +7,8 @@ package com.adambots.lib.vision.config;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.photonvision.PhotonPoseEstimator.PoseStrategy;
+
 import com.adambots.lib.vision.config.VisionCameraConfig.CameraPurpose;
 
 import static edu.wpi.first.units.Units.*;
@@ -172,6 +174,7 @@ public class VisionConfigBuilder {
         private VisionStdDevs multiTagStdDevs = VisionStdDevs.DEFAULT_MULTI_TAG;
         private int[] allowedTagIDs = new int[0];
         private double maxTagDistanceMeters = VisionCameraConfig.DEFAULT_MAX_TAG_DISTANCE;
+        private PoseStrategy poseStrategy = VisionCameraConfig.DEFAULT_POSE_STRATEGY;
 
         /**
          * Creates a new CameraBuilder.
@@ -325,6 +328,18 @@ public class VisionConfigBuilder {
         }
 
         /**
+         * Sets the pose estimation strategy for this camera.
+         * <p>Default is {@link PoseStrategy#MULTI_TAG_PNP_ON_COPROCESSOR}.
+         *
+         * @param strategy The pose estimation strategy
+         * @return This builder for chaining
+         */
+        public CameraBuilder poseStrategy(PoseStrategy strategy) {
+            this.poseStrategy = strategy;
+            return this;
+        }
+
+        /**
          * Completes this camera configuration and returns to the parent builder.
          *
          * @return The parent VisionConfigBuilder for chaining
@@ -350,7 +365,8 @@ public class VisionConfigBuilder {
                 singleTagStdDevs,
                 multiTagStdDevs,
                 allowedTagIDs,
-                maxTagDistanceMeters
+                maxTagDistanceMeters,
+                poseStrategy
             );
 
             parent.addCameraConfig(config);
