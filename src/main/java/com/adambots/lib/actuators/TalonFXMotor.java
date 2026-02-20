@@ -492,6 +492,39 @@ public class TalonFXMotor implements BaseMotor {
     }
 
     /**
+     * Sets the positive direction of the motor using Phoenix 6 InvertedValue.
+     *
+     * <p>Maps directly to CTRE's {@code InvertedValue.Clockwise_Positive} and
+     * {@code InvertedValue.CounterClockwise_Positive} for explicit CW/CCW control.
+     *
+     * @param direction The direction that counts as positive output
+     */
+    @Override
+    public void setDirection(MotorDirection direction) {
+        this.isInverted = (direction == MotorDirection.CLOCKWISE_POSITIVE);
+
+        var config = new MotorOutputConfigs();
+
+        StatusCode refreshStatus = motor.getConfigurator().refresh(config);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "TalonFXMotor: Failed to refresh MotorOutputConfigs (Status: " + refreshStatus +
+                "). Factory defaults will be used for PeakVoltage fields.", false);
+        }
+
+        config.withInverted(direction == MotorDirection.CLOCKWISE_POSITIVE
+                ? InvertedValue.Clockwise_Positive
+                : InvertedValue.CounterClockwise_Positive)
+              .withNeutralMode(isBrakeMode ? NeutralModeValue.Brake : NeutralModeValue.Coast);
+
+        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "TalonFXMotor: Failed to apply motor direction after retries", false);
+        }
+    }
+
+    /**
      * Sets the neutral mode of the motor to either brake or coast.
      * In brake mode, the motor actively resists motion when not driven.
      * In coast mode, the motor spins freely when not driven.

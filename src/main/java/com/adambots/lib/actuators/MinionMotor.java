@@ -417,6 +417,40 @@ public class MinionMotor implements BaseMotor {
     }
 
     /**
+     * Sets the positive direction of the motor using Phoenix 6 InvertedValue.
+     *
+     * <p>Maps directly to CTRE's {@code InvertedValue.Clockwise_Positive} and
+     * {@code InvertedValue.CounterClockwise_Positive} for explicit CW/CCW control.
+     *
+     * @param direction The direction that counts as positive output
+     */
+    @Override
+    public void setDirection(MotorDirection direction) {
+        this.isInverted = (direction == MotorDirection.CLOCKWISE_POSITIVE);
+
+        var config = new MotorOutputConfigs();
+
+        StatusCode refreshStatus = configurator.refresh(config);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "MinionMotor: Failed to refresh MotorOutputConfigs (Status: " + refreshStatus +
+                "). Factory defaults will be used for PeakVoltage fields.", false);
+        }
+
+        config.withInverted(direction == MotorDirection.CLOCKWISE_POSITIVE
+                ? com.ctre.phoenix6.signals.InvertedValue.Clockwise_Positive
+                : com.ctre.phoenix6.signals.InvertedValue.CounterClockwise_Positive)
+              .withNeutralMode(isBrakeMode ? com.ctre.phoenix6.signals.NeutralModeValue.Brake
+                                           : com.ctre.phoenix6.signals.NeutralModeValue.Coast);
+
+        boolean success = applyConfigWithRetry(() -> configurator.apply(config));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "MinionMotor: Failed to apply motor direction after retries", false);
+        }
+    }
+
+    /**
      * Sets the neutral mode of the motor to either brake or coast.
      * In brake mode, the motor actively resists motion when not driven.
      * In coast mode, the motor spins freely when not driven.

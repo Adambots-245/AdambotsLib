@@ -79,6 +79,24 @@ public void simulationPeriodic() {
 }
 ```
 
+### Motor Direction (v2026.3.3+)
+
+NEOMotor uses the default `setDirection()` implementation from BaseMotor, which maps `CLOCKWISE_POSITIVE` to `setInverted(true)` and `COUNTER_CLOCKWISE_POSITIVE` to `setInverted(false)`. REV hardware only supports boolean inversion, so explicit CW/CCW is a convenience wrapper.
+
+```java
+// Explicit CW/CCW direction
+motor.setDirection(BaseMotor.MotorDirection.CLOCKWISE_POSITIVE);
+
+// Or via the builder pattern
+motor.configure()
+    .direction(BaseMotor.MotorDirection.CLOCKWISE_POSITIVE)
+    .brakeMode(true)
+    .apply();
+
+// The simple boolean API still works
+motor.setInverted(true);  // Equivalent to CLOCKWISE_POSITIVE
+```
+
 ### CRITICAL: Current Limiting
 
 NEO motors have low internal resistance and can draw very high currents. **Always configure current limits to prevent:**

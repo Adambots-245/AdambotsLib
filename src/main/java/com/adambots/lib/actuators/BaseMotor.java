@@ -119,6 +119,22 @@ public interface BaseMotor extends BaseActuator{
      * motor.configureGravity(GravityType.ELEVATOR_STATIC);
      * }</pre>
      */
+    /**
+     * Motor direction for explicit clockwise/counter-clockwise control.
+     *
+     * <p>CTRE motors (TalonFX, Minion) map directly to Phoenix 6 InvertedValue.
+     * REV motors (NEO) map CLOCKWISE_POSITIVE to inverted=true and
+     * COUNTER_CLOCKWISE_POSITIVE to inverted=false.
+     *
+     * @see #setDirection(MotorDirection)
+     */
+    public enum MotorDirection {
+        /** Counter-clockwise rotation is positive output (default for most motors). */
+        COUNTER_CLOCKWISE_POSITIVE,
+        /** Clockwise rotation is positive output. */
+        CLOCKWISE_POSITIVE
+    }
+
     public enum GravityType {
         /** No gravity compensation (default). */
         NONE,
@@ -357,6 +373,20 @@ public interface BaseMotor extends BaseActuator{
      * @param inverted True to invert motor direction, false for normal direction
      */
     void setInverted(boolean inverted);
+
+    /**
+     * Sets the positive direction of the motor.
+     *
+     * <p>CTRE motors (TalonFX, Minion) map directly to Phoenix 6 InvertedValue.
+     * REV motors (NEO) map CLOCKWISE_POSITIVE to inverted=true and
+     * COUNTER_CLOCKWISE_POSITIVE to inverted=false.
+     *
+     * @param direction The direction that counts as positive output
+     * @see MotorDirection
+     */
+    default void setDirection(MotorDirection direction) {
+        setInverted(direction == MotorDirection.CLOCKWISE_POSITIVE);
+    }
 
     /**
      * Configures the motor's neutral mode behavior.

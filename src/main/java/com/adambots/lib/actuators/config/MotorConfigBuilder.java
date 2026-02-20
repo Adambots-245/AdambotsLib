@@ -51,6 +51,7 @@ public class MotorConfigBuilder {
     private double voltageCompensationValue = 12.0;
     private BaseMotor.GravityType gravityType;
     private Boolean inverted;
+    private BaseMotor.MotorDirection direction;
     private Double sensorToMechanismRatio;
 
     /**
@@ -250,6 +251,31 @@ public class MotorConfigBuilder {
     }
 
     /**
+     * Configures motor positive direction using explicit CW/CCW semantics.
+     *
+     * <p>CTRE motors (TalonFX, Minion) map directly to Phoenix 6 InvertedValue.
+     * REV motors (NEO) map CLOCKWISE_POSITIVE to inverted=true and
+     * COUNTER_CLOCKWISE_POSITIVE to inverted=false.
+     *
+     * <p>Takes precedence over {@link #inverted(boolean)} if both are set.
+     *
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * motor.configure()
+     *     .direction(BaseMotor.MotorDirection.CLOCKWISE_POSITIVE)
+     *     .brakeMode(true)
+     *     .apply();
+     * }</pre>
+     *
+     * @param direction The direction that counts as positive output
+     * @return This builder for chaining
+     */
+    public MotorConfigBuilder direction(BaseMotor.MotorDirection direction) {
+        this.direction = direction;
+        return this;
+    }
+
+    /**
      * Configures the sensor-to-mechanism gear ratio.
      *
      * <p>This ratio tells the motor controller how many sensor rotations equal
@@ -313,7 +339,9 @@ public class MotorConfigBuilder {
                 motionMagicConfig.jerkRPSPerSecPerSec()
             );
         }
-        if (inverted != null) {
+        if (direction != null) {
+            motor.setDirection(direction);
+        } else if (inverted != null) {
             motor.setInverted(inverted);
         }
         if (brakeMode != null) {

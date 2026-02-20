@@ -176,6 +176,24 @@ public class ArmSubsystem extends SubsystemBase {
 
 **Important:** `setSimPosition` and `setSimVelocity` use **rotor** units (before gear ratio). If you've configured `configureSensorToMechanismRatio()`, multiply mechanism values by the gear ratio.
 
+### Motor Direction (v2026.3.3+)
+
+TalonFXMotor overrides `setDirection()` to map directly to Phoenix 6 `InvertedValue.Clockwise_Positive` and `InvertedValue.CounterClockwise_Positive`:
+
+```java
+// Explicit CW/CCW direction
+motor.setDirection(BaseMotor.MotorDirection.CLOCKWISE_POSITIVE);
+
+// Or via the builder pattern
+motor.configure()
+    .direction(BaseMotor.MotorDirection.CLOCKWISE_POSITIVE)
+    .brakeMode(true)
+    .apply();
+
+// The simple boolean API still works
+motor.setInverted(true);  // Equivalent to CLOCKWISE_POSITIVE
+```
+
 ### Phoenix 6 Configuration Best Practices
 
 TalonFXMotor follows Phoenix 6 best practices:

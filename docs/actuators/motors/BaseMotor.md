@@ -363,6 +363,32 @@ rightMotor.setInverted(false);
 
 ---
 
+### Motor Direction (v2026.3.3+)
+
+```java
+default void setDirection(MotorDirection direction)
+```
+
+**Description:** Sets the positive direction of the motor using explicit clockwise/counter-clockwise semantics. CTRE motors (TalonFX, Minion) map directly to Phoenix 6 `InvertedValue`. REV motors (NEO) map `CLOCKWISE_POSITIVE` to inverted=true and `COUNTER_CLOCKWISE_POSITIVE` to inverted=false.
+
+**MotorDirection values:**
+- `COUNTER_CLOCKWISE_POSITIVE` - Counter-clockwise rotation is positive output (default for most motors)
+- `CLOCKWISE_POSITIVE` - Clockwise rotation is positive output
+
+**Examples:**
+```java
+// Direct method call
+motor.setDirection(BaseMotor.MotorDirection.CLOCKWISE_POSITIVE);
+
+// Using the builder pattern
+motor.configure()
+    .direction(BaseMotor.MotorDirection.CLOCKWISE_POSITIVE)
+    .brakeMode(true)
+    .apply();
+```
+
+---
+
 ```java
 void setBrakeMode(boolean brake)
 ```
