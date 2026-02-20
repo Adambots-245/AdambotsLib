@@ -49,7 +49,8 @@ swerve.setupVision(vision);
   - Multi-camera support (front, back cameras)
   - Vision-corrected pose estimation
   - Camera filtering by purpose (odometry vs alignment)
-  - Distance and angle calculations to tags
+  - Distance and angle calculations to tags and arbitrary field points
+  - Tag group center computation and visible tag counting
   - Closest tag detection
   - Tag visibility checking
   - Simulation support
@@ -139,7 +140,7 @@ if (closest != -1) {
 
 // Check if any tags visible
 if (vision.hasTarget()) {
-    List<Integer> tags = PhotonVision.getAllDetectedTagIds();
+    List<Integer> tags = vision.getAllDetectedTagIds();
 }
 ```
 
@@ -198,6 +199,18 @@ Rotation2d yaw = vision.getYawToAprilTag(7);
 
 // Full transform to tag
 Transform2d transform = vision.getTransformToAprilTag(7);
+
+// Distance/yaw to any field point
+Translation2d target = new Translation2d(5.0, 3.0);
+double dist = vision.getDistanceToPoint(target);
+Rotation2d yawToPoint = vision.getYawToPoint(target);
+
+// Tag group center (e.g., center of a scoring structure)
+int[] reefTags = {6, 7, 8, 9, 10, 11};
+Translation2d center = vision.getTagGroupCenter(reefTags);
+
+// Count visible tags from a set
+int visible = vision.getVisibleTagCount(reefTags, 0.2);
 ```
 
 ### Tag Detection
@@ -210,7 +223,7 @@ boolean canSee = vision.isTagVisible(7);
 int visibleTag = vision.hasID(new int[]{6, 7, 8});
 
 // Get all detected tags
-List<Integer> allTags = PhotonVision.getAllDetectedTagIds();
+List<Integer> allTags = vision.getAllDetectedTagIds();
 
 // Find closest
 int closest = vision.getClosestVisibleTag();
@@ -422,7 +435,7 @@ vision.disableAllCameras();
 ```java
 SmartDashboard.putBoolean("Vision Enabled", !vision.areAllCamerasDisabled());
 SmartDashboard.putBoolean("Has Target", vision.hasTarget());
-SmartDashboard.putString("Detected Tags", PhotonVision.getAllDetectedTagIds().toString());
+SmartDashboard.putString("Detected Tags", vision.getAllDetectedTagIds().toString());
 
 int closest = vision.getClosestVisibleTag();
 if (closest != -1) {

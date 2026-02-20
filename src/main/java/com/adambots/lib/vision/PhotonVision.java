@@ -6,13 +6,15 @@ package com.adambots.lib.vision;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import org.photonvision.EstimatedRobotPose;
-import org.photonvision.PhotonUtils;
+
 import org.photonvision.simulation.VisionSystemSim;
 import org.photonvision.targeting.PhotonPipelineResult;
 import org.photonvision.targeting.PhotonTrackedTarget;
@@ -28,10 +30,9 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform2d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
-import swervelib.SwerveDrive;
-import swervelib.telemetry.SwerveDriveTelemetry;
 
 /**
  * PhotonVision integration for AprilTag-based vision pose estimation.
@@ -62,7 +63,10 @@ import swervelib.telemetry.SwerveDriveTelemetry;
  * PhotonVision vision = new PhotonVision(config, swerve::getPose, swerve.field);
  *
  * // In periodic()
- * vision.updatePoseEstimation(swerveDrive);
+ * vision.updatePoseEstimation(
+ *     swerveDrive::addVisionMeasurement,
+ *     swerveDrive::getSimulationDriveTrainPose
+ * );
  * vision.updateVisionField();
  * }</pre>
  *
@@ -100,7 +104,7 @@ public class PhotonVision implements VisionSystem {
   private Supplier<Pose2d> currentPose;
 
   /**
-   * Field from {@link swervelib.SwerveDrive#field}
+   * Field2d for displaying vision targets on the dashboard.
    */
   private Field2d field2d;
 
@@ -143,8 +147,8 @@ public class PhotonVision implements VisionSystem {
    * }</pre>
    *
    * @param config      The vision system configuration
-   * @param currentPose Current pose supplier, should reference {@link SwerveDrive#getPose()}
-   * @param field       Current field, should be {@link SwerveDrive#field}
+   * @param currentPose Current pose supplier, typically a method reference to the drivetrain's getPose()
+   * @param field       Current field for displaying vision targets
    */
   public PhotonVision(VisionSystemConfig config, Supplier<Pose2d> currentPose, Field2d field) {
     this.currentPose = currentPose;
@@ -187,15 +191,19 @@ public class PhotonVision implements VisionSystem {
   }
 
   /**
-   * Update the pose estimation inside of {@link SwerveDrive} with all of the
-   * given poses.
+   * Update the pose estimation by processing camera data and feeding measurements
+   * to the provided consumer.
    *
-   * @param swerveDrive {@link SwerveDrive} instance.
+   * @param visionConsumer Accepts (Pose2d pose, double timestampSeconds, Matrix stdDevs)
+   * @param simPose Supplies the simulated drivetrain pose (for sim only), empty if not in sim
    */
   @Override
-  public void updatePoseEstimation(SwerveDrive swerveDrive) {
-    if (SwerveDriveTelemetry.isSimulation && swerveDrive.getSimulationDriveTrainPose().isPresent()) {
-      visionSim.update(swerveDrive.getSimulationDriveTrainPose().get());
+  public void updatePoseEstimation(
+          VisionMeasurementConsumer visionConsumer,
+          Supplier<Optional<Pose2d>> simPose) {
+
+    if (RobotBase.isSimulation() && simPose.get().isPresent()) {
+      visionSim.update(simPose.get().get());
     }
 
     if (allCamerasDisabled) {
@@ -212,11 +220,11 @@ public class PhotonVision implements VisionSystem {
         var pose = poseEst.get();
 
         if (RobotBase.isSimulation()) {
-          Field2d debugField = visionSim.getDebugField();
-          debugField.getObject("VisionEstimation").setPose(pose.estimatedPose.toPose2d());
+          visionSim.getDebugField().getObject("VisionEstimation")
+              .setPose(pose.estimatedPose.toPose2d());
         }
 
-        swerveDrive.addVisionMeasurement(
+        visionConsumer.accept(
             pose.estimatedPose.toPose2d(),
             pose.timestampSeconds,
             camera.getCurrentStdDevs()
@@ -234,7 +242,10 @@ public class PhotonVision implements VisionSystem {
   @Override
   public double getDistanceFromAprilTag(int id) {
     Optional<Pose3d> tag = fieldLayout.getTagPose(id);
-    return tag.map(pose3d -> PhotonUtils.getDistanceToPose(currentPose.get(), pose3d.toPose2d())).orElse(-1.0);
+    if (tag.isEmpty()) {
+      return -1.0;
+    }
+    return getDistanceToPoint(tag.get().toPose2d().getTranslation());
   }
 
   /**
@@ -262,15 +273,58 @@ public class PhotonVision implements VisionSystem {
     if (tag.isEmpty()) {
       return null;
     }
+    return getYawToPoint(tag.get().toPose2d().getTranslation());
+  }
 
-    Pose2d tagPose = tag.get().toPose2d();
+  @Override
+  public Translation2d getTagGroupCenter(int[] tagIds) {
+    double x = 0, y = 0;
+    int count = 0;
+    for (int id : tagIds) {
+      Optional<Pose3d> pose = fieldLayout.getTagPose(id);
+      if (pose.isPresent()) {
+        x += pose.get().getX();
+        y += pose.get().getY();
+        count++;
+      }
+    }
+    if (count == 0) return new Translation2d();
+    return new Translation2d(x / count, y / count);
+  }
+
+  @Override
+  public double getDistanceToPoint(Translation2d target) {
+    return currentPose.get().getTranslation().getDistance(target);
+  }
+
+  @Override
+  public Rotation2d getYawToPoint(Translation2d target) {
     Pose2d robotPose = currentPose.get();
+    double dx = target.getX() - robotPose.getX();
+    double dy = target.getY() - robotPose.getY();
+    Rotation2d angleToTarget = new Rotation2d(dx, dy);
+    return angleToTarget.minus(robotPose.getRotation());
+  }
 
-    double dx = tagPose.getX() - robotPose.getX();
-    double dy = tagPose.getY() - robotPose.getY();
-    Rotation2d angleToTag = new Rotation2d(dx, dy);
-
-    return angleToTag.minus(robotPose.getRotation());
+  @Override
+  public int getVisibleTagCount(int[] filterIds, double maxAmbiguity) {
+    Set<Integer> seen = new HashSet<>();
+    for (VisionCamera camera : cameras) {
+      if (!camera.isEnabled()) continue;
+      for (PhotonPipelineResult result : camera.getResultsList()) {
+        for (PhotonTrackedTarget target : result.getTargets()) {
+          if (target.getPoseAmbiguity() > maxAmbiguity) continue;
+          int fid = target.getFiducialId();
+          for (int id : filterIds) {
+            if (fid == id) {
+              seen.add(fid);
+              break;
+            }
+          }
+        }
+      }
+    }
+    return seen.size();
   }
 
   /**
@@ -465,22 +519,18 @@ public class PhotonVision implements VisionSystem {
    * @return List of all detected tag IDs
    */
   public List<Integer> getAllDetectedTagIds() {
-    List<Integer> detectedTagIDs = new ArrayList<>();
-
+    Set<Integer> detectedTagIDs = new HashSet<>();
     for (VisionCamera camera : cameras) {
       if (!camera.isEnabled()) continue;
       for (PhotonPipelineResult result : camera.getResultsList()) {
         if (result.hasTargets()) {
           for (PhotonTrackedTarget target : result.getTargets()) {
-            if (!detectedTagIDs.contains(target.getFiducialId())) {
-              detectedTagIDs.add(target.getFiducialId());
-            }
+            detectedTagIDs.add(target.getFiducialId());
           }
         }
       }
     }
-
-    return detectedTagIDs;
+    return new ArrayList<>(detectedTagIDs);
   }
 
   /**

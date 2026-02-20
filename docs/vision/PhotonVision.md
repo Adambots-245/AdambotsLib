@@ -26,6 +26,7 @@ The `PhotonVision` class implements the `VisionSystem` interface and provides co
 - **Tag filtering** - Enable specific cameras for different game zones
 - **Simulation support** - Full PhotonVision simulation integration
 - **Distance and angle calculations** - Find distances, yaw angles, and closest tags
+- **Geometry helpers** - Tag group centers, distance/yaw to arbitrary points, visible tag counts
 - **Camera state management** - Dynamically enable/disable cameras during match
 
 This class is designed to integrate seamlessly with YAGSL's swerve drive and WPILib's pose estimation system. The `VisionSystem` interface abstraction allows teams to swap in different vision implementations (e.g., Limelight) without modifying subsystem code.
@@ -286,6 +287,10 @@ double distance = vision.getDistanceFromAprilTag(7);  // meters
 // Get distance to closest visible tag
 double closestDistance = vision.getDistanceToClosestTag();
 
+// Get distance to any field point
+Translation2d target = new Translation2d(5.0, 3.0);
+double dist = vision.getDistanceToPoint(target);
+
 // Get full transform (distance + angle) to tag
 Transform2d transform = vision.getTransformToAprilTag(7);
 double dx = transform.getX();
@@ -299,8 +304,26 @@ double dy = transform.getY();
 Rotation2d yaw = vision.getYawToAprilTag(7);
 double yawDegrees = yaw.getDegrees();
 
+// Get yaw to any field point
+Rotation2d yawToPoint = vision.getYawToPoint(new Translation2d(5.0, 3.0));
+
 // Use in turret control
 double turretSpeed = turretPID.calculate(yaw.getRadians(), 0);
+```
+
+### Geometry Helpers
+
+```java
+// Get center point of a group of tags
+int[] reefTags = {6, 7, 8, 9, 10, 11};
+Translation2d reefCenter = vision.getTagGroupCenter(reefTags);
+
+// Combine with distance/yaw methods
+double distToReef = vision.getDistanceToPoint(reefCenter);
+Rotation2d yawToReef = vision.getYawToPoint(reefCenter);
+
+// Count how many of a set of tags are currently visible
+int visible = vision.getVisibleTagCount(reefTags, 0.2);
 ```
 
 ### Tag Detection Methods
@@ -313,7 +336,7 @@ boolean canSee = vision.isTagVisible(7);
 int visibleTag = vision.hasID(new int[]{6, 7, 8});  // Returns first found, or -1
 
 // Get all detected tags
-List<Integer> allTags = PhotonVision.getAllDetectedTagIds();
+List<Integer> allTags = vision.getAllDetectedTagIds();
 ```
 
 ### Closest Tag Methods
@@ -522,17 +545,18 @@ public class LEDSubsystem extends SubsystemBase {
 
 ### Constructor
 
-#### `PhotonVision(Supplier<Pose2d> currentPose, Field2d field)`
+#### `PhotonVision(VisionSystemConfig config, Supplier<Pose2d> currentPose, Field2d field)`
 
 Create a new PhotonVision instance.
 
 **Parameters:**
+- `config` - The vision system configuration (built via `VisionConfigBuilder`)
 - `currentPose` - Supplier for current robot pose (e.g., `swerve::getPose`)
 - `field` - Field2d object for visualization (e.g., `swerve.field`)
 
 **Example:**
 ```java
-vision = new PhotonVision(this::getPose, swerveDrive.field);
+vision = new PhotonVision(VisionConstants.CONFIG, swerve::getPose, swerve.getField());
 ```
 
 ---
@@ -586,6 +610,21 @@ if (distance > 0 && distance < 3.0) {
 }
 ```
 
+#### `getDistanceToPoint(Translation2d target)`
+
+Get the Euclidean distance from the robot to any point on the field.
+
+**Parameters:**
+- `target` - The field point to measure distance to
+
+**Returns:** Distance in meters
+
+**Example:**
+```java
+Translation2d scoringZone = new Translation2d(5.0, 3.0);
+double distance = vision.getDistanceToPoint(scoringZone);
+```
+
 #### `getDistanceToClosestTag()`
 
 Get the distance to the closest visible AprilTag.
@@ -616,6 +655,22 @@ double yDistance = transform.getY();  // Left/right
 ---
 
 ### Angle Methods
+
+#### `getYawToPoint(Translation2d target)`
+
+Get the yaw angle from the robot to any point on the field, relative to the robot's heading.
+
+**Parameters:**
+- `target` - The field point to calculate yaw to
+
+**Returns:** `Rotation2d` representing yaw (positive = left, negative = right)
+
+**Example:**
+```java
+Translation2d scoringZone = new Translation2d(5.0, 3.0);
+Rotation2d yaw = vision.getYawToPoint(scoringZone);
+double turnSpeed = pid.calculate(yaw.getRadians(), 0);
+```
 
 #### `getYawToAprilTag(int id)`
 
@@ -694,6 +749,44 @@ if (visibleTag != -1) {
 }
 ```
 
+#### `getTagGroupCenter(int[] tagIds)`
+
+Get the center point (centroid) of a group of AprilTags on the field.
+
+**Parameters:**
+- `tagIds` - Array of AprilTag IDs to average
+
+**Returns:** `Translation2d` of the center point, or `(0, 0)` if no valid tags found
+
+**Example:**
+```java
+int[] reefTags = {6, 7, 8, 9, 10, 11};
+Translation2d reefCenter = vision.getTagGroupCenter(reefTags);
+
+// Use with distance/yaw helpers
+double dist = vision.getDistanceToPoint(reefCenter);
+Rotation2d yaw = vision.getYawToPoint(reefCenter);
+```
+
+#### `getVisibleTagCount(int[] filterIds, double maxAmbiguity)`
+
+Count how many of the specified tags are currently visible across all cameras, filtered by ambiguity.
+
+**Parameters:**
+- `filterIds` - Array of AprilTag IDs to look for
+- `maxAmbiguity` - Maximum ambiguity threshold (0-1); targets above this are ignored
+
+**Returns:** Number of unique visible tags from the filter set
+
+**Example:**
+```java
+int[] reefTags = {6, 7, 8, 9, 10, 11};
+int visible = vision.getVisibleTagCount(reefTags, 0.2);
+if (visible >= 2) {
+    // High-confidence multi-tag scenario
+}
+```
+
 #### `hasTarget()`
 
 Check if any AprilTag is currently visible.
@@ -707,15 +800,15 @@ if (vision.hasTarget()) {
 }
 ```
 
-#### `getAllDetectedTagIds()` (static)
+#### `getAllDetectedTagIds()`
 
 Get a list of all currently detected AprilTag IDs across all cameras.
 
-**Returns:** `List<Integer>` of detected tag IDs
+**Returns:** `List<Integer>` of detected tag IDs (deduplicated)
 
 **Example:**
 ```java
-List<Integer> tags = PhotonVision.getAllDetectedTagIds();
+List<Integer> tags = vision.getAllDetectedTagIds();
 for (int tagID : tags) {
     System.out.println("Seeing tag: " + tagID);
 }
@@ -1022,7 +1115,7 @@ SmartDashboard.putBoolean("Has Target", vision.hasTarget());
 
 **Log detected tags:**
 ```java
-List<Integer> tags = PhotonVision.getAllDetectedTagIds();
+List<Integer> tags = vision.getAllDetectedTagIds();
 SmartDashboard.putString("Detected Tags", tags.toString());
 ```
 

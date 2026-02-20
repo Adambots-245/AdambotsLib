@@ -505,7 +505,10 @@ public class SwerveSubsystem extends SubsystemBase {
     // Vision pose estimation only when manual odometry mode AND vision is configured
     // (vision requires synchronized updates which is why we stop the odometry thread)
     if (swerveConfig.useManualOdometry() && vision != null) {
-      vision.updatePoseEstimation(swerveDrive);
+      vision.updatePoseEstimation(
+          swerveDrive::addVisionMeasurement,
+          swerveDrive::getSimulationDriveTrainPose
+      );
     }
   }
 

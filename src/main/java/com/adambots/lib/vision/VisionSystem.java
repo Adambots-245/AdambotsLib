@@ -6,10 +6,12 @@ package com.adambots.lib.vision;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 
+import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform2d;
-import swervelib.SwerveDrive;
+import edu.wpi.first.math.geometry.Translation2d;
 
 /**
  * Interface representing a complete vision system for pose estimation and target tracking.
@@ -35,6 +37,12 @@ import swervelib.SwerveDrive;
  *
  * // 3. Pass vision back to swerve
  * swerve.setupVision(vision);
+ *
+ * // 4. In periodic(), update pose estimation
+ * vision.updatePoseEstimation(
+ *     swerveDrive::addVisionMeasurement,
+ *     swerveDrive::getSimulationDriveTrainPose
+ * );
  * }</pre>
  *
  * @see VisionCameraInterface
@@ -46,14 +54,27 @@ public interface VisionSystem {
     // ==================== POSE ESTIMATION ====================
 
     /**
-     * Updates the pose estimation for the swerve drive.
+     * Updates pose estimation by processing camera data and feeding measurements
+     * to the provided consumer.
      *
      * <p>This method should be called periodically (typically in the subsystem's
      * periodic() method) to add vision measurements to the pose estimator.
      *
-     * @param swerveDrive The SwerveDrive instance to update
+     * <p><strong>Usage Example:</strong>
+     * <pre>{@code
+     * vision.updatePoseEstimation(
+     *     swerveDrive::addVisionMeasurement,
+     *     swerveDrive::getSimulationDriveTrainPose
+     * );
+     * }</pre>
+     *
+     * @param visionConsumer Accepts (Pose2d pose, double timestampSeconds, Matrix stdDevs)
+     * @param simPose Supplies the simulated drivetrain pose (for sim only), empty if not in sim
      */
-    void updatePoseEstimation(SwerveDrive swerveDrive);
+    void updatePoseEstimation(
+        VisionMeasurementConsumer visionConsumer,
+        Supplier<Optional<Pose2d>> simPose
+    );
 
     // ==================== TARGET DETECTION ====================
 
@@ -107,6 +128,51 @@ public interface VisionSystem {
      * @return Rotation2d representing yaw to the tag, or null if the tag doesn't exist
      */
     Rotation2d getYawToAprilTag(int tagID);
+
+    // ==================== GEOMETRY HELPERS ====================
+
+    /**
+     * Computes the average position of a group of AprilTags from the field layout.
+     *
+     * <p>Useful for computing the center of a target structure composed of
+     * multiple tags (e.g., speaker, amp). Uses static field layout positions,
+     * not live detections.
+     *
+     * @param tagIds Array of AprilTag IDs to average
+     * @return Average Translation2d of the tag positions, or (0, 0) if no tags found
+     */
+    Translation2d getTagGroupCenter(int[] tagIds);
+
+    /**
+     * Gets the distance from the robot's current pose to an arbitrary field point.
+     *
+     * @param target The field point to measure distance to
+     * @return Distance in meters
+     */
+    double getDistanceToPoint(Translation2d target);
+
+    /**
+     * Gets the relative yaw angle from the robot's current heading to an arbitrary field point.
+     *
+     * <p>Positive values indicate the target is to the left of the robot's heading,
+     * negative values indicate the target is to the right.
+     *
+     * @param target The field point to aim at
+     * @return Rotation2d representing relative yaw to the target
+     */
+    Rotation2d getYawToPoint(Translation2d target);
+
+    /**
+     * Counts how many tags from a filtered set are currently visible with
+     * acceptable ambiguity.
+     *
+     * <p>Each tag ID is counted at most once, even if seen by multiple cameras.
+     *
+     * @param filterIds Array of AprilTag IDs to look for
+     * @param maxAmbiguity Maximum pose ambiguity threshold (0-1); tags above this are ignored
+     * @return Number of unique matching tags currently visible
+     */
+    int getVisibleTagCount(int[] filterIds, double maxAmbiguity);
 
     // ==================== CAMERA MANAGEMENT ====================
 
