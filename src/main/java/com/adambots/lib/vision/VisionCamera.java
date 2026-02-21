@@ -373,12 +373,8 @@ public class VisionCamera implements VisionCameraInterface {
             return Optional.empty();
         }
 
-        PhotonPipelineResult bestResult = resultsList.get(0);
-        if (!bestResult.hasTargets()) {
-            return Optional.empty();
-        }
-
-        double bestAmbiguity = bestResult.getBestTarget().getPoseAmbiguity();
+        PhotonPipelineResult bestResult = null;
+        double bestAmbiguity = Double.MAX_VALUE;
 
         for (PhotonPipelineResult result : resultsList) {
             if (!result.hasTargets()) {
@@ -390,7 +386,7 @@ public class VisionCamera implements VisionCameraInterface {
                 bestAmbiguity = currentAmbiguity;
             }
         }
-        return Optional.of(bestResult);
+        return Optional.ofNullable(bestResult);
     }
 
     /**
@@ -467,19 +463,16 @@ public class VisionCamera implements VisionCameraInterface {
      * Sorts the list by timestamp.
      */
     private void updateUnreadResults() {
-        double mostRecentTimestamp = resultsList.isEmpty() ? 0.0 : resultsList.get(0).getTimestampSeconds();
         double currentTimestamp = Microseconds.of(NetworkTablesJNI.now()).in(Seconds);
         double debounceTime = Milliseconds.of(15).in(Seconds);
 
-        for (PhotonPipelineResult result : resultsList) {
-            mostRecentTimestamp = Math.max(mostRecentTimestamp, result.getTimestampSeconds());
-        }
+        // Always clear stale results so callers don't see old frames
+        resultsList.clear();
+        hasTarget = false;
+        estimatedRobotPose = Optional.empty();
 
-        // Update results if debounce time has passed
-        if ((resultsList.isEmpty() || (currentTimestamp - mostRecentTimestamp >= debounceTime)) &&
-            (currentTimestamp - lastReadTimestamp) >= debounceTime) {
-
-            resultsList.clear();
+        // Only fetch new results if debounce time has passed
+        if ((currentTimestamp - lastReadTimestamp) >= debounceTime) {
             resultsList = RobotBase.isReal()
                 ? camera.getAllUnreadResults()
                 : cameraSim.getCamera().getAllUnreadResults();
