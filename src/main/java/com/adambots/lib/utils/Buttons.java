@@ -786,6 +786,18 @@ public class Buttons {
      * @return DoubleSupplier that provides processed Y-axis input
      */
     public static DoubleSupplier createForwardSupplier(double deadzone, InputCurve curve) {
+        return createForwardSupplier(deadzone, curve, false);
+    }
+
+    /**
+     * Creates a supplier for forward/backward drive input from the active controller.
+     *
+     * @param deadzone Deadzone threshold (typically 0.05-0.15)
+     * @param curve Input curve type to apply
+     * @param inverted true to negate the output (invert direction)
+     * @return DoubleSupplier that provides processed Y-axis input
+     */
+    public static DoubleSupplier createForwardSupplier(double deadzone, InputCurve curve, boolean inverted) {
         return () -> {
             ensureInitialized();
             double rawInput = 0.0;
@@ -798,7 +810,7 @@ public class Buttons {
                 rawInput = ((CommandPS5Controller) driverController).getLeftY();
             }
 
-            return processInput(rawInput, deadzone, curve);
+            return processInput(rawInput, deadzone, curve) * (inverted ? -1.0 : 1.0);
         };
     }
 
@@ -810,6 +822,18 @@ public class Buttons {
      * @return DoubleSupplier that provides processed X-axis input
      */
     public static DoubleSupplier createStrafeSupplier(double deadzone, InputCurve curve) {
+        return createStrafeSupplier(deadzone, curve, false);
+    }
+
+    /**
+     * Creates a supplier for left/right strafe input from the active controller.
+     *
+     * @param deadzone Deadzone threshold (typically 0.05-0.15)
+     * @param curve Input curve type to apply
+     * @param inverted true to negate the output (invert direction)
+     * @return DoubleSupplier that provides processed X-axis input
+     */
+    public static DoubleSupplier createStrafeSupplier(double deadzone, InputCurve curve, boolean inverted) {
         return () -> {
             ensureInitialized();
             double rawInput = 0.0;
@@ -822,7 +846,7 @@ public class Buttons {
                 rawInput = ((CommandPS5Controller) driverController).getLeftX();
             }
 
-            return processInput(rawInput, deadzone, curve);
+            return processInput(rawInput, deadzone, curve) * (inverted ? -1.0 : 1.0);
         };
     }
 
@@ -834,6 +858,18 @@ public class Buttons {
      * @return DoubleSupplier that provides processed rotation input
      */
     public static DoubleSupplier createRotationSupplier(double deadzone, InputCurve curve) {
+        return createRotationSupplier(deadzone, curve, false);
+    }
+
+    /**
+     * Creates a supplier for rotational input from the active controller.
+     *
+     * @param deadzone Deadzone threshold (typically 0.05-0.15)
+     * @param curve Input curve type to apply
+     * @param inverted true to negate the output (invert direction)
+     * @return DoubleSupplier that provides processed rotation input
+     */
+    public static DoubleSupplier createRotationSupplier(double deadzone, InputCurve curve, boolean inverted) {
         return () -> {
             ensureInitialized();
             double rawInput = 0.0;
@@ -846,7 +882,7 @@ public class Buttons {
                 rawInput = ((CommandPS5Controller) driverController).getRightX();
             }
 
-            return processInput(rawInput, deadzone, curve);
+            return processInput(rawInput, deadzone, curve) * (inverted ? -1.0 : 1.0);
         };
     }
 
