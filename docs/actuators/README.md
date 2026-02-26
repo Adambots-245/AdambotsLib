@@ -107,6 +107,21 @@ valve.toggle();  // Switch state
 
 ---
 
+## Dummy Implementations for Disabled Subsystems
+
+Every actuator interface has a no-op "dummy" implementation (`DummyMotor`, `DummyServo`, `DummySolenoid`) for use when hardware isn't physically present. Use these instead of `null` to eliminate null checks and prevent Epilogue logging errors:
+
+```java
+// In RobotMap — disabled subsystems use dummy objects instead of null
+BaseMotor intakeMotor = isIntakeInstalled
+    ? new NEOMotor(5, false, 40, false)
+    : new DummyMotor();
+
+BaseSolenoid deployer = isIntakeInstalled
+    ? new CTREPneumaticSolenoid(0, 1)
+    : new DummySolenoid();
+```
+
 ## Common Patterns
 
 ### Interface-Based Design

@@ -8,6 +8,17 @@ Encoders measure rotational position for arms, turrets, and other mechanisms tha
 |-------|----------|------------|------------|----------|
 | [CANCoder](CANCoder.md) | CTRE CANcoder | CAN | 4096 CPR | Magnetic, CAN-based |
 | [ThroughBoreEncoder](ThroughBoreEncoder.md) | REV Through Bore | DIO (DutyCycle) | 8192 CPR | Optical, absolute |
+| DummyAbsoluteEncoder | None | N/A | N/A | No-op null object for disabled subsystems |
+
+### Disabled Subsystems (DummyAbsoluteEncoder)
+
+When no encoder is physically present, use `DummyAbsoluteEncoder` instead of `null`. Returns 0° position and identity Rotation2d:
+
+```java
+BaseAbsoluteEncoder encoder = isEncoderInstalled
+    ? new ThroughBoreEncoder(5)
+    : new DummyAbsoluteEncoder();
+```
 
 ## Quick Start
 

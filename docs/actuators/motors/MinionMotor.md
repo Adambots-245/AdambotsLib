@@ -20,19 +20,42 @@ BaseMotor intake = new MinionMotor(10);
 ---
 
 ```java
+public MinionMotor(int deviceID, boolean isOnCANivore)
+```
+
+**Parameters:**
+- `deviceID` - CAN ID for the TalonFXS controller (0-62)
+- `isOnCANivore` - True if motor is on a CANivore bus, false for regular CAN bus
+
+Uses the `"*"` wildcard to auto-discover the device on any CANivore bus. This matches the TalonFXMotor constructor interface for consistency.
+
+**Example:**
+```java
+// Minion on CANivore (auto-discover)
+BaseMotor wrist = new MinionMotor(15, true);
+
+// Minion on regular CAN bus (explicit)
+BaseMotor roller = new MinionMotor(12, false);
+```
+
+---
+
+```java
 public MinionMotor(int deviceID, String canBus)
 ```
 
 **Parameters:**
 - `deviceID` - CAN ID for the TalonFXS controller (0-62)
-- `canBus` - CAN bus name (e.g., "CANivore1", "*" for auto-detect)
+- `canBus` - CAN bus name (e.g., `"CANivore1"`, `"*"` for auto-detect, `""` for RIO bus)
+
+Use this constructor when you need to target a specific named CAN bus rather than auto-discovering via the `"*"` wildcard.
 
 **Example:**
 ```java
-// Minion on CANivore
+// Minion on a specific named CANivore
 BaseMotor wrist = new MinionMotor(15, "CANivore1");
 
-// Auto-detect CANivore
+// Auto-detect CANivore (equivalent to isOnCANivore=true)
 BaseMotor roller = new MinionMotor(12, "*");
 ```
 
@@ -667,6 +690,10 @@ falcon.set(ControlMode.VELOCITY, 50.0);
 MinionMotor minion = new MinionMotor(1);
 // No FOC available
 minion.set(ControlMode.VELOCITY, 50.0);
+
+// CANivore interface is consistent across both motor types
+TalonFXMotor krakenOnCANivore = new TalonFXMotor(5, true, 60, true);
+MinionMotor minionOnCANivore = new MinionMotor(10, true);
 
 // Key Differences:
 // - No FOC on Minion

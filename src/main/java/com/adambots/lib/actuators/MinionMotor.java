@@ -125,10 +125,24 @@ public class MinionMotor implements BaseMotor {
     }
 
     /**
-     * Constructor for MinionMotor using TalonFXS with specific CAN bus
+     * Constructor for MinionMotor using TalonFXS on a CANivore bus.
+     * Uses the "*" wildcard to auto-discover the device on any CANivore bus,
+     * matching the TalonFXMotor interface.
      *
      * @param deviceID The CAN ID of the motor controller
-     * @param canBus The name of the CAN bus
+     * @param isOnCANivore true if the motor is on a CANivore bus, false for RIO CAN bus
+     */
+    public MinionMotor(int deviceID, boolean isOnCANivore) {
+        this(deviceID, isOnCANivore ? "*" : "");
+    }
+
+    /**
+     * Constructor for MinionMotor using TalonFXS with a specific CAN bus name.
+     * Use this when you need to target a specific named CAN bus rather than
+     * auto-discovering via the "*" wildcard.
+     *
+     * @param deviceID The CAN ID of the motor controller
+     * @param canBus The name of the CAN bus (use "*" for auto-discovery, "" for RIO bus)
      */
     public MinionMotor(int deviceID, String canBus) {
         motor = new TalonFXS(deviceID, new CANBus(canBus));

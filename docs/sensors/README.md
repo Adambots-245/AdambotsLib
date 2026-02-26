@@ -138,6 +138,20 @@ double distanceInches = lidar.getDistance().in(Inches);
 
 ---
 
+## Dummy Implementations for Disabled Subsystems
+
+Every sensor interface has a no-op "dummy" implementation (`DummyGyro`, `DummyAbsoluteEncoder`, `DummyDistanceSensor`, `DummyProximitySensor`) for use when hardware isn't physically present. Use these instead of `null` to eliminate null checks and prevent Epilogue logging errors:
+
+```java
+// In RobotMap — disabled subsystems use dummy objects instead of null
+BaseGyro gyro = isGyroInstalled ? new Gyro(1) : new DummyGyro();
+BaseAbsoluteEncoder encoder = isEncoderInstalled
+    ? new ThroughBoreEncoder(5)
+    : new DummyAbsoluteEncoder();
+```
+
+Safe defaults: sensors return "nothing detected" values (0° angles, 9999m distance, `false` for proximity).
+
 ## Common Patterns
 
 ### Interface-Based Design

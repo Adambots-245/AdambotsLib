@@ -25,6 +25,17 @@ valve.disable();  // Turn off
 |-------|----------|-------|----------|
 | **[CTREPneumaticSolenoid](CTREPneumaticSolenoid.md)** | CTRE PCM | 0-7 (double) | Pneumatic cylinders (extend/retract) |
 | **[ElectricalSolenoid](ElectricalSolenoid.md)** | RoboRIO Relay | 0-3 (single) | Electrical valves, relays |
+| **DummySolenoid** | None | N/A | No-op null object for disabled subsystems |
+
+### Disabled Subsystems (DummySolenoid)
+
+When a subsystem's solenoid isn't physically present, use `DummySolenoid` instead of `null`. It tracks internal boolean state for `toggle()`/`get()` consistency but performs no hardware I/O:
+
+```java
+BaseSolenoid deployer = isMechanismInstalled
+    ? new CTREPneumaticSolenoid(0, 1)
+    : new DummySolenoid();
+```
 
 ## Interface: BaseSolenoid
 

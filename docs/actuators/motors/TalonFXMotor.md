@@ -603,6 +603,14 @@ TalonFXMotor motor = new TalonFXMotor(1, false, 40, false);
 TalonFXMotor motor = new TalonFXMotor(1, true, 40, false);
 ```
 
+The `isOnCANivore` flag uses the `"*"` wildcard internally, which auto-discovers the device on any CANivore bus. This same interface is available on MinionMotor for consistency:
+
+```java
+// Consistent CANivore interface across motor types
+TalonFXMotor kraken = new TalonFXMotor(5, true, 60, true);
+MinionMotor minion = new MinionMotor(10, true);
+```
+
 **Pros:**
 - Dedicated high-speed bus
 - Lower latency

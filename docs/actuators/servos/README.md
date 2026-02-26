@@ -29,6 +29,17 @@ pwmServo.setAngle(180.0);  // Standard RC servo
 | **[AngularHubServo](AngularHubServo.md)** | REV ServoHub | Position | 0-355° (Axon Max+) |
 | **[CRHubServo](CRHubServo.md)** | REV ServoHub | Speed | -1.0 to 1.0 |
 | **[DirectServo](DirectServo.md)** | PWM (RoboRIO) | Position or Speed | Configurable |
+| **DummyServo** | None | No-op | N/A |
+
+### Disabled Subsystems (DummyServo)
+
+When a subsystem's servo isn't physically present, use `DummyServo` instead of `null`. All methods are no-op and `getCurrent()` returns zero:
+
+```java
+BaseServo cameraServo = isCameraInstalled
+    ? new AngularHubServo(hub, 0, 355.0)
+    : new DummyServo();
+```
 
 ## Interface: BaseServo
 

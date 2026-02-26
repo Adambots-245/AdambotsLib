@@ -9,6 +9,17 @@ Distance sensors measure range to objects for positioning, collision avoidance, 
 | [UltrasonicSensor](UltrasonicSensor.md) | Analog ultrasonic | Analog (0-3) | 10cm-5m | ±1-3cm | Close range, soft surfaces |
 | [Lidar](Lidar.md) | LIDAR-Lite | DIO (PWM) | 5cm-40m | ±2.5cm | Long range, precision |
 | [CANRangeSensor](CANRangeSensor.md) | CTRE CANrange | CAN | 4cm-2m | ±2cm | CAN bus, moderate range |
+| DummyDistanceSensor | None | N/A | N/A | N/A | No-op null object for disabled subsystems |
+
+### Disabled Subsystems (DummyDistanceSensor)
+
+When no distance sensor is physically present, use `DummyDistanceSensor` instead of `null`. Returns 9999 meters so proximity/range checks evaluate as "nothing detected":
+
+```java
+BaseDistanceSensor sensor = isSensorInstalled
+    ? new UltrasonicSensor(0)
+    : new DummyDistanceSensor();
+```
 
 ## Quick Start
 

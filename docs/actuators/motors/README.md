@@ -11,10 +11,14 @@ import com.adambots.lib.actuators.*;
 BaseMotor neo = new NEOMotor(1, false, 40, false);
 
 // CTRE Falcon 500 / Kraken X60
-BaseMotor talon = new TalonFXMotor(2, false, 40, false, false);
+BaseMotor talon = new TalonFXMotor(2, false, 40, false);
 
 // CTRE Minion (TalonFXS)
-BaseMotor minion = new MinionMotor(3, false, 40, false);
+BaseMotor minion = new MinionMotor(3);
+
+// All motor types support consistent CANivore interface
+BaseMotor krakenOnCANivore = new TalonFXMotor(5, true, 60, true);
+BaseMotor minionOnCANivore = new MinionMotor(10, true);
 
 // All use same API
 neo.set(ControlMode.VELOCITY, 50.0);  // 50 RPS
@@ -29,6 +33,18 @@ minion.set(ControlMode.PERCENT_OUTPUT, 0.5);  // 50% power
 | **[NEOMotor](NEOMotor.md)** | SPARK MAX | Brushless NEO, current limiting, REVLib |
 | **[TalonFXMotor](TalonFXMotor.md)** | TalonFX | Falcon 500, Kraken X60, FOC, Phoenix 6 |
 | **[MinionMotor](MinionMotor.md)** | TalonFXS | Compact, lightweight, Phoenix 6 |
+| **DummyMotor** | None | No-op null object for disabled subsystems |
+
+### Disabled Subsystems (DummyMotor)
+
+When incrementally building a robot, use `DummyMotor` for motors that aren't physically present. It implements `BaseMotor` with all no-op methods and safe defaults (position 0, velocity 0, no control modes supported). This avoids null checks and Epilogue logging errors:
+
+```java
+// In RobotMap — return a DummyMotor when hardware isn't connected
+BaseMotor shooterMotor = isShooterInstalled
+    ? new TalonFXMotor(10, false, 40, false)
+    : new DummyMotor();
+```
 
 ## Control Modes
 

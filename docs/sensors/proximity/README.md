@@ -8,6 +8,17 @@ Proximity sensors detect object presence with binary (yes/no) feedback. Use them
 |-------|----------|------------|-------|---------------|
 | [LimitSwitch](LimitSwitch.md) | Mechanical switch | DIO | Contact only | Instant |
 | [PhotoEye](PhotoEye.md) | Infrared beam-break | DIO | 0-30cm typical | <1ms |
+| DummyProximitySensor | None | N/A | N/A | N/A |
+
+### Disabled Subsystems (DummyProximitySensor)
+
+When no proximity sensor is physically present, use `DummyProximitySensor` instead of `null`. Always returns `false` (nothing detected):
+
+```java
+BaseProximitySensor sensor = isSensorInstalled
+    ? new PhotoEye(3, false)
+    : new DummyProximitySensor();
+```
 
 ## Quick Start
 

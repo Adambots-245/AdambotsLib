@@ -7,6 +7,15 @@ Gyroscopes (gyros) measure robot orientation and rotation for navigation, balanc
 | Class | Hardware | Connection | Features |
 |-------|----------|------------|----------|
 | [Gyro](Gyro.md) | CTRE Pigeon2 IMU | CAN | 3-axis, continuous yaw, pitch & roll |
+| DummyGyro | None | N/A | No-op null object for disabled subsystems |
+
+### Disabled Subsystems (DummyGyro)
+
+When no gyro is physically present, use `DummyGyro` instead of `null`. All angles return 0° and setters are no-op:
+
+```java
+BaseGyro gyro = isGyroInstalled ? new Gyro(1) : new DummyGyro();
+```
 
 ## Quick Start
 
