@@ -39,6 +39,7 @@ import com.adambots.lib.vision.config.VisionCameraConfig.CameraPurpose;
  * @param cameras List of camera configurations
  * @param ambiguityThreshold Maximum ambiguity for pose estimates (0-1, lower = stricter)
  * @param maxPoseJumpMeters Maximum allowed pose jump in meters (filters outliers)
+ * @param maxHeadingJumpDegrees Maximum allowed heading jump in degrees (filters ambiguous solves)
  *
  * @see VisionCameraConfig
  * @see VisionConfigBuilder
@@ -46,7 +47,8 @@ import com.adambots.lib.vision.config.VisionCameraConfig.CameraPurpose;
 public record VisionSystemConfig(
     List<VisionCameraConfig> cameras,
     double ambiguityThreshold,
-    double maxPoseJumpMeters
+    double maxPoseJumpMeters,
+    double maxHeadingJumpDegrees
 ) {
 
     /**
@@ -62,6 +64,13 @@ public record VisionSystemConfig(
      * in a single frame are likely outliers and should be filtered.
      */
     public static final double DEFAULT_MAX_POSE_JUMP = 10.0;
+
+    /**
+     * Default maximum heading jump in degrees.
+     * <p>Pose estimates whose heading differs from the current heading by more than
+     * this value are likely ambiguous single-tag solves (often ~180° off) and should be rejected.
+     */
+    public static final double DEFAULT_MAX_HEADING_JUMP = 45.0;
 
     /**
      * Gets the number of configured cameras.

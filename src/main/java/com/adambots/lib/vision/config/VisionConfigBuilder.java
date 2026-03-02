@@ -67,6 +67,7 @@ public class VisionConfigBuilder {
     private final List<VisionCameraConfig> cameras = new ArrayList<>();
     private double ambiguityThreshold = VisionSystemConfig.DEFAULT_AMBIGUITY;
     private double maxPoseJumpMeters = VisionSystemConfig.DEFAULT_MAX_POSE_JUMP;
+    private double maxHeadingJumpDegrees = VisionSystemConfig.DEFAULT_MAX_HEADING_JUMP;
 
     /**
      * Private constructor - use {@link #create()} to start building.
@@ -118,6 +119,20 @@ public class VisionConfigBuilder {
     }
 
     /**
+     * Sets the maximum allowed heading jump.
+     * <p>Pose estimates whose heading differs from the current odometry heading
+     * by more than this angle are filtered. This catches ambiguous single-tag
+     * solves that are often ~180° off.
+     *
+     * @param angle Maximum heading jump angle
+     * @return This builder for chaining
+     */
+    public VisionConfigBuilder maxHeadingJump(Angle angle) {
+        this.maxHeadingJumpDegrees = angle.in(Degrees);
+        return this;
+    }
+
+    /**
      * Builds the final VisionSystemConfig.
      *
      * @return The configured VisionSystemConfig
@@ -130,7 +145,8 @@ public class VisionConfigBuilder {
         return new VisionSystemConfig(
             List.copyOf(cameras),
             ambiguityThreshold,
-            maxPoseJumpMeters
+            maxPoseJumpMeters,
+            maxHeadingJumpDegrees
         );
     }
 

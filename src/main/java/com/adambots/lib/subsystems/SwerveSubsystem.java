@@ -292,9 +292,11 @@ public class SwerveSubsystem extends SubsystemBase {
     // encoders of the angle/steering/azimuth motor controllers everytime the module
     // is at rest for half-a-second if the delta between the internal encoder and
     // absolute encoder is greater than the deadband.
-    // Enable this after initial setup and tests; set the deadband in degrees as the
-    // second parameter.
-    swerveDrive.setModuleEncoderAutoSynchronize(false, 1.0);
+    // Configurable via SwerveConfig.withEncoderAutoSync(enabled, deadbandDeg).
+    swerveDrive.setModuleEncoderAutoSynchronize(
+        swerveConfig.isEncoderAutoSyncEnabled(),
+        swerveConfig.getEncoderAutoSyncDeadbandDeg()
+    );
 
     // Offset Offloading is where the absolute encoder offset is stored on the
     // absolute encoder (or Motor Controller if the absolute encoder is attached to

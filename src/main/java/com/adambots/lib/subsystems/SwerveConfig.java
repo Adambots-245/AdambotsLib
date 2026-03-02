@@ -72,6 +72,10 @@ public class SwerveConfig {
     // Telemetry
     private TelemetryVerbosity telemetryVerbosity = TelemetryVerbosity.HIGH;
 
+    // Encoder auto-sync
+    private boolean encoderAutoSyncEnabled = false;
+    private double encoderAutoSyncDeadbandDeg = 1.0;
+
     // Vision/Odometry control
     private boolean useManualOdometry = true;
 
@@ -261,6 +265,35 @@ public class SwerveConfig {
     }
 
     /**
+     * Enables or disables steering encoder auto-synchronization.
+     *
+     * <p>When enabled, YAGSL will automatically synchronize the steering relative
+     * encoder with the absolute encoder when the robot is at rest and the difference
+     * exceeds the deadband.
+     *
+     * <p><strong>When to Enable:</strong>
+     * <ul>
+     *   <li>After initial robot setup and testing are complete</li>
+     *   <li>When you want to correct steering encoder drift automatically</li>
+     * </ul>
+     *
+     * <p><strong>When to Disable (default):</strong>
+     * <ul>
+     *   <li>During initial setup before encoder offsets are calibrated</li>
+     *   <li>If auto-sync causes unexpected wheel snapping</li>
+     * </ul>
+     *
+     * @param enabled true to enable auto-sync
+     * @param deadbandDegrees Minimum difference in degrees before sync occurs (default 1.0)
+     * @return This config for chaining
+     */
+    public SwerveConfig withEncoderAutoSync(boolean enabled, double deadbandDegrees) {
+        this.encoderAutoSyncEnabled = enabled;
+        this.encoderAutoSyncDeadbandDeg = deadbandDegrees;
+        return this;
+    }
+
+    /**
      * Controls whether to stop YAGSL's odometry thread and enable vision pose estimation.
      *
      * <p><strong>Note:</strong> Odometry is always updated in periodic() regardless of this
@@ -389,6 +422,20 @@ public class SwerveConfig {
      */
     public boolean isFeedforwardEnabled() {
         return feedforwardEnabled;
+    }
+
+    /**
+     * @return true if encoder auto-sync is enabled
+     */
+    public boolean isEncoderAutoSyncEnabled() {
+        return encoderAutoSyncEnabled;
+    }
+
+    /**
+     * @return Encoder auto-sync deadband in degrees
+     */
+    public double getEncoderAutoSyncDeadbandDeg() {
+        return encoderAutoSyncDeadbandDeg;
     }
 
     /**

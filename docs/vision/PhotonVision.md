@@ -1170,11 +1170,13 @@ if (RobotBase.isSimulation()) {
 **Problem:** Robot pose suddenly jumps to wrong location
 
 **Solutions:**
-1. Increase standard deviations for less trust in vision
-2. Check for reflective surfaces causing false detections
-3. Verify AprilTag field layout is correct
-4. Use multi-tag measurements only (more reliable)
-5. Filter out high-ambiguity readings
+1. Tune `maxPoseJump()` to reject outlier poses (default 10m)
+2. Tune `maxHeadingJump()` to reject ambiguous heading solves (default 45°)
+3. Increase standard deviations for less trust in vision
+4. Check for reflective surfaces causing false detections
+5. Verify AprilTag field layout is correct
+6. Use multi-tag measurements only (more reliable)
+7. Filter out high-ambiguity readings
 
 ### Can't See Tags at Expected Range
 

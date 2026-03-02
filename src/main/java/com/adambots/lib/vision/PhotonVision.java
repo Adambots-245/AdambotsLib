@@ -94,6 +94,11 @@ public class PhotonVision implements VisionSystem {
   private final double maxPoseJumpMeters;
 
   /**
+   * Maximum heading jump allowed in degrees. Used to filter ambiguous single-tag solves.
+   */
+  private final double maxHeadingJumpDegrees;
+
+  /**
    * Photon Vision Simulation
    */
   public VisionSystemSim visionSim;
@@ -155,6 +160,7 @@ public class PhotonVision implements VisionSystem {
     this.field2d = field;
     this.maximumAmbiguity = config.ambiguityThreshold();
     this.maxPoseJumpMeters = config.maxPoseJumpMeters();
+    this.maxHeadingJumpDegrees = config.maxHeadingJumpDegrees();
 
     // Initialize configurable cameras
     for (VisionCameraConfig cameraConfig : config.cameras()) {
@@ -218,14 +224,30 @@ public class PhotonVision implements VisionSystem {
       Optional<EstimatedRobotPose> poseEst = camera.getEstimatedGlobalPose();
       if (poseEst.isPresent()) {
         var pose = poseEst.get();
+        Pose2d estimatedPose2d = pose.estimatedPose.toPose2d();
+        Pose2d current = currentPose.get();
+
+        // Reject pose estimates that jump too far from current odometry
+        double poseDistance = current.getTranslation().getDistance(estimatedPose2d.getTranslation());
+        if (poseDistance > maxPoseJumpMeters) {
+          continue;
+        }
+
+        // Reject pose estimates with heading too far from current heading
+        double headingDiffDeg = Math.abs(
+            current.getRotation().minus(estimatedPose2d.getRotation()).getDegrees()
+        );
+        if (headingDiffDeg > maxHeadingJumpDegrees) {
+          continue;
+        }
 
         if (RobotBase.isSimulation()) {
           visionSim.getDebugField().getObject("VisionEstimation")
-              .setPose(pose.estimatedPose.toPose2d());
+              .setPose(estimatedPose2d);
         }
 
         visionConsumer.accept(
-            pose.estimatedPose.toPose2d(),
+            estimatedPose2d,
             pose.timestampSeconds,
             camera.getCurrentStdDevs()
         );

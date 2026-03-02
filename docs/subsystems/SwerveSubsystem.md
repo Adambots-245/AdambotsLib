@@ -133,6 +133,8 @@ Previously, PathPlanner PID values were hardcoded in AdambotsLib's Constants fil
 | Heading Correction | `withHeadingCorrection(bool)` | false | Auto-maintain heading during teleop |
 | Cosine Compensation | `withCosineCompensation(bool)` | true | Adjust speed based on wheel alignment |
 | Angular Velocity Comp | `withAngularVelocityCompensation(bool, coeff)` | true, 0.1 | Counteract skewing during rotation |
+| Telemetry Verbosity | `withTelemetryVerbosity(level)` | HIGH | YAGSL telemetry detail level |
+| Encoder Auto-Sync | `withEncoderAutoSync(bool, deg)` | false, 1.0 | Auto-sync steering encoders at rest |
 
 ### Basic Usage
 
@@ -252,6 +254,42 @@ Counteracts the skewing effect when the robot translates and rotates simultaneou
 .withAngularVelocityCompensation(true, 0.1)  // enabled, coefficient
 ```
 
+#### Encoder Auto-Sync
+
+Automatically synchronizes steering relative encoders with absolute encoders when at rest.
+
+```java
+.withEncoderAutoSync(true, 1.0)  // enabled, deadband in degrees
+```
+
+**When to Enable:**
+- After initial setup and encoder offset calibration is complete
+- When you want to correct steering encoder drift automatically
+
+**When to Disable (default):**
+- During initial setup before encoder offsets are calibrated
+- If auto-sync causes unexpected wheel snapping
+
+#### Telemetry Verbosity
+
+Controls how much swerve telemetry data is published to NetworkTables. Higher verbosity is useful for debugging but adds overhead.
+
+```java
+import swervelib.telemetry.SwerveDriveTelemetry.TelemetryVerbosity;
+
+.withTelemetryVerbosity(TelemetryVerbosity.LOW)  // For competition
+```
+
+**Available Levels:**
+- `NONE` — No telemetry
+- `LOW` — Minimal (module states only)
+- `INFO` — Moderate (adds chassis speeds)
+- `POSE` — Adds pose data
+- `HIGH` — Full telemetry (default, best for development)
+- `MACHINE` — Machine-readable format
+
+**Recommendation:** Use `HIGH` during development and testing, switch to `LOW` or `NONE` for competition to reduce CAN/NetworkTables overhead.
+
 ### Full Configuration Example
 
 ```java
@@ -264,7 +302,11 @@ public static final SwerveConfig SWERVE_CONFIG = new SwerveConfig()
     // Drive behavior
     .withHeadingCorrection(false)
     .withCosineCompensation(true)
-    .withAngularVelocityCompensation(true, 0.1);
+    .withAngularVelocityCompensation(true, 0.1)
+    .withEncoderAutoSync(true, 1.0)
+
+    // Telemetry
+    .withTelemetryVerbosity(TelemetryVerbosity.LOW);  // Reduce overhead for competition
 ```
 
 ### Accessing Config at Runtime
