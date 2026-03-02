@@ -1924,8 +1924,10 @@ public class SwerveSubsystem extends SubsystemBase {
    * <p><strong>Input Processing:</strong>
    * <ul>
    *   <li>Translation inputs are scaled by 80% for finer control</li>
-   *   <li>Rotation input is cubed (x³) for precise low-speed turning</li>
    *   <li>All inputs are multiplied by max chassis velocity</li>
+   *   <li>Apply your own input curves (deadband, cubic, etc.) via the suppliers — use
+   *       {@code Buttons.createForwardSupplier}, {@code Buttons.createStrafeSupplier},
+   *       and {@code Buttons.createRotationSupplier}</li>
    * </ul>
    *
    * <p><strong>Joystick Mapping (typical):</strong>
@@ -1970,7 +1972,7 @@ public class SwerveSubsystem extends SubsystemBase {
       swerveDrive.drive(SwerveMath.scaleTranslation(new Translation2d(
               translationX.getAsDouble() * swerveDrive.getMaximumChassisVelocity(),
               translationY.getAsDouble() * swerveDrive.getMaximumChassisVelocity()), 0.8),
-          Math.pow(angularRotationX.getAsDouble(), 3) * swerveDrive.getMaximumChassisAngularVelocity(),
+          angularRotationX.getAsDouble() * swerveDrive.getMaximumChassisAngularVelocity(),
           true,
           false);
     }).withName("TeleopDrive");
