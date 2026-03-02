@@ -56,7 +56,6 @@ import swervelib.parser.SwerveControllerConfiguration;
 import swervelib.parser.SwerveDriveConfiguration;
 import swervelib.parser.SwerveParser;
 import swervelib.telemetry.SwerveDriveTelemetry;
-import swervelib.telemetry.SwerveDriveTelemetry.TelemetryVerbosity;
 
 /**
  * YAGSL-based swerve drive subsystem for holonomic drivetrain control.
@@ -227,10 +226,8 @@ public class SwerveSubsystem extends SubsystemBase {
         1 / ModuleConstants.kSwerveModuleFinalGearRatio);
 
     // Configure the Telemetry before creating the SwerveDrive to avoid unnecessary
-    // objects being created.
-    // Adjust this value to control the amount of telemetry data that is printed to
-    // the console. Turn it off or to low or pose for competition.
-    SwerveDriveTelemetry.verbosity = TelemetryVerbosity.HIGH;
+    // objects being created. Configurable via SwerveConfig.withTelemetryVerbosity().
+    SwerveDriveTelemetry.verbosity = config.getTelemetryVerbosity();
 
     try {
       // Loads the conversion factors via JSON files

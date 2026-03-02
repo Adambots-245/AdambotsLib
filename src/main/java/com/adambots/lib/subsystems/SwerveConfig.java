@@ -5,6 +5,7 @@
 package com.adambots.lib.subsystems;
 
 import com.pathplanner.lib.config.PIDConstants;
+import swervelib.telemetry.SwerveDriveTelemetry.TelemetryVerbosity;
 
 /**
  * Configuration object for SwerveSubsystem settings.
@@ -43,6 +44,7 @@ import com.pathplanner.lib.config.PIDConstants;
  *   <li>Rotation PID: P=5.0, I=0.0, D=0.0</li>
  *   <li>Heading Correction: disabled</li>
  *   <li>Cosine Compensation: enabled</li>
+ *   <li>Telemetry Verbosity: HIGH</li>
  * </ul>
  *
  * @see SwerveSubsystem#SwerveSubsystem(java.io.File, SwerveConfig)
@@ -66,6 +68,9 @@ public class SwerveConfig {
 
     // PathPlanner feedforward
     private boolean feedforwardEnabled = true;
+
+    // Telemetry
+    private TelemetryVerbosity telemetryVerbosity = TelemetryVerbosity.HIGH;
 
     // Vision/Odometry control
     private boolean useManualOdometry = true;
@@ -293,6 +298,39 @@ public class SwerveConfig {
      * @param enabled true to stop YAGSL thread and enable vision (default), false otherwise
      * @return This config for chaining
      */
+    /**
+     * Sets the YAGSL telemetry verbosity level.
+     *
+     * <p>Controls how much swerve telemetry data is published to NetworkTables.
+     * Higher verbosity is useful for debugging but adds CAN/NT overhead.
+     *
+     * <p><strong>Levels:</strong>
+     * <ul>
+     *   <li>{@code NONE} — No telemetry</li>
+     *   <li>{@code LOW} — Minimal (module states only)</li>
+     *   <li>{@code INFO} — Moderate (adds chassis speeds)</li>
+     *   <li>{@code POSE} — Adds pose data</li>
+     *   <li>{@code HIGH} — Full telemetry (default)</li>
+     *   <li>{@code MACHINE} — Machine-readable format</li>
+     * </ul>
+     *
+     * <p><strong>Recommendation:</strong> Use {@code HIGH} during development,
+     * {@code LOW} or {@code NONE} for competition to reduce overhead.
+     *
+     * <p><strong>Usage Example:</strong>
+     * <pre>{@code
+     * SwerveConfig config = new SwerveConfig()
+     *     .withTelemetryVerbosity(TelemetryVerbosity.LOW);
+     * }</pre>
+     *
+     * @param verbosity The desired telemetry verbosity level
+     * @return This config for chaining
+     */
+    public SwerveConfig withTelemetryVerbosity(TelemetryVerbosity verbosity) {
+        this.telemetryVerbosity = verbosity;
+        return this;
+    }
+
     public SwerveConfig withManualOdometry(boolean enabled) {
         this.useManualOdometry = enabled;
         return this;
@@ -358,5 +396,12 @@ public class SwerveConfig {
      */
     public boolean useManualOdometry() {
         return useManualOdometry;
+    }
+
+    /**
+     * @return The configured telemetry verbosity level
+     */
+    public TelemetryVerbosity getTelemetryVerbosity() {
+        return telemetryVerbosity;
     }
 }
