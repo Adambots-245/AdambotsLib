@@ -54,7 +54,6 @@ import edu.wpi.first.units.measure.Distance;
  *         .maxTagDistance(Meters.of(3.0))  // Limit turret camera range
  *         .done()
  *     .ambiguityThreshold(0.25)
- *     .maxPoseJump(Meters.of(10.0))
  *     .build();
  * }</pre>
  *
@@ -66,8 +65,6 @@ public class VisionConfigBuilder {
 
     private final List<VisionCameraConfig> cameras = new ArrayList<>();
     private double ambiguityThreshold = VisionSystemConfig.DEFAULT_AMBIGUITY;
-    private double maxPoseJumpMeters = VisionSystemConfig.DEFAULT_MAX_POSE_JUMP;
-    private double maxHeadingJumpDegrees = VisionSystemConfig.DEFAULT_MAX_HEADING_JUMP;
 
     /**
      * Private constructor - use {@link #create()} to start building.
@@ -106,29 +103,28 @@ public class VisionConfigBuilder {
     }
 
     /**
-     * Sets the maximum allowed pose jump.
-     * <p>Pose estimates that would move the robot more than this distance
-     * in a single frame are filtered as outliers.
+     * No-op. Pose jump filtering has been removed; the WPILib Kalman filter
+     * handles outlier weighting via standard deviations.
      *
-     * @param distance Maximum pose jump distance
+     * @param distance Ignored
      * @return This builder for chaining
+     * @deprecated Hard pose-jump filtering has been removed. This method is a no-op.
      */
+    @Deprecated
     public VisionConfigBuilder maxPoseJump(Distance distance) {
-        this.maxPoseJumpMeters = distance.in(Meters);
         return this;
     }
 
     /**
-     * Sets the maximum allowed heading jump.
-     * <p>Pose estimates whose heading differs from the current odometry heading
-     * by more than this angle are filtered. This catches ambiguous single-tag
-     * solves that are often ~180° off.
+     * No-op. Heading jump filtering has been removed; the WPILib Kalman filter
+     * handles outlier weighting via standard deviations.
      *
-     * @param angle Maximum heading jump angle
+     * @param angle Ignored
      * @return This builder for chaining
+     * @deprecated Hard heading-jump filtering has been removed. This method is a no-op.
      */
+    @Deprecated
     public VisionConfigBuilder maxHeadingJump(Angle angle) {
-        this.maxHeadingJumpDegrees = angle.in(Degrees);
         return this;
     }
 
@@ -144,9 +140,7 @@ public class VisionConfigBuilder {
         }
         return new VisionSystemConfig(
             List.copyOf(cameras),
-            ambiguityThreshold,
-            maxPoseJumpMeters,
-            maxHeadingJumpDegrees
+            ambiguityThreshold
         );
     }
 

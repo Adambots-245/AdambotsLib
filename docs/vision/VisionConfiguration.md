@@ -141,8 +141,6 @@ public static final VisionSystemConfig VISION_CONFIG = VisionConfigBuilder.creat
         .maxTagDistance(Meters.of(3.0))  // Limit to close-range tags
         .done()
     .ambiguityThreshold(0.25)
-    .maxPoseJump(Meters.of(10.0))
-    .maxHeadingJump(Degrees.of(45))
     .build();
 ```
 
@@ -170,8 +168,6 @@ Top-level configuration containing all camera configs and system parameters.
 |-------|------|-------------|
 | `cameras` | `List<VisionCameraConfig>` | All camera configurations |
 | `ambiguityThreshold` | `double` | Max ambiguity for pose estimates (0-1) |
-| `maxPoseJumpMeters` | `double` | Max allowed pose jump in meters |
-| `maxHeadingJumpDegrees` | `double` | Max heading difference in degrees (filters ambiguous solves) |
 
 ### VisionCameraConfig
 
@@ -222,8 +218,6 @@ Standard deviation configuration with presets.
 VisionConfigBuilder.create()           // Start building
     .addCamera(String name)            // Add a camera (returns CameraBuilder)
     .ambiguityThreshold(double)        // Set ambiguity threshold (default: 0.25)
-    .maxPoseJump(Distance)             // Set max pose jump (default: 10m)
-    .maxHeadingJump(Angle)             // Set max heading jump (default: 45°)
     .build()                           // Build final config
 ```
 
@@ -241,28 +235,6 @@ VisionConfigBuilder.create()           // Start building
     .allowedTags(int... tagIDs)                    // Tag filtering
     .maxTagDistance(Distance)                      // Max distance for single-tag (default: 4m)
     .done()                                        // Return to VisionConfigBuilder
-```
-
----
-
-## Outlier Rejection
-
-The vision system automatically rejects outlier pose estimates before they are added to the pose estimator. Both filters are enforced in `updatePoseEstimation()`.
-
-### Pose Jump Rejection
-
-`maxPoseJump(Distance)` rejects vision poses that jump more than the specified distance from the current odometry pose. This catches stale results and gross outliers.
-
-```java
-.maxPoseJump(Meters.of(10.0))  // Default: 10m
-```
-
-### Heading Jump Rejection
-
-`maxHeadingJump(Angle)` rejects vision poses whose heading differs too much from the current odometry heading. This catches ambiguous single-tag solves that are often ~180° off.
-
-```java
-.maxHeadingJump(Degrees.of(45))  // Default: 45°
 ```
 
 ---
