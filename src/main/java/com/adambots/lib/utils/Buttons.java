@@ -310,6 +310,18 @@ public class Buttons {
     /** Joystick button 12 (right cluster on Extreme 3D Pro base). */
     public static Trigger JoystickButton12;
 
+    /** Joystick button 13. */
+    public static Trigger JoystickButton13;
+
+    /** Joystick button 14. */
+    public static Trigger JoystickButton14;
+
+    /** Joystick button 15. */
+    public static Trigger JoystickButton15;
+
+    /** Joystick button 16. */
+    public static Trigger JoystickButton16;
+
     // ======================== JOYSTICK POV HAT ========================
 
     /** Joystick POV hat up trigger. */
@@ -338,6 +350,11 @@ public class Buttons {
 
     /** Joystick POV hat center (not pressed) trigger. */
     public static Trigger JoystickPOVCenter;
+
+    // ======================== JOYSTICK THROTTLE ========================
+
+    /** Joystick throttle axis (slider on base, range -1.0 to 1.0). */
+    public static DoubleSupplier JoystickThrottle;
 
     // ======================== RUMBLE MANAGEMENT ========================
 
@@ -567,6 +584,10 @@ public class Buttons {
         JoystickButton10 = joystick.button(10);
         JoystickButton11 = joystick.button(11);
         JoystickButton12 = joystick.button(12);
+        JoystickButton13 = joystick.button(13);
+        JoystickButton14 = joystick.button(14);
+        JoystickButton15 = joystick.button(15);
+        JoystickButton16 = joystick.button(16);
 
         // POV Hat
         JoystickPOVUp = joystick.povUp();
@@ -578,6 +599,9 @@ public class Buttons {
         JoystickPOVDownLeft = joystick.povDownLeft();
         JoystickPOVDownRight = joystick.povDownRight();
         JoystickPOVCenter = joystick.povCenter();
+
+        // Throttle axis
+        JoystickThrottle = joystick::getThrottle;
     }
 
     // ======================== CONTROLLER GETTERS ========================
