@@ -71,7 +71,8 @@ public class RobotContainer {
             swerve.driveCommand(
                 Buttons.createForwardSupplier(0.05, InputCurve.CUBIC),
                 Buttons.createStrafeSupplier(0.05, InputCurve.CUBIC),
-                Buttons.createRotationSupplier(0.1, InputCurve.SIGMOID)
+                Buttons.createRotationSupplier(0.1, InputCurve.SIGMOID),
+                0.8
             )
         );
 
@@ -80,7 +81,8 @@ public class RobotContainer {
         //     swerve.driveCommand(
         //         Buttons.createForwardSupplier(0.05, InputCurve.LINEAR),
         //         Buttons.createStrafeSupplier(0.05, InputCurve.LINEAR),
-        //         Buttons.createRotationSupplier(0.1, InputCurve.LINEAR)
+        //         Buttons.createRotationSupplier(0.1, InputCurve.LINEAR),
+        //         0.8
         //     )
         // );
 
@@ -98,7 +100,8 @@ public class RobotContainer {
         //         () -> {
         //             double raw = Buttons.getXboxController().getRightX();
         //             return Buttons.processInput(raw, 0.15, InputCurve.CUBIC);
-        //         }
+        //         },
+        //         0.8
         //     )
         // );
     }

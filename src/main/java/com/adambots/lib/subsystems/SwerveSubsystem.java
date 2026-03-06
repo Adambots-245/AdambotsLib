@@ -48,6 +48,7 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Config;
 import swervelib.SwerveDrive;
+import swervelib.SwerveInputStream;
 import swervelib.SwerveDriveTest;
 import swervelib.imu.SwerveIMU;
 import swervelib.math.SwerveMath;
@@ -116,7 +117,8 @@ import swervelib.telemetry.SwerveDriveTelemetry;
  *   swerve.driveCommand(
  *     () -> -controller.getLeftY(),
  *     () -> -controller.getLeftX(),
- *     () -> -controller.getRightX()
+ *     () -> -controller.getRightX(),
+ *     0.8
  *   )
  * );
  *
@@ -1943,7 +1945,8 @@ public class SwerveSubsystem extends SubsystemBase {
    *     swerve.driveCommand(
    *         () -> -controller.getLeftY(),   // Forward (inverted for standard convention)
    *         () -> -controller.getLeftX(),   // Strafe left
-   *         () -> -controller.getRightX()   // Rotate CCW
+   *         () -> -controller.getRightX(),  // Rotate CCW
+   *         0.8                             // 80% translation speed
    *     )
    * );
    *
@@ -1952,7 +1955,8 @@ public class SwerveSubsystem extends SubsystemBase {
    *     swerve.driveCommand(
    *         Buttons.createForwardSupplier(0.05, InputCurve.CUBIC),
    *         Buttons.createStrafeSupplier(0.05, InputCurve.CUBIC),
-   *         Buttons.createRotationSupplier(0.1, InputCurve.SIGMOID)
+   *         Buttons.createRotationSupplier(0.1, InputCurve.SIGMOID),
+   *         0.8
    *     )
    * );
    * }</pre>
@@ -1960,20 +1964,20 @@ public class SwerveSubsystem extends SubsystemBase {
    * @param translationX X translation supplier (-1 to 1, forward positive)
    * @param translationY Y translation supplier (-1 to 1, left positive)
    * @param angularRotationX Angular velocity supplier (-1 to 1, CCW positive)
+   * @param scaleTranslation Translation scaling factor (0 to 1], e.g. 0.8 for 80% speed
    * @return Teleop drive command (should be set as default command)
    *
-   * @see #driveCommand(DoubleSupplier, DoubleSupplier, DoubleSupplier, DoubleSupplier)
+   * @see #driveCommand(DoubleSupplier, DoubleSupplier, DoubleSupplier, DoubleSupplier, double)
    * @see #driveFieldOrientedCommand(Supplier)
    */
   public Command driveCommand(DoubleSupplier translationX, DoubleSupplier translationY,
-                               DoubleSupplier angularRotationX) {
+                               DoubleSupplier angularRotationX, double scaleTranslation) {
+    SwerveInputStream driveInput = SwerveInputStream.of(swerveDrive, translationX, translationY)
+        .withControllerRotationAxis(angularRotationX)
+        .scaleTranslation(scaleTranslation)
+        .allianceRelativeControl(true);
     return run(() -> {
-      swerveDrive.drive(SwerveMath.scaleTranslation(new Translation2d(
-              translationX.getAsDouble() * swerveDrive.getMaximumChassisVelocity(),
-              translationY.getAsDouble() * swerveDrive.getMaximumChassisVelocity()), 0.8),
-          angularRotationX.getAsDouble() * swerveDrive.getMaximumChassisAngularVelocity(),
-          true,
-          false);
+      swerveDrive.driveFieldOriented(driveInput.get());
     }).withName("TeleopDrive");
   }
 
@@ -2006,7 +2010,8 @@ public class SwerveSubsystem extends SubsystemBase {
    *         () -> -controller.getLeftY(),   // Forward/back
    *         () -> -controller.getLeftX(),   // Strafe
    *         () -> -controller.getRightX(),  // Heading X
-   *         () -> -controller.getRightY()   // Heading Y
+   *         () -> -controller.getRightY(),  // Heading Y
+   *         0.8                             // 80% translation speed
    *     )
    * );
    * }</pre>
@@ -2015,23 +2020,20 @@ public class SwerveSubsystem extends SubsystemBase {
    * @param translationY Y translation supplier (-1 to 1, left positive)
    * @param headingX Heading joystick X component (-1 to 1)
    * @param headingY Heading joystick Y component (-1 to 1)
+   * @param scaleTranslation Translation scaling factor (0 to 1], e.g. 0.8 for 80% speed
    * @return Teleop drive command with heading lock
    *
-   * @see #driveCommand(DoubleSupplier, DoubleSupplier, DoubleSupplier)
+   * @see #driveCommand(DoubleSupplier, DoubleSupplier, DoubleSupplier, double)
    */
   public Command driveCommand(DoubleSupplier translationX, DoubleSupplier translationY,
-                               DoubleSupplier headingX, DoubleSupplier headingY) {
+                               DoubleSupplier headingX, DoubleSupplier headingY,
+                               double scaleTranslation) {
+    SwerveInputStream driveInput = SwerveInputStream.of(swerveDrive, translationX, translationY)
+        .withControllerHeadingAxis(headingX, headingY)
+        .scaleTranslation(scaleTranslation)
+        .allianceRelativeControl(true);
     return run(() -> {
-      Translation2d scaledInputs = SwerveMath.scaleTranslation(
-          new Translation2d(translationX.getAsDouble(), translationY.getAsDouble()), 0.8);
-
-      driveFieldOriented(
-          swerveDrive.swerveController.getTargetSpeeds(
-              scaledInputs.getX(), scaledInputs.getY(),
-              headingX.getAsDouble(),
-              headingY.getAsDouble(),
-              swerveDrive.getOdometryHeading().getRadians(),
-              swerveDrive.getMaximumChassisVelocity()));
+      swerveDrive.driveFieldOriented(driveInput.get());
     }).withName("TeleopDriveHeading");
   }
 
@@ -2077,7 +2079,7 @@ public class SwerveSubsystem extends SubsystemBase {
    * @return Field-oriented drive command
    *
    * @see ChassisSpeeds
-   * @see #driveCommand(DoubleSupplier, DoubleSupplier, DoubleSupplier)
+   * @see #driveCommand(DoubleSupplier, DoubleSupplier, DoubleSupplier, double)
    */
   public Command driveFieldOrientedCommand(Supplier<ChassisSpeeds> velocity) {
     return run(() -> swerveDrive.driveFieldOriented(velocity.get()))
