@@ -4,9 +4,30 @@ CTRE TalonFX motor controller implementation for Falcon 500 and Kraken X60 motor
 
 ## Constructors
 
+### TalonFXMotor(int portNum, boolean isKraken)
+
+Creates a TalonFXMotor with default settings: regular CAN bus, 40A supply current limit.
+
 ```java
-public TalonFXMotor(int portNum, boolean isOnCANivore, double supplyCurrentLimit, boolean isKraken)
+// Falcon 500 with defaults (regular CAN, 40A limit)
+BaseMotor falcon = new TalonFXMotor(1, false);
+
+// Kraken X60 with defaults
+BaseMotor kraken = new TalonFXMotor(5, true);
 ```
+
+### TalonFXMotor(int portNum, boolean isOnCANivore, boolean isKraken)
+
+Creates a TalonFXMotor on a specific CAN bus with a default 40A supply current limit.
+
+```java
+// Kraken X60 on CANivore with default 40A limit
+BaseMotor kraken = new TalonFXMotor(5, true, true);
+```
+
+### TalonFXMotor(int portNum, boolean isOnCANivore, double supplyCurrentLimit, boolean isKraken)
+
+Creates a TalonFXMotor with full configuration.
 
 **Parameters:**
 - `portNum` - CAN ID for the TalonFX controller (0-62)
@@ -14,12 +35,8 @@ public TalonFXMotor(int portNum, boolean isOnCANivore, double supplyCurrentLimit
 - `supplyCurrentLimit` - Supply current limit in amperes
 - `isKraken` - True for Kraken X60, false for Falcon 500
 
-**Example:**
 ```java
-// Falcon 500 on regular CAN bus
-BaseMotor falcon = new TalonFXMotor(1, false, 40, false);
-
-// Kraken X60 on CANivore
+// Kraken X60 on CANivore with custom current limit
 BaseMotor kraken = new TalonFXMotor(5, true, 60, true);
 
 // Falcon 500 drive motor with high current limit
