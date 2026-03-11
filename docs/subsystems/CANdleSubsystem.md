@@ -8,18 +8,46 @@ CTRE CANdle LED strip controller subsystem using Phoenix 6 API.
 
 **Phoenix 6 Migration:** This subsystem has been fully migrated to Phoenix 6 API and uses the modern control request pattern for LED control.
 
-## Constructor
+## Constructors
 
-### CANdleSubsystem(int canID)
+### CANdleSubsystem(int canID, int ledsInStrip)
 
-Creates a CANdle LED subsystem with the specified CAN ID.
+Creates a CANdle LED subsystem on the default CAN bus.
 
 ```java
-CANdleSubsystem leds = new CANdleSubsystem(10);  // CAN ID 10
+CANdleSubsystem leds = new CANdleSubsystem(10, 100);  // CAN ID 10, 100 LEDs
 ```
 
 **Parameters:**
 - `canID` - CAN ID for the CANdle (0-62)
+- `ledsInStrip` - Number of LEDs in the external strip
+
+### CANdleSubsystem(int canID, int ledsInStrip, boolean isOnCANivore)
+
+Creates a CANdle LED subsystem, optionally on a CANivore bus.
+
+```java
+CANdleSubsystem leds = new CANdleSubsystem(10, 100, true);  // On CANivore
+```
+
+**Parameters:**
+- `canID` - CAN ID for the CANdle (0-62)
+- `ledsInStrip` - Number of LEDs in the external strip
+- `isOnCANivore` - True if the CANdle is on a CANivore bus
+
+### CANdleSubsystem(int canID, int ledsInStrip, boolean isOnCANivore, Color defaultColor)
+
+Creates a CANdle LED subsystem with full configuration.
+
+```java
+CANdleSubsystem leds = new CANdleSubsystem(10, 100, false, new Color(255, 216, 2));
+```
+
+**Parameters:**
+- `canID` - CAN ID for the CANdle (0-62)
+- `ledsInStrip` - Number of LEDs in the external strip
+- `isOnCANivore` - True if the CANdle is on a CANivore bus
+- `defaultColor` - Default color to set on startup
 
 **Validation:**
 - CAN ID validated at construction
@@ -31,12 +59,6 @@ CANdleSubsystem leds = new CANdleSubsystem(10);  // CAN ID 10
 - Status LED disabled when active
 - 5V rail enabled
 - VBat output disabled
-
-### CANdleSubsystem(CANdle candleDevice)
-
-**Deprecated:** Use `CANdleSubsystem(int)` instead.
-
-Creates a CANdle subsystem with a pre-configured CANdle device.
 
 ## Methods
 
@@ -82,26 +104,22 @@ leds.setColor(0, 0, 255);    // Blue
 
 ### setLEDs(int r, int g, int b, int startIdx, int numOfLEDs)
 
-Sets a specific range of LEDs to a color.
+Sets a specific range of LEDs to a color. Indices are 0-based from the start of the external strip (the internal CANdle offset is applied automatically).
 
 ```java
 // Set first 20 LEDs to red
-leds.setLEDs(255, 0, 0, 8, 20);  // Start at index 8 (external strip)
+leds.setLEDs(255, 0, 0, 0, 20);  // Start at index 0 (first external LED)
 
 // Set middle section to blue
-leds.setLEDs(0, 0, 255, 30, 10);
+leds.setLEDs(0, 0, 255, 20, 10);
 ```
 
 **Parameters:**
 - `r` - Red (0-255)
 - `g` - Green (0-255)
 - `b` - Blue (0-255)
-- `startIdx` - Starting LED index (0-based)
+- `startIdx` - 0-based index from the start of the external strip
 - `numOfLEDs` - Number of LEDs to set
-
-**LED Indexing:**
-- Indices 0-7: Onboard CANdle LEDs
-- Indices 8-399: External LED strip (8 is first LED)
 
 **Validation:**
 - All values clamped to valid ranges
@@ -243,7 +261,6 @@ Define LED constants in `Constants.java`:
 
 ```java
 public static final class LEDConstants {
-    public static final int LEDS_IN_STRIP = 100;
     public static final StripTypeValue LED_STRIP_TYPE = StripTypeValue.GRB;
 
     // Color definitions
@@ -254,6 +271,8 @@ public static final class LEDConstants {
     public static final Color red = new Color(255, 0, 0);
 }
 ```
+
+> **Note:** The LED strip count is now passed as a constructor parameter to `CANdleSubsystem` rather than being defined as a constant.
 
 ### Strip Type Selection
 
@@ -276,7 +295,7 @@ Choose based on your LED strip model:
 
 ```java
 public class RobotContainer {
-  private final CANdleSubsystem m_leds = new CANdleSubsystem(10);
+  private final CANdleSubsystem m_leds = new CANdleSubsystem(10, 100);
 
   public RobotContainer() {
     // Default to alliance color
@@ -348,7 +367,7 @@ public void setZoneLEDs() {
     m_intake.hasGamePiece() ? 0 : 0,
     m_intake.hasGamePiece() ? 255 : 0,
     0,
-    8,   // Start at first external LED
+    0,   // Start at first external LED (0-based)
     20   // 20 LEDs
   );
 
@@ -357,7 +376,7 @@ public void setZoneLEDs() {
     m_shooter.atSetpoint() ? 255 : 50,
     0,
     0,
-    28,  // Start after intake zone
+    20,  // Start after intake zone
     20
   );
 
@@ -370,7 +389,7 @@ public void setZoneLEDs() {
     (int)(allianceColor.red * 255),
     (int)(allianceColor.green * 255),
     (int)(allianceColor.blue * 255),
-    48,  // Start after shooter zone
+    40,  // Start after shooter zone
     60   // Rest of strip
   );
 }
@@ -436,8 +455,8 @@ public class LEDCommands {
 Phoenix 6 uses a modern control request pattern:
 
 ```java
-// Solid color
-var solidColor = new SolidColor(8, 107);  // LED range
+// Solid color (indices 8+ are external strip LEDs)
+var solidColor = new SolidColor(8, 107);  // LED range (start, end)
 solidColor.Color = new RGBWColor(255, 0, 0, 0);  // RGBW
 candle.setControl(solidColor);
 
@@ -448,6 +467,8 @@ rainbow.FrameRate = 70;
 rainbow.Slot = 0;
 candle.setControl(rainbow);
 ```
+
+> **Note:** When using `CANdleSubsystem` methods like `setColor()` and `setLEDs()`, the offset to index 8 is handled automatically. Raw CANdle indices are only needed when using `getCANdle()` directly.
 
 ### Animation Configuration
 
@@ -514,7 +535,7 @@ if (status != StatusCode.OK) {
 **Problem:** Only first N LEDs work
 
 **Solutions:**
-1. Check `LEDS_IN_STRIP` constant matches physical strip
+1. Check that the `ledsInStrip` constructor parameter matches physical strip
 2. Verify power supply capacity for full strip
 3. Check data signal integrity (long runs may need buffer)
 4. Test smaller range to isolate power vs. signal issue

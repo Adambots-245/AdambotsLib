@@ -19,11 +19,10 @@ public final class Constants {
     public static final Boolean enableAutomaticShuffleboardRecording = false;
 
     public static final class LEDConstants {
-        public static final int LEDS_IN_STRIP = 100;
         public static final StripTypeValue LED_STRIP_TYPE = StripTypeValue.GRB; // if this is not set properly, the colors will not work
 
         public static final Color off = new Color(0, 0, 0);
-        public static final Color adambotsYellow = new Color(255, 255, 0);
+        public static final Color adambotsYellow = new Color(255, 216, 2);
         public static final Color yellow = new Color(255, 255, 0);
         public static final Color blue = new Color(0, 0, 255);
         public static final Color orange = new Color(180, 90, 5);
