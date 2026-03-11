@@ -121,14 +121,37 @@ public class TalonFXMotor implements BaseMotor {
     }
 
     /**
+     * Constructs a TalonFXMotor with default settings.
+     *
+     * <p>Defaults: regular CAN bus, 40A supply current limit.
+     * Current limits can be further configured via the mechanism config's
+     * {@code withCurrentLimits()} method.
+     *
+     * @param portNum  The CAN ID for the motor controller (0-62).
+     * @param isKraken True for Kraken X60, false for Falcon 500.
+     */
+    public TalonFXMotor(int portNum, boolean isKraken) {
+        this(portNum, false, 40, isKraken);
+    }
+
+    /**
+     * Constructs a TalonFXMotor on a specific CAN bus with a default 40A supply current limit.
+     *
+     * @param portNum      The CAN ID for the motor controller (0-62).
+     * @param isOnCANivore True if the motor is on a CANivore bus.
+     * @param isKraken     True for Kraken X60, false for Falcon 500.
+     */
+    public TalonFXMotor(int portNum, boolean isOnCANivore, boolean isKraken) {
+        this(portNum, isOnCANivore, 40, isKraken);
+    }
+
+    /**
      * Constructs a TalonFXMotor instance.
      *
-     * @param portNum            The port number to which the motor is connected.
-     * @param isOnCANivore       A boolean indicating if the motor is on a CANivore
-     *                           bus.
-     * @param supplyCurrentLimit The supply current limit for the motor.
-     * @param isKraken           A boolean indicating if the motor is part of the
-     *                           Kraken subsystem.
+     * @param portNum            The CAN ID for the motor controller (0-62).
+     * @param isOnCANivore       True if the motor is on a CANivore bus.
+     * @param supplyCurrentLimit The supply current limit in amps.
+     * @param isKraken           True for Kraken X60, false for Falcon 500.
      */
     public TalonFXMotor(int portNum, boolean isOnCANivore, double supplyCurrentLimit, boolean isKraken) {
         this.isKraken = isKraken;
