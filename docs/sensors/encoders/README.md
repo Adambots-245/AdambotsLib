@@ -8,6 +8,7 @@ Encoders measure rotational position for arms, turrets, and other mechanisms tha
 |-------|----------|------------|------------|----------|
 | [CANCoder](CANCoder.md) | CTRE CANcoder | CAN | 4096 CPR | Magnetic, CAN-based |
 | [ThroughBoreEncoder](ThroughBoreEncoder.md) | REV Through Bore | DIO (DutyCycle) | 8192 CPR | Optical, absolute |
+| [Potentiometer](Potentiometer.md) | Analog potentiometer | Analog input | 12-bit (4096 steps) | Linear, multi-turn support |
 | DummyAbsoluteEncoder | None | N/A | N/A | No-op null object for disabled subsystems |
 
 ### Disabled Subsystems (DummyAbsoluteEncoder)
@@ -31,6 +32,9 @@ BaseAbsoluteEncoder armEncoder = new ThroughBoreEncoder(5);
 
 // CTRE CANcoder on CAN ID 2
 BaseAbsoluteEncoder turretEncoder = new CANCoder(2);
+
+// Potentiometer on analog port 0 (10-turn, 3600° range)
+BaseAbsoluteEncoder pot = new Potentiometer(0, 3600);
 
 // Get position with WPILib units
 Angle position = armEncoder.getPosition();
@@ -358,6 +362,22 @@ public double getShortestPathToTarget(double target) {
 
 **Best For:** Turrets, mechanisms far from RoboRIO, robots with many sensors
 
+### Analog Potentiometer
+
+**Pros:**
+- Simple, inexpensive hardware
+- Multi-turn support (e.g., 10-turn for 3600° range)
+- No CAN or DIO overhead — uses analog input
+- Built-in offset support
+
+**Cons:**
+- Lower resolution (12-bit / 4096 steps over full range)
+- Position does not wrap — linear across full range
+- Requires analog port (8 available on RoboRIO 2)
+- Mechanical wear over time
+
+**Best For:** Multi-turn mechanisms, linear actuator position feedback, cost-sensitive builds
+
 ## Calibration
 
 ### Finding Encoder Offsets
@@ -433,4 +453,5 @@ public double getPosition() {
 
 - **[CANCoder](CANCoder.md)** - CTRE CANcoder documentation
 - **[ThroughBoreEncoder](ThroughBoreEncoder.md)** - REV Through Bore documentation
+- **[Potentiometer](Potentiometer.md)** - Analog potentiometer documentation
 - **[Sensors Overview](../README.md)** - All sensor types

@@ -16,6 +16,7 @@ import edu.wpi.first.units.measure.Angle;
  * <ul>
  *   <li>{@link ThroughBoreEncoder} - REV Through Bore (8192 CPR, DutyCycle)</li>
  *   <li>{@link CANCoder} - CTRE CANcoder (4096 CPR, CAN)</li>
+ *   <li>{@link Potentiometer} - Analog potentiometer (12-bit, analog input)</li>
  * </ul>
  *
  * <p><strong>Position Units:</strong>
