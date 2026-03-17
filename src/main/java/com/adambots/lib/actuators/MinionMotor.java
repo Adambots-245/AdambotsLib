@@ -67,6 +67,9 @@ public class MinionMotor implements BaseMotor {
     private final int maxRetries = 3; // Maximum retries for configuration
 
     @NotLogged
+    private boolean focFlag = true; // Safe without Pro license — ignored if unlicensed, enables FOC if licensed
+
+    @NotLogged
     private boolean isInverted = false; // Track inversion state for follower mode
 
     @NotLogged
@@ -176,16 +179,16 @@ public class MinionMotor implements BaseMotor {
     public void set(ControlMode mode, double value) {
         switch (mode) {
             case PERCENT_OUTPUT:
-                motor.setControl(percentRequest.withOutput(value));
+                motor.setControl(percentRequest.withOutput(value).withEnableFOC(focFlag));
                 break;
             case POSITION:
-                motor.setControl(positionRequest.withPosition(value));
+                motor.setControl(positionRequest.withPosition(value).withEnableFOC(focFlag));
                 break;
             case VELOCITY:
-                motor.setControl(velocityRequest.withVelocity(value));
+                motor.setControl(velocityRequest.withVelocity(value).withEnableFOC(focFlag));
                 break;
             case VOLTAGE:
-                motor.setControl(voltageRequest.withOutput(value));
+                motor.setControl(voltageRequest.withOutput(value).withEnableFOC(focFlag));
                 break;
             case CURRENT:
                 // TalonFXS doesn't have a direct current control mode - fallback to percent output
@@ -194,7 +197,7 @@ public class MinionMotor implements BaseMotor {
                 motor.setControl(percentRequest.withOutput(value));
                 break;
             case MOTION_MAGIC:
-                motor.setControl(motionMagicRequest.withPosition(value));
+                motor.setControl(motionMagicRequest.withPosition(value).withEnableFOC(focFlag));
                 break;
             case FOLLOWER:
                 // In Phoenix 6, Follower requires device ID
