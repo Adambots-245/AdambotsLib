@@ -210,7 +210,27 @@ public class MinionMotor implements BaseMotor {
                 // TalonFXS doesn't support FOC torque mode - fallback to regular Motion Magic
                 edu.wpi.first.wpilibj.DriverStation.reportWarning(
                     "MinionMotor: MOTION_MAGIC_FOC_TORQUE not supported. Falling back to MOTION_MAGIC.", false);
-                motor.setControl(motionMagicRequest.withPosition(value));
+                motor.setControl(motionMagicRequest.withPosition(value).withEnableFOC(focFlag));
+                break;
+            case POSITION_FOC_TORQUE:
+                edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                    "MinionMotor: POSITION_FOC_TORQUE not supported. Falling back to POSITION.", false);
+                motor.setControl(positionRequest.withPosition(value).withEnableFOC(focFlag));
+                break;
+            case VELOCITY_FOC_TORQUE:
+                edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                    "MinionMotor: VELOCITY_FOC_TORQUE not supported. Falling back to VELOCITY.", false);
+                motor.setControl(velocityRequest.withVelocity(value).withEnableFOC(focFlag));
+                break;
+            case MOTION_MAGIC_EXPO:
+                edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                    "MinionMotor: MOTION_MAGIC_EXPO not supported. Falling back to MOTION_MAGIC.", false);
+                motor.setControl(motionMagicRequest.withPosition(value).withEnableFOC(focFlag));
+                break;
+            case MOTION_MAGIC_EXPO_TORQUE:
+                edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                    "MinionMotor: MOTION_MAGIC_EXPO_TORQUE not supported. Falling back to MOTION_MAGIC.", false);
+                motor.setControl(motionMagicRequest.withPosition(value).withEnableFOC(focFlag));
                 break;
             default:
                 throw new IllegalArgumentException("Unsupported control mode: " + mode);
@@ -702,8 +722,13 @@ public class MinionMotor implements BaseMotor {
 
     @Override
     public boolean supportsControlMode(ControlMode mode) {
-        // MinionMotor doesn't support CURRENT or MOTION_MAGIC_FOC_TORQUE natively
-        return mode != ControlMode.CURRENT && mode != ControlMode.MOTION_MAGIC_FOC_TORQUE;
+        // MinionMotor doesn't support CURRENT or Pro-only FOC torque/expo modes
+        return mode != ControlMode.CURRENT
+            && mode != ControlMode.MOTION_MAGIC_FOC_TORQUE
+            && mode != ControlMode.POSITION_FOC_TORQUE
+            && mode != ControlMode.VELOCITY_FOC_TORQUE
+            && mode != ControlMode.MOTION_MAGIC_EXPO
+            && mode != ControlMode.MOTION_MAGIC_EXPO_TORQUE;
     }
 
     @Override

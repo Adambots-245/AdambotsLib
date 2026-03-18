@@ -135,6 +135,26 @@ public class NEOMotor implements BaseMotor {
                     "NEOMotor: MOTION_MAGIC_FOC_TORQUE not supported. Falling back to MOTION_MAGIC.", false);
                 closedLoopController.setSetpoint(value, SparkBase.ControlType.kMAXMotionPositionControl);
                 break;
+            case POSITION_FOC_TORQUE:
+                edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                    "NEOMotor: POSITION_FOC_TORQUE not supported. Falling back to POSITION.", false);
+                closedLoopController.setSetpoint(value, SparkBase.ControlType.kPosition);
+                break;
+            case VELOCITY_FOC_TORQUE:
+                edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                    "NEOMotor: VELOCITY_FOC_TORQUE not supported. Falling back to VELOCITY.", false);
+                closedLoopController.setSetpoint(value * RPS_TO_RPM, SparkBase.ControlType.kVelocity);
+                break;
+            case MOTION_MAGIC_EXPO:
+                edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                    "NEOMotor: MOTION_MAGIC_EXPO not supported. Falling back to MOTION_MAGIC.", false);
+                closedLoopController.setSetpoint(value, SparkBase.ControlType.kMAXMotionPositionControl);
+                break;
+            case MOTION_MAGIC_EXPO_TORQUE:
+                edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                    "NEOMotor: MOTION_MAGIC_EXPO_TORQUE not supported. Falling back to MOTION_MAGIC.", false);
+                closedLoopController.setSetpoint(value, SparkBase.ControlType.kMAXMotionPositionControl);
+                break;
             case FOLLOWER:
                 config.follow((int) value);
                 // CRITICAL FIX: Must call configure() to apply follower
@@ -406,8 +426,12 @@ public class NEOMotor implements BaseMotor {
 
     @Override
     public boolean supportsControlMode(ControlMode mode) {
-        // NEOMotor doesn't support MOTION_MAGIC_FOC_TORQUE
-        return mode != ControlMode.MOTION_MAGIC_FOC_TORQUE;
+        // NEOMotor doesn't support Pro-only FOC torque/expo modes
+        return mode != ControlMode.MOTION_MAGIC_FOC_TORQUE
+            && mode != ControlMode.POSITION_FOC_TORQUE
+            && mode != ControlMode.VELOCITY_FOC_TORQUE
+            && mode != ControlMode.MOTION_MAGIC_EXPO
+            && mode != ControlMode.MOTION_MAGIC_EXPO_TORQUE;
     }
 
     @Override

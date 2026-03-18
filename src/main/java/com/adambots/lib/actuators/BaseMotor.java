@@ -67,7 +67,15 @@ public interface BaseMotor extends BaseActuator{
      *   <li><strong>CURRENT:</strong> Torque current control (amperes, if supported)</li>
      *   <li><strong>MOTION_MAGIC:</strong> Position control with automatic motion profiling</li>
      *   <li><strong>MOTION_MAGIC_FOC_TORQUE:</strong> Motion Magic using field-oriented
-     *       control (TalonFX/Minion only)</li>
+     *       control (TalonFX only, requires Phoenix Pro)</li>
+     *   <li><strong>POSITION_FOC_TORQUE:</strong> Position control using torque current —
+     *       more precise position holding (TalonFX only, requires Phoenix Pro)</li>
+     *   <li><strong>VELOCITY_FOC_TORQUE:</strong> Velocity control using torque current —
+     *       tighter velocity regulation (TalonFX only, requires Phoenix Pro)</li>
+     *   <li><strong>MOTION_MAGIC_EXPO:</strong> Exponential motion profile (voltage) —
+     *       smoother S-curve-like profiles (TalonFX only)</li>
+     *   <li><strong>MOTION_MAGIC_EXPO_TORQUE:</strong> Exponential motion profile with torque
+     *       current control (TalonFX only, requires Phoenix Pro)</li>
      *   <li><strong>FOLLOWER:</strong> Follow another motor's output</li>
      * </ul>
      *
@@ -81,6 +89,10 @@ public interface BaseMotor extends BaseActuator{
      *   <tr><td>CURRENT</td><td>✓</td><td>⚠ Fallback</td><td>✓</td><td>⚠ Fallback</td></tr>
      *   <tr><td>MOTION_MAGIC</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
      *   <tr><td>MOTION_MAGIC_FOC_TORQUE</td><td>⚠ Fallback</td><td>✓</td><td>✓</td><td>⚠ Fallback</td></tr>
+     *   <tr><td>POSITION_FOC_TORQUE</td><td>⚠ Fallback</td><td>✓</td><td>✓</td><td>⚠ Fallback</td></tr>
+     *   <tr><td>VELOCITY_FOC_TORQUE</td><td>⚠ Fallback</td><td>✓</td><td>✓</td><td>⚠ Fallback</td></tr>
+     *   <tr><td>MOTION_MAGIC_EXPO</td><td>⚠ Fallback</td><td>✓</td><td>✓</td><td>⚠ Fallback</td></tr>
+     *   <tr><td>MOTION_MAGIC_EXPO_TORQUE</td><td>⚠ Fallback</td><td>✓</td><td>✓</td><td>⚠ Fallback</td></tr>
      *   <tr><td>FOLLOWER</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
      * </table>
      * <p>✓ = Fully supported | ⚠ = Supported with fallback (logs warning, uses alternate mode)
@@ -99,6 +111,10 @@ public interface BaseMotor extends BaseActuator{
         CURRENT,
         MOTION_MAGIC,
         MOTION_MAGIC_FOC_TORQUE,
+        POSITION_FOC_TORQUE,
+        VELOCITY_FOC_TORQUE,
+        MOTION_MAGIC_EXPO,
+        MOTION_MAGIC_EXPO_TORQUE,
         FOLLOWER
     }
 
@@ -749,8 +765,13 @@ public interface BaseMotor extends BaseActuator{
      * @return True if this motor fully supports the control mode, false otherwise
      */
     default boolean supportsControlMode(ControlMode mode) {
-        // Default: support all modes except FOC torque and current
-        return mode != ControlMode.MOTION_MAGIC_FOC_TORQUE && mode != ControlMode.CURRENT;
+        // Default: support all modes except Pro-only FOC torque and current modes
+        return mode != ControlMode.MOTION_MAGIC_FOC_TORQUE
+            && mode != ControlMode.CURRENT
+            && mode != ControlMode.POSITION_FOC_TORQUE
+            && mode != ControlMode.VELOCITY_FOC_TORQUE
+            && mode != ControlMode.MOTION_MAGIC_EXPO
+            && mode != ControlMode.MOTION_MAGIC_EXPO_TORQUE;
     }
 
     /**

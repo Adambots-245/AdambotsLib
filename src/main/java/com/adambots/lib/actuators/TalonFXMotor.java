@@ -112,6 +112,18 @@ public class TalonFXMotor implements BaseMotor {
     @NotLogged
     private final MotionMagicVoltage motionMagicVoltageRequest = new MotionMagicVoltage(0);
 
+    @NotLogged
+    private final PositionTorqueCurrentFOC positionTorqueRequest = new PositionTorqueCurrentFOC(0);
+
+    @NotLogged
+    private final VelocityTorqueCurrentFOC velocityTorqueRequest = new VelocityTorqueCurrentFOC(0);
+
+    @NotLogged
+    private final MotionMagicExpoVoltage motionMagicExpoVoltageRequest = new MotionMagicExpoVoltage(0);
+
+    @NotLogged
+    private final MotionMagicExpoTorqueCurrentFOC motionMagicExpoTorqueRequest = new MotionMagicExpoTorqueCurrentFOC(0);
+
     /**
      * Functional interface for applying a configuration and returning a StatusCode.
      */
@@ -255,6 +267,31 @@ public class TalonFXMotor implements BaseMotor {
             case MOTION_MAGIC_FOC_TORQUE:
                 motor.setControl(new MotionMagicTorqueCurrentFOC(value).withSlot(0).withFeedForward(feedForward));
                 break;
+            case POSITION_FOC_TORQUE:
+                // Torque current-based position control — requires Phoenix Pro license
+                motor.setControl(positionTorqueRequest.withPosition(value)
+                        .withSlot(0).withFeedForward(feedForward));
+                break;
+            case VELOCITY_FOC_TORQUE:
+                // Torque current-based velocity control — requires Phoenix Pro license
+                motor.setControl(velocityTorqueRequest.withVelocity(value)
+                        .withSlot(0).withFeedForward(feedForward));
+                break;
+            case MOTION_MAGIC_EXPO:
+                // Exponential motion profile (voltage) — smoother than trapezoidal
+                if (feedForward != 0) {
+                    motor.setControl(motionMagicExpoVoltageRequest.withPosition(value)
+                            .withSlot(0).withEnableFOC(focFlag).withFeedForward(feedForward));
+                } else {
+                    motor.setControl(motionMagicExpoVoltageRequest.withPosition(value)
+                            .withSlot(0).withEnableFOC(focFlag));
+                }
+                break;
+            case MOTION_MAGIC_EXPO_TORQUE:
+                // Exponential motion profile with torque current — requires Phoenix Pro license
+                motor.setControl(motionMagicExpoTorqueRequest.withPosition(value)
+                        .withSlot(0).withFeedForward(feedForward));
+                break;
             case FOLLOWER:
                 // Follow another Talon FX controller, respecting isInverted flag
                 int deviceID = (int) value;
@@ -387,6 +424,41 @@ public class TalonFXMotor implements BaseMotor {
         if (!success) {
             edu.wpi.first.wpilibj.DriverStation.reportError(
                 "TalonFXMotor: Failed to apply Motion Magic config after retries", false);
+        }
+    }
+
+    /**
+     * Configures Motion Magic Expo profile parameters.
+     *
+     * <p>Expo profiles approach the target asymptotically, producing smoother motion
+     * than standard trapezoidal profiles. The profile shape is determined by kV and kA
+     * parameters (always in Volts, regardless of slot gain units).
+     *
+     * <p>Use with {@link ControlMode#MOTION_MAGIC_EXPO} or {@link ControlMode#MOTION_MAGIC_EXPO_TORQUE}.
+     *
+     * @param expoKV Voltage per RPS — determines cruise velocity (V/RPS). Set to 0 for max velocity.
+     * @param expoKA Voltage per RPS² — determines acceleration (V/RPS²)
+     * @param cruiseVelocity Maximum cruise velocity. Set to {@code RotationsPerSecond.of(0)} for no limit.
+     */
+    public void configureMotionMagicExpo(double expoKV, double expoKA, AngularVelocity cruiseVelocity) {
+        var config = new MotionMagicConfigs();
+
+        // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
+        StatusCode refreshStatus = motor.getConfigurator().refresh(config);
+        if (!refreshStatus.isOK()) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "TalonFXMotor: Failed to refresh Motion Magic Expo config (Status: " + refreshStatus +
+                "). Configuration may be factory defaulted!", true);
+        }
+
+        config.MotionMagicExpo_kV = expoKV;
+        config.MotionMagicExpo_kA = expoKA;
+        config.MotionMagicCruiseVelocity = cruiseVelocity.in(RotationsPerSecond);
+
+        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "TalonFXMotor: Failed to apply Motion Magic Expo config after retries", false);
         }
     }
 
