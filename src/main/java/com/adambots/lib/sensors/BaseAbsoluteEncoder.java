@@ -46,15 +46,18 @@ public interface BaseAbsoluteEncoder {
     /**
      * Returns the absolute position of the encoder.
      *
-     * <p>Position values wrap at 360° (one full rotation).
-     * Use {@code .in(Degrees)} or {@code .in(Radians)} to convert:
+     * <p>Use {@code .in(Degrees)} or {@code .in(Radians)} to convert:
      * <pre>{@code
      * Angle pos = encoder.getPosition();
-     * double degrees = pos.in(Degrees);  // 0.0 to 360.0
-     * double radians = pos.in(Radians);  // 0.0 to 2π
+     * double degrees = pos.in(Degrees);
+     * double radians = pos.in(Radians);
      * }</pre>
      *
-     * @return Absolute position (wraps at 360°)
+     * <p><strong>Note:</strong> Wrapping behavior is implementation-dependent.
+     * Single-rotation encoders (CANCoder, ThroughBoreEncoder) wrap at 360°.
+     * Multi-turn sensors (Potentiometer) return the full range without wrapping.
+     *
+     * @return Absolute position as Angle
      */
     Angle getPosition();
 

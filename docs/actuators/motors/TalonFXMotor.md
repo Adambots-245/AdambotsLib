@@ -142,8 +142,62 @@ double rps = rpm / 60.0;
 | **VOLTAGE** | ✓ Full | ✓ Full | Direct voltage control |
 | **CURRENT** | ⚠ Fallback | ✓ Full | Kraken: TorqueCurrentFOC<br>Falcon: Falls back to duty cycle |
 | **MOTION_MAGIC** | ✓ Full | ✓ Full | Trapezoidal profiling |
-| **MOTION_MAGIC_FOC_TORQUE** | ✓ Full | ✓ Full | Motion Magic with FOC torque |
+| **MOTION_MAGIC_FOC_TORQUE** | ✓ Full | ✓ Full | Motion Magic with FOC torque (Pro) |
+| **POSITION_FOC_TORQUE** | ✓ Full | ✓ Full | Position with FOC torque current (Pro) |
+| **VELOCITY_FOC_TORQUE** | ✓ Full | ✓ Full | Velocity with FOC torque current (Pro) |
+| **MOTION_MAGIC_EXPO** | ✓ Full | ✓ Full | Exponential motion profile |
+| **MOTION_MAGIC_EXPO_TORQUE** | ✓ Full | ✓ Full | Expo profile with FOC torque (Pro) |
 | **FOLLOWER** | ✓ Full | ✓ Full | Follow another TalonFX |
+
+### Phoenix Pro Control Modes
+
+With a Phoenix Pro license, TalonFXMotor supports additional control modes for tighter closed-loop performance:
+
+**Torque Current Modes** — Control motor output using current (amps) instead of voltage:
+
+```java
+// Position hold with torque current — more precise than voltage-based
+motor.set(ControlMode.POSITION_FOC_TORQUE, 10.0);  // 10 rotations
+
+// Velocity with torque current — tighter regulation
+motor.set(ControlMode.VELOCITY_FOC_TORQUE, 50.0);  // 50 RPS
+```
+
+**Exponential Motion Profiles** — S-curve-like profiles that approach the target asymptotically (smoother than trapezoidal):
+
+```java
+// Configure expo profile parameters
+motor.configureMotionMagicExpo(
+    0.12,                         // expoKV: Volts per RPS (determines cruise velocity)
+    0.01,                         // expoKA: Volts per RPS² (determines acceleration)
+    RotationsPerSecond.of(80)     // max cruise velocity (0 for no limit)
+);
+
+// Use expo profile (voltage-based)
+motor.set(ControlMode.MOTION_MAGIC_EXPO, 25.0);  // Smooth move to 25 rotations
+
+// Expo with torque current (requires Pro)
+motor.set(ControlMode.MOTION_MAGIC_EXPO_TORQUE, 25.0);
+```
+
+Note: Expo profiles use different parameters (`expoKV`, `expoKA`) than standard Motion Magic (`cruiseVelocity`, `acceleration`, `jerk`). Both can be configured — the mode you use determines which parameters apply.
+
+### External Sensor Configuration
+
+TalonFX supports remote CAN-based sensors for closed-loop feedback:
+
+```java
+// Remote CANcoder — uses CANcoder position for closed-loop
+motor.configureRemoteCANcoder(9, 1.0);  // CAN ID 9, 1:1 ratio
+
+// Fused CANcoder (Pro) — fuses CANcoder with internal rotor for higher bandwidth
+motor.configureFusedCANcoder(9, 1.0, 12.8);  // CAN ID 9, 1:1 mechanism ratio, 12.8:1 rotor-to-sensor
+
+// Sync CANcoder (Pro) — syncs rotor position against CANcoder, then uses rotor for control
+motor.configureSyncCANcoder(9, 1.0, 12.8);
+```
+
+Note: TalonFX does not have a data port — it cannot directly read pulse-width or quadrature encoders. Use a CANcoder for remote absolute position feedback.
 
 ### Simulation Support
 

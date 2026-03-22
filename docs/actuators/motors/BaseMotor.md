@@ -20,7 +20,11 @@ public enum ControlMode {
     VOLTAGE,                  // Direct voltage control
     CURRENT,                  // Torque current control (if supported)
     MOTION_MAGIC,            // Position with motion profiling
-    MOTION_MAGIC_FOC_TORQUE, // Motion profiling with FOC (TalonFX only)
+    MOTION_MAGIC_FOC_TORQUE, // Motion profiling with FOC torque (TalonFX, Pro)
+    POSITION_FOC_TORQUE,     // Position with FOC torque current (TalonFX, Pro)
+    VELOCITY_FOC_TORQUE,     // Velocity with FOC torque current (TalonFX, Pro)
+    MOTION_MAGIC_EXPO,       // Exponential motion profile (TalonFX)
+    MOTION_MAGIC_EXPO_TORQUE,// Expo profile with FOC torque (TalonFX, Pro)
     FOLLOWER                 // Follow another motor
 }
 ```
@@ -35,7 +39,11 @@ public enum ControlMode {
 | **VOLTAGE** | Output voltage | Volts (-12.0 to 12.0) | All motors |
 | **CURRENT** | Torque current | Amperes | NEO, Kraken only |
 | **MOTION_MAGIC** | Target position with profiling | Rotations | All motors |
-| **MOTION_MAGIC_FOC_TORQUE** | FOC torque mode | Rotations | TalonFX only |
+| **MOTION_MAGIC_FOC_TORQUE** | FOC torque profiling | Rotations | TalonFX only (Pro) |
+| **POSITION_FOC_TORQUE** | FOC torque position | Rotations | TalonFX only (Pro) |
+| **VELOCITY_FOC_TORQUE** | FOC torque velocity | RPS | TalonFX only (Pro) |
+| **MOTION_MAGIC_EXPO** | Expo motion profile | Rotations | TalonFX only |
+| **MOTION_MAGIC_EXPO_TORQUE** | Expo profile + FOC torque | Rotations | TalonFX only (Pro) |
 | **FOLLOWER** | Device ID to follow | CAN ID | All motors |
 
 ### Compatibility Matrix
@@ -49,6 +57,10 @@ public enum ControlMode {
 | CURRENT | ✓ | ⚠ Fallback | ✓ | ⚠ Fallback |
 | MOTION_MAGIC | ✓ | ✓ | ✓ | ✓ |
 | MOTION_MAGIC_FOC_TORQUE | ⚠ Fallback | ✓ | ✓ | ⚠ Fallback |
+| POSITION_FOC_TORQUE | ⚠ Fallback | ✓ | ✓ | ⚠ Fallback |
+| VELOCITY_FOC_TORQUE | ⚠ Fallback | ✓ | ✓ | ⚠ Fallback |
+| MOTION_MAGIC_EXPO | ⚠ Fallback | ✓ | ✓ | ⚠ Fallback |
+| MOTION_MAGIC_EXPO_TORQUE | ⚠ Fallback | ✓ | ✓ | ⚠ Fallback |
 | FOLLOWER | ✓ | ✓ | ✓ | ✓ |
 
 ✓ = Fully supported | ⚠ = Supported with fallback (logs warning, uses alternate mode)

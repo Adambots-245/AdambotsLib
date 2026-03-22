@@ -12,6 +12,7 @@ import com.ctre.phoenix6.signals.ForwardLimitValue;
 import com.ctre.phoenix6.signals.MotorAlignmentValue;
 import com.ctre.phoenix6.signals.ReverseLimitValue;
 import com.ctre.phoenix6.StatusCode;
+import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.CurrentLimitsConfigs;
 import com.ctre.phoenix6.configs.MotionMagicConfigs;
 import com.ctre.phoenix6.configs.SoftwareLimitSwitchConfigs;
@@ -22,6 +23,7 @@ import com.ctre.phoenix6.configs.CommutationConfigs;
 import com.ctre.phoenix6.configs.ExternalFeedbackConfigs;
 import com.ctre.phoenix6.configs.TalonFXSConfiguration;
 import com.ctre.phoenix6.configs.TalonFXSConfigurator;
+import com.ctre.phoenix6.signals.ExternalFeedbackSensorSourceValue;
 import com.ctre.phoenix6.signals.GravityTypeValue;
 import com.ctre.phoenix6.signals.MotorArrangementValue;
 
@@ -64,6 +66,27 @@ public class MinionMotor implements BaseMotor {
     private final DutyCycleOut percentRequest = new DutyCycleOut(0);
 
     @NotLogged
+    private final Follower followerRequest = new Follower(0, MotorAlignmentValue.Aligned);
+
+    // Cached StatusSignal objects — initialized in constructor to avoid repeated HashMap lookups
+    @NotLogged
+    private StatusSignal<Angle> positionSignal;
+    @NotLogged
+    private StatusSignal<AngularVelocity> velocitySignal;
+    @NotLogged
+    private StatusSignal<AngularAcceleration> accelerationSignal;
+    @NotLogged
+    private StatusSignal<Current> statorCurrentSignal;
+    @NotLogged
+    private StatusSignal<Double> dutyCycleSignal;
+    @NotLogged
+    private StatusSignal<Temperature> temperatureSignal;
+    @NotLogged
+    private StatusSignal<ForwardLimitValue> forwardLimitSignal;
+    @NotLogged
+    private StatusSignal<ReverseLimitValue> reverseLimitSignal;
+
+    @NotLogged
     private final int maxRetries = 3; // Maximum retries for configuration
 
     @NotLogged
@@ -85,6 +108,28 @@ public class MinionMotor implements BaseMotor {
     private double slot0_kS = 0, slot0_kA = 0, slot0_kG = 0;
     @NotLogged
     private GravityTypeValue slot0_gravityType = GravityTypeValue.Elevator_Static;
+
+    // Local tracking for soft limits — single source of truth (eliminates refresh-failure risk)
+    @NotLogged
+    private double softLimitForwardThreshold = 0, softLimitReverseThreshold = 0;
+    @NotLogged
+    private boolean softLimitForwardEnabled = false, softLimitReverseEnabled = false;
+
+    // Local tracking for MotionMagicConfigs
+    @NotLogged
+    private double mmCruiseVelocity = 0, mmAcceleration = 0, mmJerk = 0;
+
+    // Local tracking for ExternalFeedbackConfigs
+    @NotLogged
+    private ExternalFeedbackSensorSourceValue extFeedbackSource = ExternalFeedbackSensorSourceValue.Commutation;
+    @NotLogged
+    private int extFeedbackRemoteSensorID = 0;
+    @NotLogged
+    private double extSensorToMechRatio = 1.0, extRotorToSensorRatio = 1.0;
+    @NotLogged
+    private double extAbsoluteSensorOffset = 0, extDiscontinuityPoint = 1.0;
+    @NotLogged
+    private int extQuadratureEdgesPerRotation = 4096;
 
     /**
      * Functional interface for applying a configuration and returning a StatusCode.
@@ -120,6 +165,9 @@ public class MinionMotor implements BaseMotor {
 
         // Optimize CAN bus usage
         motor.optimizeBusUtilization();
+
+        // Cache StatusSignal references to avoid repeated HashMap lookups in getters
+        cacheStatusSignals();
 
         // Cache sim state for simulation support
         if (RobotBase.isSimulation()) {
@@ -169,10 +217,24 @@ public class MinionMotor implements BaseMotor {
         // Optimize CAN bus usage
         motor.optimizeBusUtilization();
 
+        // Cache StatusSignal references to avoid repeated HashMap lookups in getters
+        cacheStatusSignals();
+
         // Cache sim state for simulation support
         if (RobotBase.isSimulation()) {
             simState = motor.getSimState();
         }
+    }
+
+    private void cacheStatusSignals() {
+        positionSignal = motor.getPosition();
+        velocitySignal = motor.getVelocity();
+        accelerationSignal = motor.getAcceleration();
+        statorCurrentSignal = motor.getStatorCurrent();
+        dutyCycleSignal = motor.getDutyCycle();
+        temperatureSignal = motor.getDeviceTemp();
+        forwardLimitSignal = motor.getForwardLimit();
+        reverseLimitSignal = motor.getReverseLimit();
     }
 
     @Override
@@ -200,11 +262,8 @@ public class MinionMotor implements BaseMotor {
                 motor.setControl(motionMagicRequest.withPosition(value).withEnableFOC(focFlag));
                 break;
             case FOLLOWER:
-                // In Phoenix 6, Follower requires device ID
-                // value here is assumed to be the device ID to follow
-                // Use isInverted to determine alignment (like TalonFXMotor)
-                motor.setControl(new Follower((int)value,
-                        isInverted ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned));
+                motor.setControl(followerRequest.withLeaderID((int) value)
+                        .withMotorAlignment(isInverted ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned));
                 break;
             case MOTION_MAGIC_FOC_TORQUE:
                 // TalonFXS doesn't support FOC torque mode - fallback to regular Motion Magic
@@ -237,14 +296,35 @@ public class MinionMotor implements BaseMotor {
         }
     }
 
+    /**
+     * Sets PID gains for closed-loop control.
+     *
+     * <p><strong>Note:</strong> MinionMotor (TalonFXS) only supports PID slot 0.
+     * If a non-zero slot index is passed, a warning is logged and the gains are
+     * applied to slot 0.
+     *
+     * @param slotIdx PID slot index (only 0 is supported on MinionMotor)
+     * @param kP Proportional gain
+     * @param kI Integral gain
+     * @param kD Derivative gain
+     * @param kF Feed-forward gain (maps to kV)
+     */
     @Override
     public void setPID(int slotIdx, double kP, double kI, double kD, double kF) {
+        if (slotIdx != 0) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "MinionMotor: Only PID slot 0 is supported. Slot " + slotIdx + " requested — applying to slot 0.", false);
+        }
         slot0_kP = kP; slot0_kI = kI; slot0_kD = kD; slot0_kV = kF;
         applySlot0();
     }
 
     /**
      * Sets PID and feedforward gains with full Phoenix 6 support.
+     *
+     * <p><strong>Note:</strong> MinionMotor (TalonFXS) only supports PID slot 0.
+     * If a non-zero slot index is passed, a warning is logged and the gains are
+     * applied to slot 0.
      *
      * <p>Phoenix 6 provides separate feedforward gains for different control scenarios:
      * <ul>
@@ -258,7 +338,7 @@ public class MinionMotor implements BaseMotor {
      * {@link #configureGravity(GravityType)} to set the gravity compensation type.
      * Without it, kG defaults to Elevator_Static behavior.
      *
-     * @param slotIdx The PID slot index to configure (0 only for MinionMotor)
+     * @param slotIdx The PID slot index to configure (only 0 is supported on MinionMotor)
      * @param kP Proportional gain
      * @param kI Integral gain
      * @param kD Derivative gain
@@ -269,6 +349,10 @@ public class MinionMotor implements BaseMotor {
      */
     public void setPID(int slotIdx, double kP, double kI, double kD,
                        double kV, double kS, double kA, double kG) {
+        if (slotIdx != 0) {
+            edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "MinionMotor: Only PID slot 0 is supported. Slot " + slotIdx + " requested — applying to slot 0.", false);
+        }
         slot0_kP = kP; slot0_kI = kI; slot0_kD = kD;
         slot0_kV = kV; slot0_kS = kS; slot0_kA = kA; slot0_kG = kG;
         applySlot0();
@@ -294,46 +378,120 @@ public class MinionMotor implements BaseMotor {
 
     @Override
     public void configureSensorToMechanismRatio(double ratio) {
+        extSensorToMechRatio = ratio;
+        applyExternalFeedbackConfig();
+    }
+
+    /**
+     * Configures a pulse-width absolute encoder connected to the TalonFXS data port.
+     *
+     * <p>Use for REV Through Bore encoders or PWM-output potentiometers wired directly
+     * to the motor controller's data port.
+     *
+     * @param sensorToMechanismRatio Gear ratio from sensor to mechanism output
+     * @param absoluteSensorOffset   Offset in rotations (0 to 1) to zero the sensor
+     * @param discontinuityPoint     Wrap point in rotations (1.0 for full wrap, 0.5 for ±180°)
+     */
+    @Override
+    public void configureExternalPulseWidthSensor(double sensorToMechanismRatio,
+            double absoluteSensorOffset, double discontinuityPoint) {
+        extFeedbackSource = ExternalFeedbackSensorSourceValue.PulseWidth;
+        extSensorToMechRatio = sensorToMechanismRatio;
+        extAbsoluteSensorOffset = absoluteSensorOffset;
+        extDiscontinuityPoint = discontinuityPoint;
+        applyExternalFeedbackConfig();
+    }
+
+    /**
+     * Configures a quadrature encoder connected to the TalonFXS data port.
+     *
+     * @param sensorToMechanismRatio Gear ratio from sensor to mechanism output
+     * @param edgesPerRotation       Quadrature edges per rotation (e.g., 8192 for REV Through Bore)
+     */
+    @Override
+    public void configureExternalQuadratureSensor(double sensorToMechanismRatio, int edgesPerRotation) {
+        extFeedbackSource = ExternalFeedbackSensorSourceValue.Quadrature;
+        extSensorToMechRatio = sensorToMechanismRatio;
+        extQuadratureEdgesPerRotation = edgesPerRotation;
+        applyExternalFeedbackConfig();
+    }
+
+    /**
+     * Configures a remote CANcoder as the feedback sensor.
+     *
+     * @param cancoderId             CAN ID of the CANcoder
+     * @param sensorToMechanismRatio Gear ratio from sensor to mechanism output
+     */
+    @Override
+    public void configureRemoteCANcoder(int cancoderId, double sensorToMechanismRatio) {
+        extFeedbackSource = ExternalFeedbackSensorSourceValue.RemoteCANcoder;
+        extFeedbackRemoteSensorID = cancoderId;
+        extSensorToMechRatio = sensorToMechanismRatio;
+        applyExternalFeedbackConfig();
+    }
+
+    /**
+     * Configures a fused CANcoder as the feedback sensor (requires Phoenix Pro).
+     *
+     * <p>Fuses the CANcoder with the commutation sensor for higher bandwidth position
+     * and velocity feedback. Best for mechanisms requiring high-accuracy closed-loop control.
+     *
+     * @param cancoderId             CAN ID of the CANcoder
+     * @param sensorToMechanismRatio Gear ratio from sensor to mechanism output
+     * @param rotorToSensorRatio     Gear ratio from rotor to the CANcoder
+     */
+    @Override
+    public void configureFusedCANcoder(int cancoderId, double sensorToMechanismRatio, double rotorToSensorRatio) {
+        extFeedbackSource = ExternalFeedbackSensorSourceValue.FusedCANcoder;
+        extFeedbackRemoteSensorID = cancoderId;
+        extSensorToMechRatio = sensorToMechanismRatio;
+        extRotorToSensorRatio = rotorToSensorRatio;
+        applyExternalFeedbackConfig();
+    }
+
+    /**
+     * Builds ExternalFeedbackConfigs from local state and applies it.
+     * No refresh needed — we own the full state.
+     */
+    private void applyExternalFeedbackConfig() {
         var config = new ExternalFeedbackConfigs();
-
-        StatusCode refreshStatus = configurator.refresh(config);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "MinionMotor: Failed to refresh ExternalFeedbackConfigs (Status: " + refreshStatus +
-                "). Other feedback fields may be factory defaulted.", false);
-        }
-
-        config.SensorToMechanismRatio = ratio;
+        config.ExternalFeedbackSensorSource = extFeedbackSource;
+        config.FeedbackRemoteSensorID = extFeedbackRemoteSensorID;
+        config.SensorToMechanismRatio = extSensorToMechRatio;
+        config.RotorToSensorRatio = extRotorToSensorRatio;
+        config.AbsoluteSensorOffset = extAbsoluteSensorOffset;
+        config.AbsoluteSensorDiscontinuityPoint = extDiscontinuityPoint;
+        config.QuadratureEdgesPerRotation = extQuadratureEdgesPerRotation;
 
         boolean success = applyConfigWithRetry(() -> configurator.apply(config));
         if (!success) {
             edu.wpi.first.wpilibj.DriverStation.reportError(
-                "MinionMotor: Failed to apply SensorToMechanismRatio after retries", false);
+                "MinionMotor: Failed to apply ExternalFeedbackConfigs after retries", false);
         }
     }
 
     @Override
     public void configureMotionMagic(AngularVelocity cruiseVelocity, AngularAcceleration acceleration, double jerkRPSPerSecPerSec) {
-        MotionMagicConfigs configs = new MotionMagicConfigs();
+        mmCruiseVelocity = cruiseVelocity.in(RotationsPerSecond);
+        mmAcceleration = acceleration.in(RotationsPerSecondPerSecond);
+        mmJerk = jerkRPSPerSecPerSec;
+        applyMotionMagic();
+    }
 
-        // CRITICAL: Check if refresh fails
-        StatusCode refreshStatus = configurator.refresh(configs);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "MinionMotor: Failed to refresh config before configureMotionMagic (Status: " + refreshStatus +
-                "). Configuration may be factory defaulted!", true);
-        }
+    /**
+     * Builds MotionMagicConfigs from local state and applies it.
+     * No refresh needed — we own the full state.
+     */
+    private void applyMotionMagic() {
+        var config = new MotionMagicConfigs();
+        config.MotionMagicCruiseVelocity = mmCruiseVelocity;
+        config.MotionMagicAcceleration = mmAcceleration;
+        config.MotionMagicJerk = mmJerk;
 
-        // Set new values
-        configs.MotionMagicCruiseVelocity = cruiseVelocity.in(RotationsPerSecond);
-        configs.MotionMagicAcceleration = acceleration.in(RotationsPerSecondPerSecond);
-        configs.MotionMagicJerk = jerkRPSPerSecPerSec;
-
-        // Apply configuration - check return value
-        boolean success = applyConfigWithRetry(() -> configurator.apply(configs));
+        boolean success = applyConfigWithRetry(() -> configurator.apply(config));
         if (!success) {
             edu.wpi.first.wpilibj.DriverStation.reportError(
-                "MinionMotor: Failed to apply Motion Magic configuration after retries", false);
+                "MinionMotor: Failed to apply Motion Magic config after retries", false);
         }
     }
 
@@ -370,51 +528,35 @@ public class MinionMotor implements BaseMotor {
 
     @Override
     public void configureSoftLimits(double forwardLimitRotations, double reverseLimitRotations, boolean enable) {
-        SoftwareLimitSwitchConfigs configs = new SoftwareLimitSwitchConfigs();
-
-        // CRITICAL: Check if refresh fails
-        StatusCode refreshStatus = configurator.refresh(configs);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "MinionMotor: Failed to refresh config before configureSoftLimits (Status: " + refreshStatus +
-                "). Configuration may be factory defaulted!", true);
-        }
-
-        // Set new values
-        configs.ForwardSoftLimitThreshold = forwardLimitRotations;
-        configs.ForwardSoftLimitEnable = enable;
-        configs.ReverseSoftLimitThreshold = reverseLimitRotations;
-        configs.ReverseSoftLimitEnable = enable;
-
-        // Apply configuration - check return value
-        boolean success = applyConfigWithRetry(() -> configurator.apply(configs));
-        if (!success) {
-            edu.wpi.first.wpilibj.DriverStation.reportError(
-                "MinionMotor: Failed to apply soft limit configuration after retries", false);
-        }
+        softLimitForwardThreshold = forwardLimitRotations;
+        softLimitReverseThreshold = reverseLimitRotations;
+        softLimitForwardEnabled = enable;
+        softLimitReverseEnabled = enable;
+        applySoftLimits();
     }
 
     @Override
     public void enableSoftLimits(boolean enable) {
-        SoftwareLimitSwitchConfigs configs = new SoftwareLimitSwitchConfigs();
+        softLimitForwardEnabled = enable;
+        softLimitReverseEnabled = enable;
+        applySoftLimits();
+    }
 
-        // CRITICAL: Check if refresh fails
-        StatusCode refreshStatus = configurator.refresh(configs);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "MinionMotor: Failed to refresh config before enableSoftLimits (Status: " + refreshStatus +
-                "). Configuration may be factory defaulted!", true);
-        }
+    /**
+     * Builds SoftwareLimitSwitchConfigs from local state and applies it.
+     * No refresh needed — we own the full state.
+     */
+    private void applySoftLimits() {
+        var config = new SoftwareLimitSwitchConfigs();
+        config.ForwardSoftLimitThreshold = softLimitForwardThreshold;
+        config.ReverseSoftLimitThreshold = softLimitReverseThreshold;
+        config.ForwardSoftLimitEnable = softLimitForwardEnabled;
+        config.ReverseSoftLimitEnable = softLimitReverseEnabled;
 
-        // Update enable values only
-        configs.ForwardSoftLimitEnable = enable;
-        configs.ReverseSoftLimitEnable = enable;
-
-        // Apply configuration - check return value
-        boolean success = applyConfigWithRetry(() -> configurator.apply(configs));
+        boolean success = applyConfigWithRetry(() -> configurator.apply(config));
         if (!success) {
             edu.wpi.first.wpilibj.DriverStation.reportError(
-                "MinionMotor: Failed to apply soft limit enable configuration after retries", false);
+                "MinionMotor: Failed to apply soft limits after retries", false);
         }
     }
 
@@ -430,27 +572,7 @@ public class MinionMotor implements BaseMotor {
     @Override
     public void setInverted(boolean inverted) {
         this.isInverted = inverted;
-
-        var config = new MotorOutputConfigs();
-
-        // Refresh to preserve PeakVoltage and other MotorOutputConfigs fields
-        StatusCode refreshStatus = configurator.refresh(config);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "MinionMotor: Failed to refresh MotorOutputConfigs (Status: " + refreshStatus +
-                "). Factory defaults will be used for PeakVoltage fields.", false);
-        }
-
-        config.withInverted(isInverted ? com.ctre.phoenix6.signals.InvertedValue.Clockwise_Positive :
-                                          com.ctre.phoenix6.signals.InvertedValue.CounterClockwise_Positive)
-              .withNeutralMode(isBrakeMode ? com.ctre.phoenix6.signals.NeutralModeValue.Brake :
-                                              com.ctre.phoenix6.signals.NeutralModeValue.Coast);
-
-        boolean success = applyConfigWithRetry(() -> configurator.apply(config));
-        if (!success) {
-            edu.wpi.first.wpilibj.DriverStation.reportError(
-                "MinionMotor: Failed to apply motor inversion after retries", false);
-        }
+        applyMotorOutput();
     }
 
     /**
@@ -464,26 +586,26 @@ public class MinionMotor implements BaseMotor {
     @Override
     public void setDirection(MotorDirection direction) {
         this.isInverted = (direction == MotorDirection.CLOCKWISE_POSITIVE);
+        applyMotorOutput();
+    }
 
+    /**
+     * Builds MotorOutputConfigs from local state and applies it.
+     * No refresh needed — we own the full state (Inverted + NeutralMode).
+     * Note: PeakForwardVoltage/PeakReverseVoltage use factory defaults (16.0/-16.0)
+     * since the library does not expose methods to modify them.
+     */
+    private void applyMotorOutput() {
         var config = new MotorOutputConfigs();
-
-        StatusCode refreshStatus = configurator.refresh(config);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "MinionMotor: Failed to refresh MotorOutputConfigs (Status: " + refreshStatus +
-                "). Factory defaults will be used for PeakVoltage fields.", false);
-        }
-
-        config.withInverted(direction == MotorDirection.CLOCKWISE_POSITIVE
-                ? com.ctre.phoenix6.signals.InvertedValue.Clockwise_Positive
-                : com.ctre.phoenix6.signals.InvertedValue.CounterClockwise_Positive)
-              .withNeutralMode(isBrakeMode ? com.ctre.phoenix6.signals.NeutralModeValue.Brake
-                                           : com.ctre.phoenix6.signals.NeutralModeValue.Coast);
+        config.withInverted(isInverted ? com.ctre.phoenix6.signals.InvertedValue.Clockwise_Positive :
+                                          com.ctre.phoenix6.signals.InvertedValue.CounterClockwise_Positive)
+              .withNeutralMode(isBrakeMode ? com.ctre.phoenix6.signals.NeutralModeValue.Brake :
+                                              com.ctre.phoenix6.signals.NeutralModeValue.Coast);
 
         boolean success = applyConfigWithRetry(() -> configurator.apply(config));
         if (!success) {
             edu.wpi.first.wpilibj.DriverStation.reportError(
-                "MinionMotor: Failed to apply motor direction after retries", false);
+                "MinionMotor: Failed to apply motor output config after retries", false);
         }
     }
 
@@ -533,60 +655,42 @@ public class MinionMotor implements BaseMotor {
 
     @Override
     public double getPosition() {
-        // In Phoenix 6, getPosition returns a StatusSignal<Double> representing rotations
-        var positionSignal = motor.getPosition();
-        positionSignal.refresh(); // Make sure we have the latest value
-        return positionSignal.getValue().magnitude(); // Value is in rotations which matches our interface
+        return positionSignal.getValueAsDouble();
     }
 
     @Override
     public AngularVelocity getVelocity() {
-        // In Phoenix 6, getVelocity returns rotations per second
-        var velocitySignal = motor.getVelocity();
-        velocitySignal.refresh();
-        return RotationsPerSecond.of(velocitySignal.getValue().magnitude());
+        return RotationsPerSecond.of(velocitySignal.getValueAsDouble());
     }
 
     @Override
     public AngularAcceleration getAcceleration() {
-        var accelerationSignal = motor.getAcceleration();
-        accelerationSignal.refresh();
-        return RotationsPerSecondPerSecond.of(accelerationSignal.getValue().magnitude());
+        return RotationsPerSecondPerSecond.of(accelerationSignal.getValueAsDouble());
     }
 
     @Override
     public Current getCurrentDraw() {
-        var currentSignal = motor.getStatorCurrent();
-        currentSignal.refresh();
-        return Amps.of(currentSignal.getValue().magnitude());
+        return Amps.of(statorCurrentSignal.getValueAsDouble());
     }
 
     @Override
     public double getOutputPercent() {
-        var outputSignal = motor.getDutyCycle();
-        outputSignal.refresh();
-        return outputSignal.getValue().doubleValue(); // Value is from -1.0 to 1.0
+        return dutyCycleSignal.getValueAsDouble();
     }
 
     @Override
     public double getTemperature() {
-        var tempSignal = motor.getDeviceTemp();
-        tempSignal.refresh();
-        return tempSignal.getValue().magnitude(); // Value is in Celsius
+        return temperatureSignal.getValueAsDouble();
     }
 
     @Override
     public boolean getForwardLimitSwitch() {
-        var limitSignal = motor.getForwardLimit();
-        limitSignal.refresh();
-        return limitSignal.getValue().equals(ForwardLimitValue.ClosedToGround); // Returns true if switch is closed
+        return forwardLimitSignal.getValue().equals(ForwardLimitValue.ClosedToGround);
     }
 
     @Override
     public boolean getReverseLimitSwitch() {
-        var limitSignal = motor.getReverseLimit();
-        limitSignal.refresh();
-        return limitSignal.getValue().equals(ReverseLimitValue.ClosedToGround); // Returns true if switch is closed
+        return reverseLimitSignal.getValue().equals(ReverseLimitValue.ClosedToGround);
     }
 
     /**
@@ -627,7 +731,7 @@ public class MinionMotor implements BaseMotor {
     @Override
     public void setStrictFollower(int deviceID, boolean opposeMaster) {
         MotorAlignmentValue alignment = opposeMaster ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned;
-        motor.setControl(new Follower(deviceID, alignment));
+        motor.setControl(followerRequest.withLeaderID(deviceID).withMotorAlignment(alignment));
     }
 
     @Override

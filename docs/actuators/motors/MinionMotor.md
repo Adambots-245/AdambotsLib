@@ -68,7 +68,7 @@ BaseMotor roller = new MinionMotor(12, "*");
 | **Stall Current** | 135A |
 | **Weight** | 150g (with TalonFXS) |
 | **Encoder** | Integrated (2048 CPR) |
-| **FOC** | No |
+| **FOC** | Yes (enabled by default, requires Phoenix Pro to take effect) |
 | **Controller** | TalonFXS (compact TalonFX variant) |
 
 ## Controller: TalonFXS
@@ -126,12 +126,39 @@ double rps = rpm / 60.0;
 | **CURRENT** | ⚠ Fallback | Falls back to PERCENT_OUTPUT with warning |
 | **MOTION_MAGIC** | ✓ Full | Trapezoidal profiling with MotionMagicVoltage |
 | **MOTION_MAGIC_FOC_TORQUE** | ⚠ Fallback | Falls back to MOTION_MAGIC with warning |
+| **POSITION_FOC_TORQUE** | ⚠ Fallback | Falls back to POSITION with warning |
+| **VELOCITY_FOC_TORQUE** | ⚠ Fallback | Falls back to VELOCITY with warning |
+| **MOTION_MAGIC_EXPO** | ⚠ Fallback | Falls back to MOTION_MAGIC with warning |
+| **MOTION_MAGIC_EXPO_TORQUE** | ⚠ Fallback | Falls back to MOTION_MAGIC with warning |
 | **FOLLOWER** | ✓ Full | Follow another TalonFXS or TalonFX |
 
 **Limitations:**
-- No FOC (Field-Oriented Control)
-- No direct current control (TorqueCurrentFOC)
-- Single PID slot (slot 0 only)
+- No torque current control modes (TorqueCurrentFOC, Expo Torque — TalonFX only)
+- Single PID slot (slot 0 only — warns if non-zero slot is passed)
+
+**FOC Support:** FOC is enabled by default on all voltage-based control requests. With a Phoenix Pro license, this provides improved efficiency and smoother operation. Without Pro, the FOC flag is safely ignored.
+
+### External Sensor Configuration
+
+TalonFXS has a data port for direct sensor connection, plus CAN-based remote sensor support:
+
+```java
+// Pulse-width encoder on data port (REV Through Bore, PWM potentiometer)
+motor.configureExternalPulseWidthSensor(
+    1.0,   // sensor-to-mechanism ratio
+    0.25,  // absolute sensor offset (rotations, 0-1)
+    1.0    // discontinuity point (1.0 = full wrap)
+);
+
+// Quadrature encoder on data port
+motor.configureExternalQuadratureSensor(1.0, 8192);  // 1:1 ratio, 8192 edges/rev
+
+// Remote CANcoder on CAN bus
+motor.configureRemoteCANcoder(9, 1.0);  // CAN ID 9, 1:1 ratio
+
+// Fused CANcoder (Pro) — fuses with commutation sensor for higher bandwidth
+motor.configureFusedCANcoder(9, 1.0, 12.8);  // CAN ID 9, 1:1 mechanism, 12.8:1 rotor-to-sensor
+```
 
 ### Simulation Support
 

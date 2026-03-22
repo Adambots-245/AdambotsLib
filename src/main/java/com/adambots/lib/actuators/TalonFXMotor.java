@@ -1,6 +1,7 @@
 package com.adambots.lib.actuators;
 
 import com.ctre.phoenix6.StatusCode;
+import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.configs.*;
 import com.ctre.phoenix6.controls.*;
@@ -99,6 +100,26 @@ public class TalonFXMotor implements BaseMotor {
     @NotLogged
     private double slot2_kS = 0, slot2_kA = 0, slot2_kG = 0;
 
+    // Local tracking for soft limits — single source of truth (eliminates refresh-failure risk)
+    @NotLogged
+    private double softLimitForwardThreshold = 0, softLimitReverseThreshold = 0;
+    @NotLogged
+    private boolean softLimitForwardEnabled = false, softLimitReverseEnabled = false;
+
+    // Local tracking for MotionMagicConfigs
+    @NotLogged
+    private double mmCruiseVelocity = 0, mmAcceleration = 0, mmJerk = 0;
+    @NotLogged
+    private double mmExpoKV = 0, mmExpoKA = 0;
+
+    // Local tracking for FeedbackConfigs
+    @NotLogged
+    private FeedbackSensorSourceValue feedbackSource = FeedbackSensorSourceValue.RotorSensor;
+    @NotLogged
+    private int feedbackRemoteSensorID = 0;
+    @NotLogged
+    private double feedbackSensorToMechRatio = 1.0, feedbackRotorToSensorRatio = 1.0;
+
     // Reusable control request objects to avoid allocation overhead
     @NotLogged
     private final VoltageOut voltageRequest = new VoltageOut(0);
@@ -123,6 +144,36 @@ public class TalonFXMotor implements BaseMotor {
 
     @NotLogged
     private final MotionMagicExpoTorqueCurrentFOC motionMagicExpoTorqueRequest = new MotionMagicExpoTorqueCurrentFOC(0);
+
+    @NotLogged
+    private final DutyCycleOut dutyCycleRequest = new DutyCycleOut(0);
+
+    @NotLogged
+    private final TorqueCurrentFOC torqueCurrentRequest = new TorqueCurrentFOC(0);
+
+    @NotLogged
+    private final MotionMagicTorqueCurrentFOC motionMagicTorqueRequest = new MotionMagicTorqueCurrentFOC(0);
+
+    @NotLogged
+    private final Follower followerRequest = new Follower(0, MotorAlignmentValue.Aligned);
+
+    // Cached StatusSignal objects — initialized in constructor to avoid repeated HashMap lookups
+    @NotLogged
+    private StatusSignal<Angle> positionSignal;
+    @NotLogged
+    private StatusSignal<AngularVelocity> velocitySignal;
+    @NotLogged
+    private StatusSignal<AngularAcceleration> accelerationSignal;
+    @NotLogged
+    private StatusSignal<Current> statorCurrentSignal;
+    @NotLogged
+    private StatusSignal<Double> dutyCycleSignal;
+    @NotLogged
+    private StatusSignal<Temperature> temperatureSignal;
+    @NotLogged
+    private StatusSignal<ForwardLimitValue> forwardLimitSignal;
+    @NotLogged
+    private StatusSignal<ReverseLimitValue> reverseLimitSignal;
 
     /**
      * Functional interface for applying a configuration and returning a StatusCode.
@@ -199,6 +250,16 @@ public class TalonFXMotor implements BaseMotor {
         // Optimize CAN bus usage
         motor.optimizeBusUtilization();
 
+        // Cache StatusSignal references to avoid repeated HashMap lookups in getters
+        positionSignal = motor.getPosition();
+        velocitySignal = motor.getVelocity();
+        accelerationSignal = motor.getAcceleration();
+        statorCurrentSignal = motor.getStatorCurrent();
+        dutyCycleSignal = motor.getDutyCycle();
+        temperatureSignal = motor.getDeviceTemp();
+        forwardLimitSignal = motor.getForwardLimit();
+        reverseLimitSignal = motor.getReverseLimit();
+
         // Cache sim state for simulation support
         if (RobotBase.isSimulation()) {
             simState = motor.getSimState();
@@ -224,7 +285,7 @@ public class TalonFXMotor implements BaseMotor {
     public void set(ControlMode mode, double value) {
         switch (mode) {
             case PERCENT_OUTPUT:
-                motor.setControl(new DutyCycleOut(value).withEnableFOC(focFlag));
+                motor.setControl(dutyCycleRequest.withOutput(value).withEnableFOC(focFlag));
                 break;
             case POSITION:
                 // Use Voltage-based control for better precision (Phoenix 6 recommendation)
@@ -252,7 +313,7 @@ public class TalonFXMotor implements BaseMotor {
                 break;
             case CURRENT:
                 // TorqueCurrentFOC works on all TalonFX (requires Phoenix Pro license)
-                motor.setControl(new TorqueCurrentFOC(value));
+                motor.setControl(torqueCurrentRequest.withOutput(value));
                 break;
             case MOTION_MAGIC:
                 // Use Voltage-based control for better precision (Phoenix 6 recommendation)
@@ -265,7 +326,7 @@ public class TalonFXMotor implements BaseMotor {
                 }
                 break;
             case MOTION_MAGIC_FOC_TORQUE:
-                motor.setControl(new MotionMagicTorqueCurrentFOC(value).withSlot(0).withFeedForward(feedForward));
+                motor.setControl(motionMagicTorqueRequest.withPosition(value).withSlot(0).withFeedForward(feedForward));
                 break;
             case POSITION_FOC_TORQUE:
                 // Torque current-based position control — requires Phoenix Pro license
@@ -294,9 +355,8 @@ public class TalonFXMotor implements BaseMotor {
                 break;
             case FOLLOWER:
                 // Follow another Talon FX controller, respecting isInverted flag
-                int deviceID = (int) value;
-                motor.setControl(new com.ctre.phoenix6.controls.Follower(deviceID,
-                        isInverted ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned));
+                motor.setControl(followerRequest.withLeaderID((int) value)
+                        .withMotorAlignment(isInverted ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned));
                 break;
         }
     }
@@ -315,7 +375,7 @@ public class TalonFXMotor implements BaseMotor {
      */
     @Override
     public void set(double speed) {
-        motor.setControl(new DutyCycleOut(speed));
+        motor.setControl(dutyCycleRequest.withOutput(speed).withEnableFOC(focFlag));
     }
 
     /**
@@ -406,25 +466,10 @@ public class TalonFXMotor implements BaseMotor {
      */
     @Override
     public void configureMotionMagic(AngularVelocity cruiseVelocity, AngularAcceleration acceleration, double jerkRPSPerSecPerSec) {
-        var config = new MotionMagicConfigs();
-
-        // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
-        StatusCode refreshStatus = motor.getConfigurator().refresh(config);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "TalonFXMotor: Failed to refresh Motion Magic config (Status: " + refreshStatus +
-                "). Configuration may be factory defaulted!", true);
-        }
-
-        config.MotionMagicCruiseVelocity = cruiseVelocity.in(RotationsPerSecond);
-        config.MotionMagicAcceleration = acceleration.in(RotationsPerSecondPerSecond);
-        config.MotionMagicJerk = jerkRPSPerSecPerSec;
-
-        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
-        if (!success) {
-            edu.wpi.first.wpilibj.DriverStation.reportError(
-                "TalonFXMotor: Failed to apply Motion Magic config after retries", false);
-        }
+        mmCruiseVelocity = cruiseVelocity.in(RotationsPerSecond);
+        mmAcceleration = acceleration.in(RotationsPerSecondPerSecond);
+        mmJerk = jerkRPSPerSecPerSec;
+        applyMotionMagic();
     }
 
     /**
@@ -441,19 +486,23 @@ public class TalonFXMotor implements BaseMotor {
      * @param cruiseVelocity Maximum cruise velocity. Set to {@code RotationsPerSecond.of(0)} for no limit.
      */
     public void configureMotionMagicExpo(double expoKV, double expoKA, AngularVelocity cruiseVelocity) {
+        mmExpoKV = expoKV;
+        mmExpoKA = expoKA;
+        mmCruiseVelocity = cruiseVelocity.in(RotationsPerSecond);
+        applyMotionMagic();
+    }
+
+    /**
+     * Builds MotionMagicConfigs from local state and applies it.
+     * No refresh needed — we own the full state.
+     */
+    private void applyMotionMagic() {
         var config = new MotionMagicConfigs();
-
-        // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
-        StatusCode refreshStatus = motor.getConfigurator().refresh(config);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "TalonFXMotor: Failed to refresh Motion Magic Expo config (Status: " + refreshStatus +
-                "). Configuration may be factory defaulted!", true);
-        }
-
-        config.MotionMagicExpo_kV = expoKV;
-        config.MotionMagicExpo_kA = expoKA;
-        config.MotionMagicCruiseVelocity = cruiseVelocity.in(RotationsPerSecond);
+        config.MotionMagicCruiseVelocity = mmCruiseVelocity;
+        config.MotionMagicAcceleration = mmAcceleration;
+        config.MotionMagicJerk = mmJerk;
+        config.MotionMagicExpo_kV = mmExpoKV;
+        config.MotionMagicExpo_kA = mmExpoKA;
 
         boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
         if (!success) {
@@ -502,54 +551,42 @@ public class TalonFXMotor implements BaseMotor {
      */
     @Override
     public void configureSoftLimits(double forwardLimitRotations, double reverseLimitRotations, boolean enable) {
-        var config = new SoftwareLimitSwitchConfigs();
-
-        // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
-        StatusCode refreshStatus = motor.getConfigurator().refresh(config);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "TalonFXMotor: Failed to refresh soft limits config (Status: " + refreshStatus +
-                "). Configuration may be factory defaulted!", true);
-        }
-
-        config.ForwardSoftLimitThreshold = forwardLimitRotations;
-        config.ReverseSoftLimitThreshold = reverseLimitRotations;
-        config.ForwardSoftLimitEnable = enable;
-        config.ReverseSoftLimitEnable = enable;
-
-        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
-        if (!success) {
-            edu.wpi.first.wpilibj.DriverStation.reportError(
-                "TalonFXMotor: Failed to apply soft limits after retries", false);
-        }
+        softLimitForwardThreshold = forwardLimitRotations;
+        softLimitReverseThreshold = reverseLimitRotations;
+        softLimitForwardEnabled = enable;
+        softLimitReverseEnabled = enable;
+        applySoftLimits();
     }
 
     /**
      * Enables or disables software limit switches for both forward and reverse
      * directions.
      * Software limits prevent the motor from moving beyond specified positions.
-     * 
+     *
      * @param enable true to enable software limits, false to disable them
      */
     @Override
     public void enableSoftLimits(boolean enable) {
+        softLimitForwardEnabled = enable;
+        softLimitReverseEnabled = enable;
+        applySoftLimits();
+    }
+
+    /**
+     * Builds SoftwareLimitSwitchConfigs from local state and applies it.
+     * No refresh needed — we own the full state.
+     */
+    private void applySoftLimits() {
         var config = new SoftwareLimitSwitchConfigs();
-
-        // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
-        StatusCode refreshStatus = motor.getConfigurator().refresh(config);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "TalonFXMotor: Failed to refresh soft limits enable config (Status: " + refreshStatus +
-                "). Configuration may be factory defaulted!", true);
-        }
-
-        config.ForwardSoftLimitEnable = enable;
-        config.ReverseSoftLimitEnable = enable;
+        config.ForwardSoftLimitThreshold = softLimitForwardThreshold;
+        config.ReverseSoftLimitThreshold = softLimitReverseThreshold;
+        config.ForwardSoftLimitEnable = softLimitForwardEnabled;
+        config.ReverseSoftLimitEnable = softLimitReverseEnabled;
 
         boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
         if (!success) {
             edu.wpi.first.wpilibj.DriverStation.reportError(
-                "TalonFXMotor: Failed to apply soft limits enable after retries", false);
+                "TalonFXMotor: Failed to apply soft limits after retries", false);
         }
     }
 
@@ -565,25 +602,7 @@ public class TalonFXMotor implements BaseMotor {
     @Override
     public void setInverted(boolean inverted) {
         this.isInverted = inverted;
-
-        var config = new MotorOutputConfigs();
-
-        // Refresh to preserve PeakVoltage and other MotorOutputConfigs fields
-        StatusCode refreshStatus = motor.getConfigurator().refresh(config);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "TalonFXMotor: Failed to refresh MotorOutputConfigs (Status: " + refreshStatus +
-                "). Factory defaults will be used for PeakVoltage fields.", false);
-        }
-
-        config.withInverted(isInverted ? InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive)
-              .withNeutralMode(isBrakeMode ? NeutralModeValue.Brake : NeutralModeValue.Coast);
-
-        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
-        if (!success) {
-            edu.wpi.first.wpilibj.DriverStation.reportError(
-                "TalonFXMotor: Failed to apply motor inversion after retries", false);
-        }
+        applyMotorOutput();
     }
 
     /**
@@ -597,25 +616,24 @@ public class TalonFXMotor implements BaseMotor {
     @Override
     public void setDirection(MotorDirection direction) {
         this.isInverted = (direction == MotorDirection.CLOCKWISE_POSITIVE);
+        applyMotorOutput();
+    }
 
+    /**
+     * Builds MotorOutputConfigs from local state and applies it.
+     * No refresh needed — we own the full state (Inverted + NeutralMode).
+     * Note: PeakForwardVoltage/PeakReverseVoltage use factory defaults (16.0/-16.0)
+     * since the library does not expose methods to modify them.
+     */
+    private void applyMotorOutput() {
         var config = new MotorOutputConfigs();
-
-        StatusCode refreshStatus = motor.getConfigurator().refresh(config);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "TalonFXMotor: Failed to refresh MotorOutputConfigs (Status: " + refreshStatus +
-                "). Factory defaults will be used for PeakVoltage fields.", false);
-        }
-
-        config.withInverted(direction == MotorDirection.CLOCKWISE_POSITIVE
-                ? InvertedValue.Clockwise_Positive
-                : InvertedValue.CounterClockwise_Positive)
+        config.withInverted(isInverted ? InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive)
               .withNeutralMode(isBrakeMode ? NeutralModeValue.Brake : NeutralModeValue.Coast);
 
         boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
         if (!success) {
             edu.wpi.first.wpilibj.DriverStation.reportError(
-                "TalonFXMotor: Failed to apply motor direction after retries", false);
+                "TalonFXMotor: Failed to apply motor output config after retries", false);
         }
     }
 
@@ -655,8 +673,9 @@ public class TalonFXMotor implements BaseMotor {
      */
     public void setPositionWithArbFeedForward(double rotations, double arbFeedForward) {
         int activePidSlot = 0;
-        motor.setControl(new PositionVoltage(rotations)
+        motor.setControl(positionVoltageRequest.withPosition(rotations)
                 .withSlot(activePidSlot)
+                .withEnableFOC(focFlag)
                 .withFeedForward(arbFeedForward));
     }
 
@@ -698,7 +717,7 @@ public class TalonFXMotor implements BaseMotor {
      */
     @Override
     public double getPosition() {
-        return motor.getPosition().getValueAsDouble();
+        return positionSignal.getValueAsDouble();
     }
 
     /**
@@ -708,7 +727,7 @@ public class TalonFXMotor implements BaseMotor {
      */
     @Override
     public AngularVelocity getVelocity() {
-        return RotationsPerSecond.of(motor.getVelocity().getValueAsDouble());
+        return RotationsPerSecond.of(velocitySignal.getValueAsDouble());
     }
 
     /**
@@ -718,7 +737,7 @@ public class TalonFXMotor implements BaseMotor {
      */
     @Override
     public AngularAcceleration getAcceleration() {
-        return RotationsPerSecondPerSecond.of(motor.getAcceleration().getValueAsDouble());
+        return RotationsPerSecondPerSecond.of(accelerationSignal.getValueAsDouble());
     }
 
     /**
@@ -728,49 +747,47 @@ public class TalonFXMotor implements BaseMotor {
      */
     @Override
     public Current getCurrentDraw() {
-        return Amps.of(motor.getStatorCurrent().getValueAsDouble());
+        return Amps.of(statorCurrentSignal.getValueAsDouble());
     }
 
     /**
      * Gets the current output percentage of the motor.
-     * 
+     *
      * @return The current output percentage as a double between -1.0 and 1.0
      */
     @Override
     public double getOutputPercent() {
-        return motor.getDutyCycle().getValueAsDouble();
+        return dutyCycleSignal.getValueAsDouble();
     }
 
     /**
      * Gets the current temperature of the motor.
-     * 
+     *
      * @return The current temperature in degrees Celsius
      */
     @Override
     public double getTemperature() {
-        return motor.getDeviceTemp().getValueAsDouble();
+        return temperatureSignal.getValueAsDouble();
     }
 
     /**
      * Gets the state of the forward limit switch.
-     * 
+     *
      * @return True if the forward limit switch is closed, false otherwise
      */
     @Override
     public boolean getForwardLimitSwitch() {
-        // return motor.getForwardLimit().getValueAsDouble() == 1;
-        return motor.getForwardLimit().getValue() == ForwardLimitValue.ClosedToGround;
+        return forwardLimitSignal.getValue() == ForwardLimitValue.ClosedToGround;
     }
 
     /**
      * Gets the state of the reverse limit switch.
-     * 
+     *
      * @return True if the reverse limit switch is closed, false otherwise
      */
     @Override
     public boolean getReverseLimitSwitch() {
-        // return motor.getReverseLimit().getValueAsDouble() == 1;
-        return motor.getReverseLimit().getValue() == ReverseLimitValue.ClosedToGround;
+        return reverseLimitSignal.getValue() == ReverseLimitValue.ClosedToGround;
     }
 
     /**
@@ -813,7 +830,7 @@ public class TalonFXMotor implements BaseMotor {
         // Set this motor as a follower using the Follower control request
         // Follower control ignores motor inversion config, so we must use MotorAlignment
         MotorAlignmentValue alignment = opposeMaster ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned;
-        motor.setControl(new com.ctre.phoenix6.controls.Follower(deviceID, alignment));
+        motor.setControl(followerRequest.withLeaderID(deviceID).withMotorAlignment(alignment));
     }
 
     /**
@@ -887,21 +904,77 @@ public class TalonFXMotor implements BaseMotor {
 
     @Override
     public void configureSensorToMechanismRatio(double ratio) {
+        feedbackSensorToMechRatio = ratio;
+        applyFeedbackConfig();
+    }
+
+    /**
+     * Configures a remote CANcoder as the feedback sensor.
+     *
+     * @param cancoderId             CAN ID of the CANcoder
+     * @param sensorToMechanismRatio Gear ratio from sensor to mechanism output
+     */
+    @Override
+    public void configureRemoteCANcoder(int cancoderId, double sensorToMechanismRatio) {
+        feedbackSource = FeedbackSensorSourceValue.RemoteCANcoder;
+        feedbackRemoteSensorID = cancoderId;
+        feedbackSensorToMechRatio = sensorToMechanismRatio;
+        applyFeedbackConfig();
+    }
+
+    /**
+     * Configures a fused CANcoder as the feedback sensor (requires Phoenix Pro).
+     *
+     * <p>Fuses the CANcoder with the internal rotor sensor for higher bandwidth position
+     * and velocity feedback. Best for swerve azimuth and high-accuracy mechanisms.
+     *
+     * @param cancoderId             CAN ID of the CANcoder
+     * @param sensorToMechanismRatio Gear ratio from sensor to mechanism output
+     * @param rotorToSensorRatio     Gear ratio from rotor to the CANcoder
+     */
+    @Override
+    public void configureFusedCANcoder(int cancoderId, double sensorToMechanismRatio, double rotorToSensorRatio) {
+        feedbackSource = FeedbackSensorSourceValue.FusedCANcoder;
+        feedbackRemoteSensorID = cancoderId;
+        feedbackSensorToMechRatio = sensorToMechanismRatio;
+        feedbackRotorToSensorRatio = rotorToSensorRatio;
+        applyFeedbackConfig();
+    }
+
+    /**
+     * Configures a sync CANcoder as the feedback sensor (requires Phoenix Pro).
+     *
+     * <p>Synchronizes the internal rotor position against the CANcoder, then continues
+     * using the rotor sensor for closed-loop control. Reports if positions diverge.
+     *
+     * @param cancoderId             CAN ID of the CANcoder
+     * @param sensorToMechanismRatio Gear ratio from sensor to mechanism output
+     * @param rotorToSensorRatio     Gear ratio from rotor to the CANcoder
+     */
+    @Override
+    public void configureSyncCANcoder(int cancoderId, double sensorToMechanismRatio, double rotorToSensorRatio) {
+        feedbackSource = FeedbackSensorSourceValue.SyncCANcoder;
+        feedbackRemoteSensorID = cancoderId;
+        feedbackSensorToMechRatio = sensorToMechanismRatio;
+        feedbackRotorToSensorRatio = rotorToSensorRatio;
+        applyFeedbackConfig();
+    }
+
+    /**
+     * Builds FeedbackConfigs from local state and applies it.
+     * No refresh needed — we own the full state.
+     */
+    private void applyFeedbackConfig() {
         var config = new FeedbackConfigs();
-
-        StatusCode refreshStatus = motor.getConfigurator().refresh(config);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "TalonFXMotor: Failed to refresh FeedbackConfigs (Status: " + refreshStatus +
-                "). Other feedback fields may be factory defaulted.", false);
-        }
-
-        config.SensorToMechanismRatio = ratio;
+        config.FeedbackSensorSource = feedbackSource;
+        config.FeedbackRemoteSensorID = feedbackRemoteSensorID;
+        config.SensorToMechanismRatio = feedbackSensorToMechRatio;
+        config.RotorToSensorRatio = feedbackRotorToSensorRatio;
 
         boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
         if (!success) {
             edu.wpi.first.wpilibj.DriverStation.reportError(
-                "TalonFXMotor: Failed to apply SensorToMechanismRatio after retries", false);
+                "TalonFXMotor: Failed to apply FeedbackConfigs after retries", false);
         }
     }
 
