@@ -85,6 +85,8 @@ public class MinionMotor implements BaseMotor {
     private StatusSignal<ForwardLimitValue> forwardLimitSignal;
     @NotLogged
     private StatusSignal<ReverseLimitValue> reverseLimitSignal;
+    @NotLogged
+    private StatusSignal<Angle> rotorPositionSignal;
 
     @NotLogged
     private final int maxRetries = 3; // Maximum retries for configuration
@@ -235,6 +237,7 @@ public class MinionMotor implements BaseMotor {
         temperatureSignal = motor.getDeviceTemp();
         forwardLimitSignal = motor.getForwardLimit();
         reverseLimitSignal = motor.getReverseLimit();
+        rotorPositionSignal = motor.getRotorPosition();
     }
 
     @Override
@@ -666,6 +669,11 @@ public class MinionMotor implements BaseMotor {
     @Override
     public double getPosition() {
         return positionSignal.getValueAsDouble();
+    }
+
+    @Override
+    public double getRotorPosition() {
+        return rotorPositionSignal.getValueAsDouble();
     }
 
     @Override

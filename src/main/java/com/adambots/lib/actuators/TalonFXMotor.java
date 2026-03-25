@@ -174,6 +174,8 @@ public class TalonFXMotor implements BaseMotor {
     private StatusSignal<ForwardLimitValue> forwardLimitSignal;
     @NotLogged
     private StatusSignal<ReverseLimitValue> reverseLimitSignal;
+    @NotLogged
+    private StatusSignal<Angle> rotorPositionSignal;
 
     /**
      * Functional interface for applying a configuration and returning a StatusCode.
@@ -259,6 +261,7 @@ public class TalonFXMotor implements BaseMotor {
         temperatureSignal = motor.getDeviceTemp();
         forwardLimitSignal = motor.getForwardLimit();
         reverseLimitSignal = motor.getReverseLimit();
+        rotorPositionSignal = motor.getRotorPosition();
 
         // Cache sim state for simulation support
         if (RobotBase.isSimulation()) {
@@ -722,6 +725,11 @@ public class TalonFXMotor implements BaseMotor {
     @Override
     public double getPosition() {
         return positionSignal.getValueAsDouble();
+    }
+
+    @Override
+    public double getRotorPosition() {
+        return rotorPositionSignal.getValueAsDouble();
     }
 
     /**

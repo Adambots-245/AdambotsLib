@@ -483,6 +483,22 @@ public interface BaseMotor extends BaseActuator{
     double getPosition();
 
     /**
+     * Gets the raw rotor position, independent of any configured feedback source.
+     *
+     * <p>On CTRE motors (TalonFX, TalonFXS), this returns the internal rotor position
+     * even when an external sensor is configured as the feedback source. Useful for
+     * debugging sensor alignment or monitoring rotor position separately.
+     *
+     * <p>On motors without a separate rotor concept (e.g., NEO), this returns the
+     * same value as {@link #getPosition()}.
+     *
+     * @return Raw rotor position in rotations
+     */
+    default double getRotorPosition() {
+        return getPosition();
+    }
+
+    /**
      * Gets the current motor velocity.
      *
      * <p><strong>Returns typed AngularVelocity</strong> - use {@code .in(RotationsPerSecond)}
