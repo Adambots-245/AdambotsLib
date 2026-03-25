@@ -468,6 +468,12 @@ public class MinionMotor implements BaseMotor {
             edu.wpi.first.wpilibj.DriverStation.reportError(
                 "MinionMotor: Failed to apply ExternalFeedbackConfigs after retries", false);
         }
+
+        // Re-enable signals for the new feedback source — optimizeBusUtilization()
+        // in the constructor may have suppressed signals needed by the new source
+        positionSignal.setUpdateFrequency(50);
+        velocitySignal.setUpdateFrequency(50);
+        motor.optimizeBusUtilization();
     }
 
     @Override
@@ -524,6 +530,10 @@ public class MinionMotor implements BaseMotor {
             edu.wpi.first.wpilibj.DriverStation.reportError(
                 "MinionMotor: Failed to apply current limit configuration after retries", false);
         }
+
+        // Enable stator current reporting — suppressed by optimizeBusUtilization() in constructor
+        statorCurrentSignal.setUpdateFrequency(10);
+        motor.optimizeBusUtilization();
     }
 
     @Override
@@ -756,12 +766,16 @@ public class MinionMotor implements BaseMotor {
         configs.ReverseLimitAutosetPositionEnable = enableReverse;
         configs.ReverseLimitAutosetPositionValue = reverseResetValueRotations;
 
-        // Apply configuration - check return value
         boolean success = applyConfigWithRetry(() -> configurator.apply(configs));
         if (!success) {
             edu.wpi.first.wpilibj.DriverStation.reportError(
                 "MinionMotor: Failed to apply hard limit configuration after retries", false);
         }
+
+        // Re-enable limit signals at higher rate for active limit monitoring
+        forwardLimitSignal.setUpdateFrequency(50);
+        reverseLimitSignal.setUpdateFrequency(50);
+        motor.optimizeBusUtilization();
     }
 
     @Override

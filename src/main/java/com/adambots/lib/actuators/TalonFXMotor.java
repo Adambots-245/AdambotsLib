@@ -540,6 +540,10 @@ public class TalonFXMotor implements BaseMotor {
             edu.wpi.first.wpilibj.DriverStation.reportError(
                 "TalonFXMotor: Failed to apply current limits after retries", false);
         }
+
+        // Enable stator current reporting — suppressed by optimizeBusUtilization() in constructor
+        statorCurrentSignal.setUpdateFrequency(10);
+        motor.optimizeBusUtilization();
     }
 
     /**
@@ -874,9 +878,10 @@ public class TalonFXMotor implements BaseMotor {
                 "TalonFXMotor: Failed to apply hard limits after retries", false);
         }
 
-        // For simulation/feedback
-        motor.getForwardLimit().setUpdateFrequency(50);
-        motor.getReverseLimit().setUpdateFrequency(50);
+        // Re-enable limit signals at higher rate for active limit monitoring
+        forwardLimitSignal.setUpdateFrequency(50);
+        reverseLimitSignal.setUpdateFrequency(50);
+        motor.optimizeBusUtilization();
 
         // Set up simulation state
         var simState = motor.getSimState();
@@ -976,6 +981,12 @@ public class TalonFXMotor implements BaseMotor {
             edu.wpi.first.wpilibj.DriverStation.reportError(
                 "TalonFXMotor: Failed to apply FeedbackConfigs after retries", false);
         }
+
+        // Re-enable signals for the new feedback source — optimizeBusUtilization()
+        // in the constructor may have suppressed signals needed by the new source
+        positionSignal.setUpdateFrequency(50);
+        velocitySignal.setUpdateFrequency(50);
+        motor.optimizeBusUtilization();
     }
 
     /**
