@@ -994,6 +994,7 @@ public class TalonFXMotor implements BaseMotor {
         // in the constructor may have suppressed signals needed by the new source
         positionSignal.setUpdateFrequency(50);
         velocitySignal.setUpdateFrequency(50);
+        rotorPositionSignal.setUpdateFrequency(50);
         motor.optimizeBusUtilization();
     }
 
