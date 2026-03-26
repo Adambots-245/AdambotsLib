@@ -11,6 +11,7 @@ import com.ctre.phoenix6.hardware.TalonFXS;
 import com.ctre.phoenix6.signals.ForwardLimitValue;
 import com.ctre.phoenix6.signals.MotorAlignmentValue;
 import com.ctre.phoenix6.signals.ReverseLimitValue;
+import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusCode;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.CurrentLimitsConfigs;
@@ -68,7 +69,10 @@ public class MinionMotor implements BaseMotor {
     @NotLogged
     private final Follower followerRequest = new Follower(0, MotorAlignmentValue.Aligned);
 
-    // Cached StatusSignal objects — initialized in constructor to avoid repeated HashMap lookups
+    // Cached StatusSignal objects — initialized in constructor to avoid repeated HashMap lookups.
+    // IMPORTANT: Phoenix 6 StatusSignals do NOT auto-update. Every getter MUST call
+    // signal.refresh() before reading. refresh() is non-blocking (reads from local CAN
+    // cache, not a CAN round-trip). Without refresh(), values go stale after the first read.
     @NotLogged
     private StatusSignal<Angle> positionSignal;
     @NotLogged
@@ -111,6 +115,22 @@ public class MinionMotor implements BaseMotor {
     @NotLogged
     private GravityTypeValue slot0_gravityType = GravityTypeValue.Elevator_Static;
 
+    // Local tracking for CurrentLimitsConfigs — defaults match Phoenix 6 factory defaults
+    @NotLogged
+    private double currentStatorLimit = 120, currentSupplyLimit = 70;
+    @NotLogged
+    private boolean currentStatorEnabled = true, currentSupplyEnabled = true;
+    @NotLogged
+    private double currentSupplyLowerLimit = 0, currentSupplyLowerTime = 0.1;
+
+    // Local tracking for HardwareLimitSwitchConfigs
+    @NotLogged
+    private boolean hardLimitForwardEnabled = false, hardLimitReverseEnabled = false;
+    @NotLogged
+    private boolean hardLimitForwardAutoset = false, hardLimitReverseAutoset = false;
+    @NotLogged
+    private double hardLimitForwardValue = 0, hardLimitReverseValue = 0;
+
     // Local tracking for soft limits — single source of truth (eliminates refresh-failure risk)
     @NotLogged
     private double softLimitForwardThreshold = 0, softLimitReverseThreshold = 0;
@@ -152,20 +172,25 @@ public class MinionMotor implements BaseMotor {
 
         // Factory reset to ensure a clean baseline — TalonFXS persists configs in flash,
         // so stale settings from previous code deploys or Phoenix Tuner can cause issues
-        configurator.apply(new TalonFXSConfiguration(), 0.050);
+        configurator.apply(new TalonFXSConfiguration(), 0.100);
 
         // Tell the TalonFXS a Minion motor is connected via JST
         CommutationConfigs commutationConfigs = new CommutationConfigs();
         commutationConfigs.MotorArrangement = MotorArrangementValue.Minion_JST;
         configurator.apply(commutationConfigs);
 
-        // Configure status frame periods for efficiency
-        motor.getVelocity().setUpdateFrequency(50);
+        // Configure status frame periods for all signals used by getters
         motor.getPosition().setUpdateFrequency(50);
+        motor.getVelocity().setUpdateFrequency(50);
+        motor.getAcceleration().setUpdateFrequency(50);
+        motor.getRotorPosition().setUpdateFrequency(50);
+        motor.getStatorCurrent().setUpdateFrequency(10);
+        motor.getDutyCycle().setUpdateFrequency(10);
+        motor.getDeviceTemp().setUpdateFrequency(4);
         motor.getForwardLimit().setUpdateFrequency(25);
         motor.getReverseLimit().setUpdateFrequency(25);
 
-        // Optimize CAN bus usage
+        // Optimize CAN bus usage — suppresses signals not listed above
         motor.optimizeBusUtilization();
 
         // Cache StatusSignal references to avoid repeated HashMap lookups in getters
@@ -203,20 +228,25 @@ public class MinionMotor implements BaseMotor {
 
         // Factory reset to ensure a clean baseline — TalonFXS persists configs in flash,
         // so stale settings from previous code deploys or Phoenix Tuner can cause issues
-        configurator.apply(new TalonFXSConfiguration(), 0.050);
+        configurator.apply(new TalonFXSConfiguration(), 0.100);
 
         // Tell the TalonFXS a Minion motor is connected via JST
         CommutationConfigs commutationConfigs = new CommutationConfigs();
         commutationConfigs.MotorArrangement = MotorArrangementValue.Minion_JST;
         configurator.apply(commutationConfigs);
 
-        // Configure status frame periods for efficiency
-        motor.getVelocity().setUpdateFrequency(50);
+        // Configure status frame periods for all signals used by getters
         motor.getPosition().setUpdateFrequency(50);
+        motor.getVelocity().setUpdateFrequency(50);
+        motor.getAcceleration().setUpdateFrequency(50);
+        motor.getRotorPosition().setUpdateFrequency(50);
+        motor.getStatorCurrent().setUpdateFrequency(10);
+        motor.getDutyCycle().setUpdateFrequency(10);
+        motor.getDeviceTemp().setUpdateFrequency(4);
         motor.getForwardLimit().setUpdateFrequency(25);
         motor.getReverseLimit().setUpdateFrequency(25);
 
-        // Optimize CAN bus usage
+        // Optimize CAN bus usage — suppresses signals not listed above
         motor.optimizeBusUtilization();
 
         // Cache StatusSignal references to avoid repeated HashMap lookups in getters
@@ -481,6 +511,7 @@ public class MinionMotor implements BaseMotor {
         positionSignal.setUpdateFrequency(50);
         velocitySignal.setUpdateFrequency(50);
         rotorPositionSignal.setUpdateFrequency(50);
+        motor.optimizeBusUtilization();
     }
 
     @Override
@@ -510,36 +541,34 @@ public class MinionMotor implements BaseMotor {
 
     @Override
     public void configureCurrentLimits(Current stallLimit, Current freeLimit, double limitRpmThreshold) {
-        CurrentLimitsConfigs configs = new CurrentLimitsConfigs();
-
-        // CRITICAL: Check if refresh fails
-        StatusCode refreshStatus = configurator.refresh(configs);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "MinionMotor: Failed to refresh config before configureCurrentLimits (Status: " + refreshStatus +
-                "). Configuration may be factory defaulted!", true);
-        }
-
-        double stallLimitAmps = stallLimit.in(Amps);
         double freeLimitAmps = freeLimit.in(Amps);
+        currentStatorLimit = stallLimit.in(Amps);
+        currentStatorEnabled = true;
+        currentSupplyLimit = freeLimitAmps;
+        currentSupplyEnabled = true;
+        currentSupplyLowerLimit = freeLimitAmps * 0.8;
+        currentSupplyLowerTime = 0.1;
+        applyCurrentLimits();
+    }
 
-        // Set new values - note that Phoenix 6 has different terminology
-        configs.StatorCurrentLimit = stallLimitAmps;
-        configs.StatorCurrentLimitEnable = true;
-        configs.SupplyCurrentLimit = freeLimitAmps;
-        configs.SupplyCurrentLimitEnable = true;
-        configs.SupplyCurrentLowerLimit = freeLimitAmps * 0.8; // Lower limit after time threshold
-        configs.SupplyCurrentLowerTime = 0.1; // Time to exceed threshold before lowering limit
+    /**
+     * Builds CurrentLimitsConfigs from local state and applies it.
+     * No refresh needed — we own the full state.
+     */
+    private void applyCurrentLimits() {
+        var config = new CurrentLimitsConfigs();
+        config.StatorCurrentLimit = currentStatorLimit;
+        config.StatorCurrentLimitEnable = currentStatorEnabled;
+        config.SupplyCurrentLimit = currentSupplyLimit;
+        config.SupplyCurrentLimitEnable = currentSupplyEnabled;
+        config.SupplyCurrentLowerLimit = currentSupplyLowerLimit;
+        config.SupplyCurrentLowerTime = currentSupplyLowerTime;
 
-        // Apply configuration - check return value
-        boolean success = applyConfigWithRetry(() -> configurator.apply(configs));
+        boolean success = applyConfigWithRetry(() -> configurator.apply(config));
         if (!success) {
             edu.wpi.first.wpilibj.DriverStation.reportError(
-                "MinionMotor: Failed to apply current limit configuration after retries", false);
+                "MinionMotor: Failed to apply current limits after retries", false);
         }
-
-        // Enable stator current reporting — suppressed by optimizeBusUtilization() in constructor
-        statorCurrentSignal.setUpdateFrequency(10);
     }
 
     @Override
@@ -669,49 +698,53 @@ public class MinionMotor implements BaseMotor {
         // DO NOT apply configuration - this would incorrectly cap voltage
     }
 
+    // --- StatusSignal Getters ---
+    // Every getter calls signal.refresh() to fetch the latest value from the local CAN cache.
+    // DO NOT remove refresh() calls — without them, signals return stale startup values.
+
     @Override
     public double getPosition() {
-        return positionSignal.getValueAsDouble();
+        return positionSignal.refresh().getValueAsDouble();
     }
 
     @Override
     public double getRotorPosition() {
-        return rotorPositionSignal.getValueAsDouble();
+        return rotorPositionSignal.refresh().getValueAsDouble();
     }
 
     @Override
     public AngularVelocity getVelocity() {
-        return RotationsPerSecond.of(velocitySignal.getValueAsDouble());
+        return RotationsPerSecond.of(velocitySignal.refresh().getValueAsDouble());
     }
 
     @Override
     public AngularAcceleration getAcceleration() {
-        return RotationsPerSecondPerSecond.of(accelerationSignal.getValueAsDouble());
+        return RotationsPerSecondPerSecond.of(accelerationSignal.refresh().getValueAsDouble());
     }
 
     @Override
     public Current getCurrentDraw() {
-        return Amps.of(statorCurrentSignal.getValueAsDouble());
+        return Amps.of(statorCurrentSignal.refresh().getValueAsDouble());
     }
 
     @Override
     public double getOutputPercent() {
-        return dutyCycleSignal.getValueAsDouble();
+        return dutyCycleSignal.refresh().getValueAsDouble();
     }
 
     @Override
     public double getTemperature() {
-        return temperatureSignal.getValueAsDouble();
+        return temperatureSignal.refresh().getValueAsDouble();
     }
 
     @Override
     public boolean getForwardLimitSwitch() {
-        return forwardLimitSignal.getValue().equals(ForwardLimitValue.ClosedToGround);
+        return forwardLimitSignal.refresh().getValue() == ForwardLimitValue.ClosedToGround;
     }
 
     @Override
     public boolean getReverseLimitSwitch() {
-        return reverseLimitSignal.getValue().equals(ReverseLimitValue.ClosedToGround);
+        return reverseLimitSignal.refresh().getValue() == ReverseLimitValue.ClosedToGround;
     }
 
     /**
@@ -758,32 +791,43 @@ public class MinionMotor implements BaseMotor {
     @Override
     public void configureHardLimits(boolean enableForward, boolean enableReverse,
                                    double forwardResetValueRotations, double reverseResetValueRotations) {
-        HardwareLimitSwitchConfigs configs = new HardwareLimitSwitchConfigs();
+        hardLimitForwardEnabled = enableForward;
+        hardLimitReverseEnabled = enableReverse;
+        hardLimitForwardAutoset = enableForward;
+        hardLimitReverseAutoset = enableReverse;
+        hardLimitForwardValue = forwardResetValueRotations;
+        hardLimitReverseValue = reverseResetValueRotations;
+        applyHardLimits();
 
-        // CRITICAL: Check if refresh fails
-        StatusCode refreshStatus = configurator.refresh(configs);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "MinionMotor: Failed to refresh config before configureHardLimits (Status: " + refreshStatus +
-                "). Configuration may be factory defaulted!", true);
+        // Set up simulation state
+        if (simState != null) {
+            simState.setForwardLimit(enableForward);
+            simState.setReverseLimit(enableReverse);
         }
+    }
 
-        // Configure limits
-        configs.ForwardLimitEnable = enableForward;
-        configs.ForwardLimitAutosetPositionEnable = enableForward;
-        configs.ForwardLimitAutosetPositionValue = forwardResetValueRotations;
+    /**
+     * Builds HardwareLimitSwitchConfigs from local state and applies it.
+     * No refresh needed — we own the full state.
+     */
+    private void applyHardLimits() {
+        var config = new HardwareLimitSwitchConfigs();
+        config.ForwardLimitEnable = hardLimitForwardEnabled;
+        config.ForwardLimitAutosetPositionEnable = hardLimitForwardAutoset;
+        config.ForwardLimitAutosetPositionValue = hardLimitForwardValue;
+        config.ForwardLimitType = com.ctre.phoenix6.signals.ForwardLimitTypeValue.NormallyOpen;
+        config.ReverseLimitEnable = hardLimitReverseEnabled;
+        config.ReverseLimitAutosetPositionEnable = hardLimitReverseAutoset;
+        config.ReverseLimitAutosetPositionValue = hardLimitReverseValue;
+        config.ReverseLimitType = com.ctre.phoenix6.signals.ReverseLimitTypeValue.NormallyOpen;
 
-        configs.ReverseLimitEnable = enableReverse;
-        configs.ReverseLimitAutosetPositionEnable = enableReverse;
-        configs.ReverseLimitAutosetPositionValue = reverseResetValueRotations;
-
-        boolean success = applyConfigWithRetry(() -> configurator.apply(configs));
+        boolean success = applyConfigWithRetry(() -> configurator.apply(config));
         if (!success) {
             edu.wpi.first.wpilibj.DriverStation.reportError(
-                "MinionMotor: Failed to apply hard limit configuration after retries", false);
+                "MinionMotor: Failed to apply hard limits after retries", false);
         }
 
-        // Re-enable limit signals at higher rate for active limit monitoring
+        // Boost limit signal rate for active monitoring
         forwardLimitSignal.setUpdateFrequency(50);
         reverseLimitSignal.setUpdateFrequency(50);
     }
@@ -846,6 +890,15 @@ public class MinionMotor implements BaseMotor {
         edu.wpi.first.wpilibj.DriverStation.reportWarning(
             "MinionMotor configuration failed after " + maxRetries + " attempts", false);
         return false; // Configuration failed after retries
+    }
+
+    @Override
+    public void refreshAllSignals() {
+        BaseStatusSignal.refreshAll(
+            positionSignal, velocitySignal, accelerationSignal,
+            statorCurrentSignal, dutyCycleSignal, temperatureSignal,
+            forwardLimitSignal, reverseLimitSignal, rotorPositionSignal
+        );
     }
 
     @Override

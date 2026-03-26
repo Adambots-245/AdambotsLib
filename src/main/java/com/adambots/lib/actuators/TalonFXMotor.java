@@ -1,5 +1,6 @@
 package com.adambots.lib.actuators;
 
+import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusCode;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.CANBus;
@@ -106,6 +107,22 @@ public class TalonFXMotor implements BaseMotor {
     @NotLogged
     private boolean softLimitForwardEnabled = false, softLimitReverseEnabled = false;
 
+    // Local tracking for CurrentLimitsConfigs
+    @NotLogged
+    private double currentStatorLimit = 40, currentSupplyLimit = 40;
+    @NotLogged
+    private boolean currentStatorEnabled = true, currentSupplyEnabled = true;
+    @NotLogged
+    private double currentSupplyLowerLimit = 0, currentSupplyLowerTime = 0;
+
+    // Local tracking for HardwareLimitSwitchConfigs
+    @NotLogged
+    private boolean hardLimitForwardEnabled = false, hardLimitReverseEnabled = false;
+    @NotLogged
+    private boolean hardLimitForwardAutoset = false, hardLimitReverseAutoset = false;
+    @NotLogged
+    private double hardLimitForwardValue = 0, hardLimitReverseValue = 0;
+
     // Local tracking for MotionMagicConfigs
     @NotLogged
     private double mmCruiseVelocity = 0, mmAcceleration = 0, mmJerk = 0;
@@ -157,7 +174,10 @@ public class TalonFXMotor implements BaseMotor {
     @NotLogged
     private final Follower followerRequest = new Follower(0, MotorAlignmentValue.Aligned);
 
-    // Cached StatusSignal objects — initialized in constructor to avoid repeated HashMap lookups
+    // Cached StatusSignal objects — initialized in constructor to avoid repeated HashMap lookups.
+    // IMPORTANT: Phoenix 6 StatusSignals do NOT auto-update. Every getter MUST call
+    // signal.refresh() before reading. refresh() is non-blocking (reads from local CAN
+    // cache, not a CAN round-trip). Without refresh(), values go stale after the first read.
     @NotLogged
     private StatusSignal<Angle> positionSignal;
     @NotLogged
@@ -230,26 +250,24 @@ public class TalonFXMotor implements BaseMotor {
 
         // Factory reset to ensure a clean baseline — TalonFX persists configs in flash,
         // so stale settings from previous code deploys or Phoenix Tuner can cause issues
-        motor.getConfigurator().apply(new TalonFXConfiguration(), 0.050);
+        motor.getConfigurator().apply(new TalonFXConfiguration(), 0.100);
 
-        // Configure default current limits
-        var currentLimits = new CurrentLimitsConfigs();
-        currentLimits.SupplyCurrentLimit = supplyCurrentLimit;
-        currentLimits.SupplyCurrentLimitEnable = true;
+        // Configure default current limits using local state tracking
+        currentSupplyLimit = supplyCurrentLimit;
+        applyCurrentLimits();
 
-        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(currentLimits));
-        if (!success) {
-            edu.wpi.first.wpilibj.DriverStation.reportError(
-                "TalonFXMotor: Failed to apply current limits after retries", false);
-        }
-
-        // Configure status frame periods for efficiency
-        motor.getVelocity().setUpdateFrequency(50);
+        // Configure status frame periods for all signals used by getters
         motor.getPosition().setUpdateFrequency(50);
+        motor.getVelocity().setUpdateFrequency(50);
+        motor.getAcceleration().setUpdateFrequency(50);
+        motor.getRotorPosition().setUpdateFrequency(50);
+        motor.getStatorCurrent().setUpdateFrequency(10);
+        motor.getDutyCycle().setUpdateFrequency(10);
+        motor.getDeviceTemp().setUpdateFrequency(4);
         motor.getForwardLimit().setUpdateFrequency(25);
         motor.getReverseLimit().setUpdateFrequency(25);
 
-        // Optimize CAN bus usage
+        // Optimize CAN bus usage — suppresses signals not listed above
         motor.optimizeBusUtilization();
 
         // Cache StatusSignal references to avoid repeated HashMap lookups in getters
@@ -484,6 +502,10 @@ public class TalonFXMotor implements BaseMotor {
      *
      * <p>Use with {@link ControlMode#MOTION_MAGIC_EXPO} or {@link ControlMode#MOTION_MAGIC_EXPO_TORQUE}.
      *
+     * <p><strong>Note:</strong> Cruise velocity is shared with standard Motion Magic
+     * ({@link #configureMotionMagic}). Calling this method updates the cruise velocity
+     * for both standard and expo profiles.
+     *
      * @param expoKV Voltage per RPS — determines cruise velocity (V/RPS). Set to 0 for max velocity.
      * @param expoKA Voltage per RPS² — determines acceleration (V/RPS²)
      * @param cruiseVelocity Maximum cruise velocity. Set to {@code RotationsPerSecond.of(0)} for no limit.
@@ -523,29 +545,31 @@ public class TalonFXMotor implements BaseMotor {
      */
     @Override
     public void configureCurrentLimits(Current stallLimit, Current freeLimit, double limitRpmThreshold) {
+        currentStatorLimit = stallLimit.in(Amps);
+        currentStatorEnabled = true;
+        currentSupplyLimit = freeLimit.in(Amps);
+        currentSupplyEnabled = true;
+        applyCurrentLimits();
+    }
+
+    /**
+     * Builds CurrentLimitsConfigs from local state and applies it.
+     * No refresh needed — we own the full state.
+     */
+    private void applyCurrentLimits() {
         var config = new CurrentLimitsConfigs();
-
-        // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
-        StatusCode refreshStatus = motor.getConfigurator().refresh(config);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "TalonFXMotor: Failed to refresh current limits config (Status: " + refreshStatus +
-                "). Configuration may be factory defaulted!", true);
-        }
-
-        config.StatorCurrentLimit = stallLimit.in(Amps);
-        config.StatorCurrentLimitEnable = true;
-        config.SupplyCurrentLimit = freeLimit.in(Amps);
-        config.SupplyCurrentLimitEnable = true;
+        config.StatorCurrentLimit = currentStatorLimit;
+        config.StatorCurrentLimitEnable = currentStatorEnabled;
+        config.SupplyCurrentLimit = currentSupplyLimit;
+        config.SupplyCurrentLimitEnable = currentSupplyEnabled;
+        config.SupplyCurrentLowerLimit = currentSupplyLowerLimit;
+        config.SupplyCurrentLowerTime = currentSupplyLowerTime;
 
         boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
         if (!success) {
             edu.wpi.first.wpilibj.DriverStation.reportError(
                 "TalonFXMotor: Failed to apply current limits after retries", false);
         }
-
-        // Enable stator current reporting — suppressed by optimizeBusUtilization() in constructor
-        statorCurrentSignal.setUpdateFrequency(10);
     }
 
     /**
@@ -716,19 +740,23 @@ public class TalonFXMotor implements BaseMotor {
         // DO NOT apply configuration - this would incorrectly cap voltage
     }
 
+    // --- StatusSignal Getters ---
+    // Every getter calls signal.refresh() to fetch the latest value from the local CAN cache.
+    // DO NOT remove refresh() calls — without them, signals return stale startup values.
+
     /**
      * Gets the current position of the motor.
-     * 
+     *
      * @return The current position of the motor in rotations (double)
      */
     @Override
     public double getPosition() {
-        return positionSignal.getValueAsDouble();
+        return positionSignal.refresh().getValueAsDouble();
     }
 
     @Override
     public double getRotorPosition() {
-        return rotorPositionSignal.getValueAsDouble();
+        return rotorPositionSignal.refresh().getValueAsDouble();
     }
 
     /**
@@ -738,7 +766,7 @@ public class TalonFXMotor implements BaseMotor {
      */
     @Override
     public AngularVelocity getVelocity() {
-        return RotationsPerSecond.of(velocitySignal.getValueAsDouble());
+        return RotationsPerSecond.of(velocitySignal.refresh().getValueAsDouble());
     }
 
     /**
@@ -748,7 +776,7 @@ public class TalonFXMotor implements BaseMotor {
      */
     @Override
     public AngularAcceleration getAcceleration() {
-        return RotationsPerSecondPerSecond.of(accelerationSignal.getValueAsDouble());
+        return RotationsPerSecondPerSecond.of(accelerationSignal.refresh().getValueAsDouble());
     }
 
     /**
@@ -758,7 +786,7 @@ public class TalonFXMotor implements BaseMotor {
      */
     @Override
     public Current getCurrentDraw() {
-        return Amps.of(statorCurrentSignal.getValueAsDouble());
+        return Amps.of(statorCurrentSignal.refresh().getValueAsDouble());
     }
 
     /**
@@ -768,7 +796,7 @@ public class TalonFXMotor implements BaseMotor {
      */
     @Override
     public double getOutputPercent() {
-        return dutyCycleSignal.getValueAsDouble();
+        return dutyCycleSignal.refresh().getValueAsDouble();
     }
 
     /**
@@ -778,7 +806,7 @@ public class TalonFXMotor implements BaseMotor {
      */
     @Override
     public double getTemperature() {
-        return temperatureSignal.getValueAsDouble();
+        return temperatureSignal.refresh().getValueAsDouble();
     }
 
     /**
@@ -788,7 +816,7 @@ public class TalonFXMotor implements BaseMotor {
      */
     @Override
     public boolean getForwardLimitSwitch() {
-        return forwardLimitSignal.getValue() == ForwardLimitValue.ClosedToGround;
+        return forwardLimitSignal.refresh().getValue() == ForwardLimitValue.ClosedToGround;
     }
 
     /**
@@ -798,7 +826,7 @@ public class TalonFXMotor implements BaseMotor {
      */
     @Override
     public boolean getReverseLimitSwitch() {
-        return reverseLimitSignal.getValue() == ReverseLimitValue.ClosedToGround;
+        return reverseLimitSignal.refresh().getValue() == ReverseLimitValue.ClosedToGround;
     }
 
     /**
@@ -860,39 +888,45 @@ public class TalonFXMotor implements BaseMotor {
     @Override
     public void configureHardLimits(boolean enableForward, boolean enableReverse, double forwardValue,
             double reverseValue) {
-        var limitSwitchConfigs = new HardwareLimitSwitchConfigs();
+        hardLimitForwardEnabled = enableForward;
+        hardLimitReverseEnabled = enableReverse;
+        hardLimitForwardAutoset = enableForward;
+        hardLimitReverseAutoset = enableReverse;
+        hardLimitForwardValue = forwardValue;
+        hardLimitReverseValue = reverseValue;
+        applyHardLimits();
 
-        // CRITICAL: Refresh before apply to avoid factory defaulting other config fields
-        StatusCode refreshStatus = motor.getConfigurator().refresh(limitSwitchConfigs);
-        if (!refreshStatus.isOK()) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "TalonFXMotor: Failed to refresh hard limits config (Status: " + refreshStatus +
-                "). Configuration may be factory defaulted!", true);
+        // Set up simulation state
+        if (simState != null) {
+            simState.setForwardLimit(enableForward);
+            simState.setReverseLimit(enableReverse);
         }
+    }
 
-        limitSwitchConfigs.ForwardLimitEnable = enableForward;
-        limitSwitchConfigs.ForwardLimitAutosetPositionEnable = enableForward;
-        limitSwitchConfigs.ForwardLimitAutosetPositionValue = forwardValue;
-        limitSwitchConfigs.ForwardLimitType = ForwardLimitTypeValue.NormallyOpen;
-        limitSwitchConfigs.ReverseLimitEnable = enableReverse;
-        limitSwitchConfigs.ReverseLimitAutosetPositionEnable = enableReverse;
-        limitSwitchConfigs.ReverseLimitAutosetPositionValue = reverseValue;
-        limitSwitchConfigs.ReverseLimitType = ReverseLimitTypeValue.NormallyOpen;
+    /**
+     * Builds HardwareLimitSwitchConfigs from local state and applies it.
+     * No refresh needed — we own the full state.
+     */
+    private void applyHardLimits() {
+        var config = new HardwareLimitSwitchConfigs();
+        config.ForwardLimitEnable = hardLimitForwardEnabled;
+        config.ForwardLimitAutosetPositionEnable = hardLimitForwardAutoset;
+        config.ForwardLimitAutosetPositionValue = hardLimitForwardValue;
+        config.ForwardLimitType = ForwardLimitTypeValue.NormallyOpen;
+        config.ReverseLimitEnable = hardLimitReverseEnabled;
+        config.ReverseLimitAutosetPositionEnable = hardLimitReverseAutoset;
+        config.ReverseLimitAutosetPositionValue = hardLimitReverseValue;
+        config.ReverseLimitType = ReverseLimitTypeValue.NormallyOpen;
 
-        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(limitSwitchConfigs));
+        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
         if (!success) {
             edu.wpi.first.wpilibj.DriverStation.reportError(
                 "TalonFXMotor: Failed to apply hard limits after retries", false);
         }
 
-        // Re-enable limit signals at higher rate for active limit monitoring
+        // Boost limit signal rate for active monitoring
         forwardLimitSignal.setUpdateFrequency(50);
         reverseLimitSignal.setUpdateFrequency(50);
-
-        // Set up simulation state
-        var simState = motor.getSimState();
-        simState.setForwardLimit(enableForward); // Set the initial state
-        simState.setReverseLimit(enableReverse);
     }
 
     @Override
@@ -997,6 +1031,7 @@ public class TalonFXMotor implements BaseMotor {
         positionSignal.setUpdateFrequency(50);
         velocitySignal.setUpdateFrequency(50);
         rotorPositionSignal.setUpdateFrequency(50);
+        motor.optimizeBusUtilization();
     }
 
     /**
@@ -1090,6 +1125,15 @@ public class TalonFXMotor implements BaseMotor {
         edu.wpi.first.wpilibj.DriverStation.reportWarning(
             "TalonFX configuration failed after " + maxRetries + " attempts", false);
         return false; // Configuration failed after retries
+    }
+
+    @Override
+    public void refreshAllSignals() {
+        BaseStatusSignal.refreshAll(
+            positionSignal, velocitySignal, accelerationSignal,
+            statorCurrentSignal, dutyCycleSignal, temperatureSignal,
+            forwardLimitSignal, reverseLimitSignal, rotorPositionSignal
+        );
     }
 
     @Override

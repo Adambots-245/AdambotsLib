@@ -499,6 +499,28 @@ public interface BaseMotor extends BaseActuator{
     }
 
     /**
+     * Batch-refreshes all cached StatusSignals in a single operation.
+     *
+     * <p>More efficient than individual getter refreshes when reading multiple
+     * values per cycle. Call this in {@code periodic()} before reading getters.
+     *
+     * <p>Individual getters still call {@code refresh()} internally, so this method
+     * is optional — it provides a performance optimization, not a requirement.
+     *
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * public void periodic() {
+     *     motor.refreshAllSignals();  // Single JNI call for all signals
+     *     double pos = motor.getPosition();
+     *     double vel = motor.getVelocity().in(RotationsPerSecond);
+     * }
+     * }</pre>
+     */
+    default void refreshAllSignals() {
+        // Default no-op — motors without StatusSignals (NEO) don't need this
+    }
+
+    /**
      * Gets the current motor velocity.
      *
      * <p><strong>Returns typed AngularVelocity</strong> - use {@code .in(RotationsPerSecond)}
