@@ -546,7 +546,6 @@ public class TalonFXMotor implements BaseMotor {
 
         // Enable stator current reporting — suppressed by optimizeBusUtilization() in constructor
         statorCurrentSignal.setUpdateFrequency(10);
-        motor.optimizeBusUtilization();
     }
 
     /**
@@ -889,7 +888,6 @@ public class TalonFXMotor implements BaseMotor {
         // Re-enable limit signals at higher rate for active limit monitoring
         forwardLimitSignal.setUpdateFrequency(50);
         reverseLimitSignal.setUpdateFrequency(50);
-        motor.optimizeBusUtilization();
 
         // Set up simulation state
         var simState = motor.getSimState();
@@ -999,7 +997,6 @@ public class TalonFXMotor implements BaseMotor {
         positionSignal.setUpdateFrequency(50);
         velocitySignal.setUpdateFrequency(50);
         rotorPositionSignal.setUpdateFrequency(50);
-        motor.optimizeBusUtilization();
     }
 
     /**
