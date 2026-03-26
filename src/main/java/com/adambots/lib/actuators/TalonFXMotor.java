@@ -990,8 +990,12 @@ public class TalonFXMotor implements BaseMotor {
                 "TalonFXMotor: Failed to apply FeedbackConfigs after retries", false);
         }
 
-        // Re-enable signals for the new feedback source — optimizeBusUtilization()
-        // in the constructor may have suppressed signals needed by the new source
+        // Re-cache signals — feedback source changed, signal routing may differ
+        positionSignal = motor.getPosition();
+        velocitySignal = motor.getVelocity();
+        rotorPositionSignal = motor.getRotorPosition();
+
+        // Re-enable signals for the new feedback source
         positionSignal.setUpdateFrequency(50);
         velocitySignal.setUpdateFrequency(50);
         rotorPositionSignal.setUpdateFrequency(50);

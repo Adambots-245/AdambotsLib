@@ -3,8 +3,8 @@
   <groupId>com.adambots.lib</groupId>
   <artifactId>AdambotsLib-java</artifactId>
   <versioning>
-    <latest>2026.3.19</latest>
-    <release>2026.3.19</release>
+    <latest>2026.3.20</latest>
+    <release>2026.3.20</release>
     <versions>
       <version>2026.1.0</version>
       <version>2026.1.1</version>
@@ -42,7 +42,8 @@
       <version>2026.3.17</version>
       <version>2026.3.18</version>
       <version>2026.3.19</version>
+      <version>2026.3.20</version>
     </versions>
-    <lastUpdated>20260326000516</lastUpdated>
+    <lastUpdated>20260326002959</lastUpdated>
   </versioning>
 </metadata>
