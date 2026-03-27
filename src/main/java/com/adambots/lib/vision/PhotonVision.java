@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 
 import org.photonvision.EstimatedRobotPose;
@@ -108,6 +109,12 @@ public class PhotonVision implements VisionSystem {
    * Use this when vision is unreliable or causing issues.
    */
   private boolean allCamerasDisabled = false;
+
+  /**
+   * Dynamic scaler for vision std devs. Applied to all cameras uniformly.
+   * Default returns 1.0 (no scaling).
+   */
+  private DoubleSupplier stdDevScaler = () -> 1.0;
 
   /**
    * List of configurable vision cameras.
@@ -222,9 +229,38 @@ public class PhotonVision implements VisionSystem {
         visionConsumer.accept(
             estimatedPose2d,
             pose.timestampSeconds,
-            camera.getCurrentStdDevs()
+            camera.getCurrentStdDevs().times(Math.max(stdDevScaler.getAsDouble(), 0.01))
         );
       }
+    }
+  }
+
+  /**
+   * Sets a dynamic scaler for vision standard deviations.
+   *
+   * <p>The scaler is evaluated each cycle and multiplied into the computed std devs
+   * before passing to the pose estimator. Use this to reduce vision trust at high
+   * robot speeds (motion blur, latency).
+   *
+   * @param scaler Supplier returning the scale factor (1.0 = no change). Null resets to 1.0.
+   */
+  @Override
+  public void setStdDevScaler(DoubleSupplier scaler) {
+    this.stdDevScaler = scaler != null ? scaler : () -> 1.0;
+  }
+
+  /**
+   * Sets a runtime tag filter restricting which AprilTags are used for pose estimation.
+   *
+   * <p>Applies to all cameras. Pass {@code null} or an empty array to restore the
+   * config-time tag filter for each camera.
+   *
+   * @param allowedTagIds Array of allowed tag IDs, or null/empty to restore defaults
+   */
+  @Override
+  public void setTagFilter(int[] allowedTagIds) {
+    for (VisionCamera camera : cameras) {
+      camera.setTagFilter(allowedTagIds);
     }
   }
 

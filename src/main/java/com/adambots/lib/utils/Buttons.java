@@ -1011,6 +1011,81 @@ public class Buttons {
         controller.getHID().setRumble(RumbleType.kBothRumble, 0.0);
     }
 
+    // ======================== CONVENIENCE RUMBLE METHODS ========================
+
+    /**
+     * Rumbles the operator controller regardless of its type (Xbox or PS5).
+     *
+     * <p>Automatically detects the operator controller type and calls the appropriate
+     * rumble method. No-op if the operator is a joystick (no rumble support), not
+     * configured, or not initialized.
+     *
+     * <p><strong>Usage:</strong>
+     * <pre>{@code
+     * trigger.onTrue(Commands.runOnce(() -> Buttons.rumbleOperator(1000, 1.0)));
+     * }</pre>
+     *
+     * @param durationMs Duration in milliseconds (clamped to 0-5000ms)
+     * @param intensity  Rumble intensity from 0.0 to 1.0
+     */
+    public static void rumbleOperator(int durationMs, double intensity) {
+        ensureInitialized();
+        if (operatorController == null) return;
+        switch (operatorType) {
+            case XBOX -> rumbleXbox((CommandXboxController) operatorController, durationMs, intensity);
+            case PS5 -> rumblePS5((CommandPS5Controller) operatorController, durationMs, intensity);
+            default -> {} // Joystick/NONE — no rumble support
+        }
+    }
+
+    /**
+     * Rumbles the driver controller regardless of its type (Xbox or PS5).
+     *
+     * <p>Automatically detects the driver controller type and calls the appropriate
+     * rumble method. No-op if the driver is a joystick (no rumble support), not
+     * configured, or not initialized.
+     *
+     * @param durationMs Duration in milliseconds (clamped to 0-5000ms)
+     * @param intensity  Rumble intensity from 0.0 to 1.0
+     */
+    public static void rumbleDriver(int durationMs, double intensity) {
+        ensureInitialized();
+        if (driverController == null) return;
+        switch (driverType) {
+            case XBOX -> rumbleXbox((CommandXboxController) driverController, durationMs, intensity);
+            case PS5 -> rumblePS5((CommandPS5Controller) driverController, durationMs, intensity);
+            default -> {}
+        }
+    }
+
+    /**
+     * Immediately stops rumble on the operator controller.
+     * No-op if the operator is a joystick, not configured, or not initialized.
+     */
+    public static void stopRumbleOperator() {
+        ensureInitialized();
+        if (operatorController == null) return;
+        switch (operatorType) {
+            case XBOX -> stopRumbleXbox((CommandXboxController) operatorController);
+            case PS5 -> stopRumblePS5((CommandPS5Controller) operatorController);
+            default -> {}
+        }
+    }
+
+    /**
+     * Immediately stops rumble on the driver controller.
+     * No-op if the driver is a joystick, not configured, or not initialized.
+     */
+    public static void stopRumbleDriver() {
+        ensureInitialized();
+        if (driverController == null) return;
+        switch (driverType) {
+            case XBOX -> stopRumbleXbox((CommandXboxController) driverController);
+            case PS5 -> stopRumblePS5((CommandPS5Controller) driverController);
+            default -> {}
+        }
+    }
+
     // ======================== ADVANCED TRIGGER PATTERNS ========================
 
     /**

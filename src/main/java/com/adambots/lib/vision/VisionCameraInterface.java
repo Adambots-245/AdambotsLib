@@ -69,4 +69,13 @@ public interface VisionCameraInterface {
      * @return The latest result, or empty if no results available
      */
     Optional<? extends VisionResult> getLatestResult();
+
+    /**
+     * Sets a runtime tag filter restricting which AprilTags are used for pose estimation.
+     *
+     * <p>Pass {@code null} or an empty array to restore the config-time tag filter.
+     *
+     * @param allowedTagIds Array of allowed tag IDs, or null/empty to restore defaults
+     */
+    default void setTagFilter(int[] allowedTagIds) {}
 }

@@ -6,6 +6,7 @@ package com.adambots.lib.vision;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 
 import edu.wpi.first.math.geometry.Pose2d;
@@ -173,6 +174,48 @@ public interface VisionSystem {
      * @return Number of unique matching tags currently visible
      */
     int getVisibleTagCount(int[] filterIds, double maxAmbiguity);
+
+    // ==================== RUNTIME TUNING ====================
+
+    /**
+     * Sets a dynamic scaler for vision standard deviations.
+     *
+     * <p>The scaler is evaluated each cycle and multiplied into the computed std devs
+     * before passing to the pose estimator. Use this to reduce vision trust at high
+     * robot speeds (motion blur, latency).
+     *
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * vision.setStdDevScaler(() -> {
+     *     double speed = Math.hypot(
+     *         swerve.getRobotVelocity().vxMetersPerSecond,
+     *         swerve.getRobotVelocity().vyMetersPerSecond);
+     *     return 1.0 + speed;  // trust vision less at higher speeds
+     * });
+     * }</pre>
+     *
+     * @param scaler Supplier returning the scale factor (1.0 = no change). Null resets to 1.0.
+     */
+    default void setStdDevScaler(DoubleSupplier scaler) {}
+
+    /**
+     * Sets a runtime tag filter restricting which AprilTags are used for pose estimation.
+     *
+     * <p>Pass {@code null} or an empty array to restore the config-time tag filter
+     * (or allow all tags if no config-time filter was set).
+     *
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * // During shooting — only use hub tags:
+     * vision.setTagFilter(new int[]{1, 2, 3, 4});
+     *
+     * // After shooting — restore default filtering:
+     * vision.setTagFilter(null);
+     * }</pre>
+     *
+     * @param allowedTagIds Array of allowed tag IDs, or null/empty to restore defaults
+     */
+    default void setTagFilter(int[] allowedTagIds) {}
 
     // ==================== CAMERA MANAGEMENT ====================
 

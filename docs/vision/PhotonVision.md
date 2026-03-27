@@ -9,6 +9,8 @@ PhotonVision integration for AprilTag-based vision pose estimation with multi-ca
 - [Quick Start](#quick-start)
 - [Features](#features)
 - [Camera Management](#camera-management)
+- [Runtime Std Dev Scaling](#runtime-std-dev-scaling)
+- [Runtime Tag Filtering](#runtime-tag-filtering)
 - [Core Methods](#core-methods)
 - [Real-World Examples](#real-world-examples)
 - [API Reference](#api-reference)
@@ -252,6 +254,42 @@ vision.disableCamera("Middle");
 vision.enableCamerasWithPurpose(CameraPurpose.ODOMETRY);
 vision.disableCamerasWithPurpose(CameraPurpose.ALIGNMENT);
 ```
+
+### Runtime Std Dev Scaling
+
+Dynamically scale vision standard deviations based on robot speed or other factors. The scaler multiplies the computed std devs each cycle before passing to the pose estimator.
+
+```java
+// Scale std devs by robot speed — trust vision less at higher speeds
+vision.setStdDevScaler(() -> {
+    double speed = Math.hypot(
+        swerve.getRobotVelocity().vxMetersPerSecond,
+        swerve.getRobotVelocity().vyMetersPerSecond);
+    return 1.0 + speed;  // 1.0 at rest, 2.0 at 1 m/s, etc.
+});
+
+// Reset to default (no scaling)
+vision.setStdDevScaler(null);
+```
+
+The scaler applies uniformly to all cameras, on top of the existing per-camera distance-based scaling.
+
+### Runtime Tag Filtering
+
+Dynamically restrict which AprilTags are used for pose estimation. Useful during shooting to only trust hub-facing tags.
+
+```java
+// Only use hub tags during shooting
+vision.setTagFilter(new int[]{1, 2, 3, 4});
+
+// Restore default filtering (config-time allowedTags or all tags)
+vision.setTagFilter(null);
+
+// Per-camera filtering is also available
+vision.getCamera("Left").setTagFilter(new int[]{6, 7, 8});
+```
+
+When a runtime filter is active, it overrides the config-time `allowedTags()` for each camera. Passing `null` or an empty array restores the original config-time behavior.
 
 ### Check Camera State
 

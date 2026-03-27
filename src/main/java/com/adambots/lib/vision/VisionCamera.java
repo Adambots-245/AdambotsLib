@@ -130,6 +130,12 @@ public class VisionCamera implements VisionCameraInterface {
     private double lastReadTimestamp = Microseconds.of(NetworkTablesJNI.now()).in(Seconds);
 
     /**
+     * Runtime tag filter. When non-null, overrides the config-time allowedTagIDs.
+     * Null means use the config-time filter (or allow all tags if none configured).
+     */
+    private int[] runtimeAllowedTagIds = null;
+
+    /**
      * Whether this camera is currently enabled.
      */
     private boolean enabled = true;
@@ -312,6 +318,41 @@ public class VisionCamera implements VisionCameraInterface {
      */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    /**
+     * Sets a runtime tag filter restricting which AprilTags are used for pose estimation.
+     *
+     * <p>Pass {@code null} or an empty array to restore the config-time tag filter.
+     *
+     * @param allowedTagIds Array of allowed tag IDs, or null/empty to restore defaults
+     */
+    @Override
+    public void setTagFilter(int[] allowedTagIds) {
+        this.runtimeAllowedTagIds = (allowedTagIds != null && allowedTagIds.length > 0)
+            ? allowedTagIds.clone() : null;
+    }
+
+    /**
+     * Checks whether any tag filter is active (either runtime or config-time).
+     */
+    private boolean hasActiveTagFilter() {
+        return runtimeAllowedTagIds != null || config.hasTagFilter();
+    }
+
+    /**
+     * Checks whether a specific tag ID is currently allowed by the active filter.
+     */
+    private boolean isTagCurrentlyAllowed(int tagId) {
+        int[] activeFilter = runtimeAllowedTagIds;
+        if (activeFilter != null) {
+            for (int id : activeFilter) {
+                if (id == tagId) return true;
+            }
+            return false;
+        }
+        // Fall back to config-time filter
+        return config.hasTagFilter() ? config.isTagAllowed(tagId) : true;
     }
 
     /**
@@ -503,11 +544,11 @@ public class VisionCamera implements VisionCameraInterface {
                 continue;
             }
 
-            // Check tag filtering
-            if (config.hasTagFilter()) {
+            // Check tag filtering (runtime filter takes priority over config-time filter)
+            if (hasActiveTagFilter()) {
                 boolean hasAllowedTag = false;
                 for (PhotonTrackedTarget target : result.getTargets()) {
-                    if (config.isTagAllowed(target.getFiducialId())) {
+                    if (isTagCurrentlyAllowed(target.getFiducialId())) {
                         hasAllowedTag = true;
                         break;
                     }
@@ -523,10 +564,10 @@ public class VisionCamera implements VisionCameraInterface {
             visionEst = poseEstimator.update(result);
 
             // Verify the pose used allowed tags
-            if (visionEst.isPresent() && config.hasTagFilter()) {
+            if (visionEst.isPresent() && hasActiveTagFilter()) {
                 boolean usedAllowedTag = false;
                 for (PhotonTrackedTarget usedTarget : visionEst.get().targetsUsed) {
-                    if (config.isTagAllowed(usedTarget.getFiducialId())) {
+                    if (isTagCurrentlyAllowed(usedTarget.getFiducialId())) {
                         usedAllowedTag = true;
                         break;
                     }
