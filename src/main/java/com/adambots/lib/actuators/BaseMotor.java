@@ -757,6 +757,39 @@ public interface BaseMotor extends BaseActuator{
     }
 
     /**
+     * Enables or disables ContinuousWrap for closed-loop control.
+     *
+     * <p>When enabled, the motor controller assumes the mechanism is continuous
+     * within 1 rotation and automatically takes the shortest path to any
+     * commanded target position. This is Phoenix 6's built-in solution for
+     * mechanisms whose position sensor wraps within the mechanism's range of
+     * motion (turrets, swerve steer, any arm with an absolute sensor where the
+     * multi-turn accumulator may drift across power cycles).
+     *
+     * <p>Example: if the motor's reported position is 2.1 rotations and the
+     * target is 0.8 rotations, ContinuousWrap will drive 0.3 rotations backwards
+     * to 1.8 rotations (the short path) instead of 1.3 rotations backwards to
+     * 0.8 rotations (the long path).
+     *
+     * <p>Only affects closed-loop targeting. {@link #getPosition()} continues to
+     * return the raw accumulated value — if you need wrap-aware position
+     * comparisons (e.g. isAtTarget), do that in the application layer.
+     *
+     * <p>Requires the feedback ratio configs to correctly describe the
+     * mechanism so that 1 mechanism rotation = 1 unit of position.
+     *
+     * <p>Supported by TalonFX and TalonFXS motors.
+     *
+     * @param enabled true to enable ContinuousWrap, false to disable
+     * @throws UnsupportedOperationException if this motor does not support
+     *         ContinuousWrap
+     */
+    default void configureContinuousWrap(boolean enabled) {
+        throw new UnsupportedOperationException(
+            getMotorType() + " does not support ContinuousWrap");
+    }
+
+    /**
      * Configures a pulse-width absolute encoder with explicit sensor phase.
      *
      * <p>Sensor phase controls whether the sensor counts in the same direction as the motor.

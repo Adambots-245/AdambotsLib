@@ -14,6 +14,7 @@ import com.ctre.phoenix6.signals.ReverseLimitValue;
 import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusCode;
 import com.ctre.phoenix6.StatusSignal;
+import com.ctre.phoenix6.configs.ClosedLoopGeneralConfigs;
 import com.ctre.phoenix6.configs.CurrentLimitsConfigs;
 import com.ctre.phoenix6.configs.MotionMagicConfigs;
 import com.ctre.phoenix6.configs.SoftwareLimitSwitchConfigs;
@@ -458,6 +459,24 @@ public class MinionMotor implements BaseMotor {
         extDiscontinuityPoint = discontinuityPoint;
         extSensorPhase = opposeMotor ? SensorPhaseValue.Opposed : SensorPhaseValue.Aligned;
         applyExternalFeedbackConfig();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>On TalonFXS, this is applied via {@link ClosedLoopGeneralConfigs}.
+     * Other closed-loop general configs on the device are left untouched.
+     */
+    @Override
+    public void configureContinuousWrap(boolean enabled) {
+        var config = new ClosedLoopGeneralConfigs();
+        config.ContinuousWrap = enabled;
+
+        boolean success = applyConfigWithRetry(() -> configurator.apply(config));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "MinionMotor: Failed to apply ClosedLoopGeneralConfigs after retries", false);
+        }
     }
 
     /**

@@ -1006,6 +1006,24 @@ public class TalonFXMotor implements BaseMotor {
     }
 
     /**
+     * {@inheritDoc}
+     *
+     * <p>On TalonFX, this is applied via {@link ClosedLoopGeneralConfigs}.
+     * Other closed-loop general configs on the device are left untouched.
+     */
+    @Override
+    public void configureContinuousWrap(boolean enabled) {
+        var config = new ClosedLoopGeneralConfigs();
+        config.ContinuousWrap = enabled;
+
+        boolean success = applyConfigWithRetry(() -> motor.getConfigurator().apply(config));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "TalonFXMotor: Failed to apply ClosedLoopGeneralConfigs after retries", false);
+        }
+    }
+
+    /**
      * Builds FeedbackConfigs from local state and applies it.
      * No refresh needed — we own the full state.
      */

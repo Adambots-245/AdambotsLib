@@ -171,6 +171,23 @@ motor.configureFusedCANcoder(9, 1.0, 12.8);  // CAN ID 9, 1:1 mechanism, 12.8:1 
 
 **Sensor Phase:** For data-port sensors (PulseWidth, Quadrature), `opposeMotor` flips the reported sensor direction. To calibrate: drive the motor with positive output and `opposeMotor=false`. If the sensor velocity is positive, the phase is correct. If negative, set `opposeMotor=true`. Phoenix 6 automatically inverts the sensor along with motor invert, so this only needs to reflect the mechanical relationship.
 
+### Continuous Wrap
+
+For mechanisms whose position sensor wraps within the mechanism's range of motion (turrets, swerve steer, arms with absolute encoders), enable ContinuousWrap so closed-loop targeting takes the shortest path to the target:
+
+```java
+// Turret with a Through Bore on the gadgeteer port
+motor.configureExternalPulseWidthSensor(1.0, 0.0, 1.0);
+motor.configureContinuousWrap(true);
+
+// Now Motion Magic / Position control will take the short path
+motor.set(ControlMode.MOTION_MAGIC, 0.8);  // If at 2.1, drives to 1.8 (0.3 back), not 0.8 (1.3 back)
+```
+
+Only affects closed-loop targeting. `getPosition()` still returns the raw accumulated value — do wrap-aware position comparisons in application code (e.g., `isAtTarget`).
+
+Requires the feedback ratio configs to correctly describe the mechanism so that 1 mechanism rotation = 1 unit of position.
+
 ### Simulation Support
 
 MinionMotor exposes simulation methods using `TalonFXSSimState`, which has the same core API as `TalonFXSimState`. The sim state is cached on construction when running in simulation.

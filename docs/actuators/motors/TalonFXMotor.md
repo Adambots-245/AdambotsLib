@@ -199,6 +199,22 @@ motor.configureSyncCANcoder(9, 1.0, 12.8);
 
 Note: TalonFX does not have a data port — it cannot directly read pulse-width or quadrature encoders. Use a CANcoder for remote absolute position feedback.
 
+### Continuous Wrap
+
+For mechanisms whose position sensor wraps within one rotation (turrets, swerve azimuth, arms with fused CANcoders), enable ContinuousWrap so closed-loop targeting takes the shortest path:
+
+```java
+motor.configureFusedCANcoder(9, 1.0, 12.8);
+motor.configureContinuousWrap(true);
+
+// Now Motion Magic / Position control will take the short path
+motor.set(ControlMode.MOTION_MAGIC, 0.8);  // If at 2.1, drives to 1.8 (0.3 back), not 0.8 (1.3 back)
+```
+
+Only affects closed-loop targeting. `getPosition()` still returns the raw accumulated value — do wrap-aware comparisons in application code.
+
+Requires the feedback ratio configs to correctly describe the mechanism so that 1 mechanism rotation = 1 unit of position.
+
 ### Simulation Support
 
 TalonFXMotor exposes simulation methods for use with WPILib physics simulations. The sim state is cached on construction (only when running in simulation) and provides access to the underlying `TalonFXSimState`.
