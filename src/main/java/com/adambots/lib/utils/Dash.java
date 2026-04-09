@@ -4,7 +4,12 @@
 
 package com.adambots.lib.utils;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
@@ -14,6 +19,8 @@ import java.util.function.Supplier;
 import com.adambots.lib.Constants;
 
 import edu.wpi.first.networktables.GenericEntry;
+import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.Filesystem;
 import edu.wpi.first.wpilibj.shuffleboard.BuiltInWidgets;
 import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
 import edu.wpi.first.wpilibj.shuffleboard.ShuffleboardTab;
@@ -79,6 +86,15 @@ public class Dash {
     /** Cache of tabs by name for quick access. */
     private static final Map<String, ShuffleboardTab> tabCache = new HashMap<>();
 
+    /** Widget metadata for Elastic layout export. */
+    private static final List<WidgetInfo> widgets = new ArrayList<>();
+
+    /** Widget metadata record for tracking what was added to the dashboard. */
+    private record WidgetInfo(
+        String tabName, String name, String dataType,
+        boolean tunable, int column, int row
+    ) {}
+
     // Static initializer to set default tab
     static {
         currentTab = Shuffleboard.getTab(DEFAULT_TAB_NAME);
@@ -140,6 +156,11 @@ public class Dash {
         return currentTab;
     }
 
+    /** Records widget metadata for Elastic export. */
+    private static void trackWidget(String name, String dataType, boolean tunable, int column, int row) {
+        widgets.add(new WidgetInfo(getCurrentTabName(), name, dataType, tunable, column, row));
+    }
+
     // ======================== ADD VALUES (AUTO-UPDATE) ========================
 
     /**
@@ -156,6 +177,7 @@ public class Dash {
      */
     public static void add(String name, DoubleSupplier supplier) {
         currentTab.addDouble(name, supplier);
+        trackWidget(name, "double", false, -1, -1);
     }
 
     /**
@@ -168,6 +190,7 @@ public class Dash {
      */
     public static void add(String name, DoubleSupplier supplier, int column, int row) {
         currentTab.addDouble(name, supplier).withPosition(column, row);
+        trackWidget(name, "double", false, column, row);
     }
 
     /**
@@ -184,6 +207,7 @@ public class Dash {
      */
     public static void add(String name, LongSupplier supplier) {
         currentTab.addInteger(name, supplier);
+        trackWidget(name, "integer", false, -1, -1);
     }
 
     /**
@@ -196,6 +220,7 @@ public class Dash {
      */
     public static void add(String name, LongSupplier supplier, int column, int row) {
         currentTab.addInteger(name, supplier).withPosition(column, row);
+        trackWidget(name, "integer", false, column, row);
     }
 
     /**
@@ -212,6 +237,7 @@ public class Dash {
      */
     public static void add(String name, BooleanSupplier supplier) {
         currentTab.addBoolean(name, supplier);
+        trackWidget(name, "boolean", false, -1, -1);
     }
 
     /**
@@ -224,6 +250,7 @@ public class Dash {
      */
     public static void add(String name, BooleanSupplier supplier, int column, int row) {
         currentTab.addBoolean(name, supplier).withPosition(column, row);
+        trackWidget(name, "boolean", false, column, row);
     }
 
     /**
@@ -240,6 +267,7 @@ public class Dash {
      */
     public static void add(String name, Supplier<String> supplier) {
         currentTab.addString(name, supplier);
+        trackWidget(name, "string", false, -1, -1);
     }
 
     /**
@@ -252,6 +280,7 @@ public class Dash {
      */
     public static void add(String name, Supplier<String> supplier, int column, int row) {
         currentTab.addString(name, supplier).withPosition(column, row);
+        trackWidget(name, "string", false, column, row);
     }
 
     /**
@@ -272,6 +301,7 @@ public class Dash {
      */
     public static void addDoubleArray(String name, Supplier<double[]> supplier) {
         currentTab.addDoubleArray(name, supplier);
+        trackWidget(name, "doubleArray", false, -1, -1);
     }
 
     /**
@@ -284,6 +314,7 @@ public class Dash {
      */
     public static void addDoubleArray(String name, Supplier<double[]> supplier, int column, int row) {
         currentTab.addDoubleArray(name, supplier).withPosition(column, row);
+        trackWidget(name, "doubleArray", false, column, row);
     }
 
     /**
@@ -303,6 +334,7 @@ public class Dash {
      */
     public static void addStringArray(String name, Supplier<String[]> supplier) {
         currentTab.addStringArray(name, supplier);
+        trackWidget(name, "stringArray", false, -1, -1);
     }
 
     /**
@@ -315,6 +347,7 @@ public class Dash {
      */
     public static void addStringArray(String name, Supplier<String[]> supplier, int column, int row) {
         currentTab.addStringArray(name, supplier).withPosition(column, row);
+        trackWidget(name, "stringArray", false, column, row);
     }
 
     // ======================== TUNABLE VALUES ========================
@@ -345,9 +378,11 @@ public class Dash {
      * @return GenericEntry that can be read to get the current value
      */
     public static GenericEntry addTunable(String name, double defaultValue) {
-        return currentTab.add(name, defaultValue)
+        GenericEntry entry = currentTab.add(name, defaultValue)
             .withWidget(BuiltInWidgets.kTextView)
             .getEntry();
+        trackWidget(name, "double", true, -1, -1);
+        return entry;
     }
 
     /**
@@ -360,10 +395,12 @@ public class Dash {
      * @return GenericEntry that can be read to get the current value
      */
     public static GenericEntry addTunable(String name, double defaultValue, int column, int row) {
-        return currentTab.add(name, defaultValue)
+        GenericEntry entry = currentTab.add(name, defaultValue)
             .withWidget(BuiltInWidgets.kTextView)
             .withPosition(column, row)
             .getEntry();
+        trackWidget(name, "double", true, column, row);
+        return entry;
     }
 
     /**
@@ -385,9 +422,11 @@ public class Dash {
      * @return GenericEntry that can be read to get the current value
      */
     public static GenericEntry addTunable(String name, boolean defaultValue) {
-        return currentTab.add(name, defaultValue)
+        GenericEntry entry = currentTab.add(name, defaultValue)
             .withWidget(BuiltInWidgets.kToggleButton)
             .getEntry();
+        trackWidget(name, "boolean", true, -1, -1);
+        return entry;
     }
 
     /**
@@ -400,10 +439,12 @@ public class Dash {
      * @return GenericEntry that can be read to get the current value
      */
     public static GenericEntry addTunable(String name, boolean defaultValue, int column, int row) {
-        return currentTab.add(name, defaultValue)
+        GenericEntry entry = currentTab.add(name, defaultValue)
             .withWidget(BuiltInWidgets.kToggleButton)
             .withPosition(column, row)
             .getEntry();
+        trackWidget(name, "boolean", true, column, row);
+        return entry;
     }
 
     /**
@@ -424,9 +465,11 @@ public class Dash {
      * @return GenericEntry that can be read to get the current value
      */
     public static GenericEntry addTunable(String name, String defaultValue) {
-        return currentTab.add(name, defaultValue)
+        GenericEntry entry = currentTab.add(name, defaultValue)
             .withWidget(BuiltInWidgets.kTextView)
             .getEntry();
+        trackWidget(name, "string", true, -1, -1);
+        return entry;
     }
 
     /**
@@ -439,10 +482,12 @@ public class Dash {
      * @return GenericEntry that can be read to get the current value
      */
     public static GenericEntry addTunable(String name, String defaultValue, int column, int row) {
-        return currentTab.add(name, defaultValue)
+        GenericEntry entry = currentTab.add(name, defaultValue)
             .withWidget(BuiltInWidgets.kTextView)
             .withPosition(column, row)
             .getEntry();
+        trackWidget(name, "string", true, column, row);
+        return entry;
     }
 
     // ======================== COMMANDS ========================
@@ -466,6 +511,7 @@ public class Dash {
      */
     public static void addCommand(String name, Command command) {
         currentTab.add(name, command);
+        trackWidget(name, "command", false, -1, -1);
     }
 
     /**
@@ -478,6 +524,253 @@ public class Dash {
      */
     public static void addCommand(String name, Command command, int column, int row) {
         currentTab.add(name, command).withPosition(column, row);
+        trackWidget(name, "command", false, column, row);
+    }
+
+    // ======================== ELASTIC DASHBOARD EXPORT ========================
+
+    /** Elastic Dashboard grid cell size in pixels (default from Elastic source). */
+    private static final int ELASTIC_GRID_SIZE = 128;
+
+    /** Default widget width in grid cells. */
+    private static final int DEFAULT_WIDGET_CELLS_W = 2;
+
+    /** Default widget height in grid cells. */
+    private static final int DEFAULT_WIDGET_CELLS_H = 1;
+
+    /** Grid columns used for auto-layout wrapping. */
+    private static final int AUTO_LAYOUT_COLS = 8;
+
+    /**
+     * Exports the current dashboard layout as an Elastic Dashboard JSON file.
+     *
+     * <p>Call this after all {@code Dash.add()} calls are complete (e.g., at the end
+     * of {@code robotInit()}). The file is written to the robot's deploy directory.
+     *
+     * <p><strong>Loading in Elastic:</strong> Elastic can load the exported file via
+     * File → Open Layout (after copying it to your laptop), or via remote layout
+     * download if enabled in Elastic settings.
+     *
+     * <p><strong>Usage:</strong>
+     * <pre>{@code
+     * // At end of robotInit() or RobotContainer constructor
+     * Dash.exportElasticLayout();
+     * }</pre>
+     *
+     * <p><strong>Thread safety:</strong> Not thread-safe. Call from the main robot
+     * thread only, after all widgets have been added.
+     */
+    public static void exportElasticLayout() {
+        exportElasticLayout(
+            Filesystem.getDeployDirectory().toPath().resolve("elastic-layout.json").toString()
+        );
+    }
+
+    /**
+     * Exports the current dashboard layout as an Elastic Dashboard JSON file
+     * to a custom path. See {@link #exportElasticLayout()} for details.
+     *
+     * @param filePath Path to write the JSON file
+     */
+    public static void exportElasticLayout(String filePath) {
+        // Group widgets by tab, preserving insertion order
+        Map<String, List<WidgetInfo>> tabWidgets = new LinkedHashMap<>();
+        for (WidgetInfo w : widgets) {
+            tabWidgets.computeIfAbsent(w.tabName(), k -> new ArrayList<>()).add(w);
+        }
+
+        StringBuilder json = new StringBuilder();
+        json.append("{\n");
+        json.append("  \"version\": 1.0,\n");
+        json.append("  \"grid_size\": ").append(ELASTIC_GRID_SIZE).append(",\n");
+        json.append("  \"tabs\": [\n");
+
+        boolean firstTab = true;
+        for (var entry : tabWidgets.entrySet()) {
+            if (!firstTab) json.append(",\n");
+            firstTab = false;
+
+            String tabName = entry.getKey();
+            List<WidgetInfo> tabItems = entry.getValue();
+
+            json.append("    {\n");
+            json.append("      \"name\": \"").append(escapeJson(tabName)).append("\",\n");
+            json.append("      \"grid_layout\": {\n");
+            json.append("        \"layouts\": [],\n");
+            json.append("        \"containers\": [\n");
+
+            // Collect occupied cells from explicit positions (to avoid auto-layout collisions)
+            java.util.Set<Long> occupiedCells = new java.util.HashSet<>();
+            for (WidgetInfo w : tabItems) {
+                if (w.column() >= 0 && w.row() >= 0) {
+                    for (int dx = 0; dx < DEFAULT_WIDGET_CELLS_W; dx++) {
+                        for (int dy = 0; dy < DEFAULT_WIDGET_CELLS_H; dy++) {
+                            occupiedCells.add(cellKey(w.column() + dx, w.row() + dy));
+                        }
+                    }
+                }
+            }
+
+            int autoCol = 0, autoRow = 0;
+            boolean firstWidget = true;
+            for (WidgetInfo w : tabItems) {
+                if (!firstWidget) json.append(",\n");
+                firstWidget = false;
+
+                int col, row;
+                if (w.column() >= 0 && w.row() >= 0) {
+                    col = w.column();
+                    row = w.row();
+                } else {
+                    // Find next free cell, skipping occupied ones
+                    while (isOccupied(occupiedCells, autoCol, autoRow)) {
+                        autoCol += DEFAULT_WIDGET_CELLS_W;
+                        if (autoCol + DEFAULT_WIDGET_CELLS_W > AUTO_LAYOUT_COLS) {
+                            autoCol = 0;
+                            autoRow++;
+                        }
+                    }
+                    col = autoCol;
+                    row = autoRow;
+                    // Mark this cell as occupied and advance
+                    for (int dx = 0; dx < DEFAULT_WIDGET_CELLS_W; dx++) {
+                        for (int dy = 0; dy < DEFAULT_WIDGET_CELLS_H; dy++) {
+                            occupiedCells.add(cellKey(col + dx, row + dy));
+                        }
+                    }
+                    autoCol += DEFAULT_WIDGET_CELLS_W;
+                    if (autoCol + DEFAULT_WIDGET_CELLS_W > AUTO_LAYOUT_COLS) {
+                        autoCol = 0;
+                        autoRow++;
+                    }
+                }
+
+                // Convert cell positions to pixels
+                double xPixels = (double) col * ELASTIC_GRID_SIZE;
+                double yPixels = (double) row * ELASTIC_GRID_SIZE;
+                double widthPixels = (double) DEFAULT_WIDGET_CELLS_W * ELASTIC_GRID_SIZE;
+                double heightPixels = (double) DEFAULT_WIDGET_CELLS_H * ELASTIC_GRID_SIZE;
+
+                String widgetType = mapToElasticType(w.dataType(), w.tunable());
+                String topic = "/Shuffleboard/" + tabName + "/" + w.name();
+                String dataType = mapToElasticDataType(w.dataType());
+
+                json.append("          {\n");
+                json.append("            \"title\": \"").append(escapeJson(w.name())).append("\",\n");
+                json.append("            \"x\": ").append(formatDouble(xPixels)).append(",\n");
+                json.append("            \"y\": ").append(formatDouble(yPixels)).append(",\n");
+                json.append("            \"width\": ").append(formatDouble(widthPixels)).append(",\n");
+                json.append("            \"height\": ").append(formatDouble(heightPixels)).append(",\n");
+                json.append("            \"type\": \"").append(widgetType).append("\",\n");
+                json.append("            \"properties\": {\n");
+                json.append("              \"topic\": \"").append(escapeJson(topic)).append("\",\n");
+                json.append("              \"period\": 0.06");
+
+                if (dataType != null) {
+                    json.append(",\n              \"data_type\": \"").append(dataType).append("\"");
+                }
+                if (w.tunable() && !"boolean".equals(w.dataType())) {
+                    json.append(",\n              \"show_submit_button\": true");
+                }
+                if ("boolean".equals(w.dataType()) && !w.tunable()) {
+                    json.append(",\n              \"true_color\": \"0xFF00FF00\"");
+                    json.append(",\n              \"false_color\": \"0xFFFF0000\"");
+                }
+
+                json.append("\n            }\n");
+                json.append("          }");
+            }
+
+            json.append("\n        ]\n");
+            json.append("      }\n");
+            json.append("    }");
+        }
+
+        json.append("\n  ]\n");
+        json.append("}\n");
+
+        try (FileWriter writer = new FileWriter(filePath)) {
+            writer.write(json.toString());
+            DriverStation.reportWarning("Dash: Exported Elastic layout to " + filePath +
+                " (" + widgets.size() + " widgets)", false);
+        } catch (IOException e) {
+            DriverStation.reportError("Dash: Failed to export Elastic layout to " + filePath +
+                ": " + e.getMessage(), false);
+        }
+    }
+
+    /** Encodes a (col, row) cell as a packed long for HashSet lookup. */
+    private static long cellKey(int col, int row) {
+        return ((long) col << 32) | (row & 0xFFFFFFFFL);
+    }
+
+    /** Checks if any cell in a 2x1 widget region is occupied. */
+    private static boolean isOccupied(java.util.Set<Long> occupied, int col, int row) {
+        for (int dx = 0; dx < DEFAULT_WIDGET_CELLS_W; dx++) {
+            for (int dy = 0; dy < DEFAULT_WIDGET_CELLS_H; dy++) {
+                if (occupied.contains(cellKey(col + dx, row + dy))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Maps Dash data types to Elastic widget type names. */
+    private static String mapToElasticType(String dataType, boolean tunable) {
+        if ("boolean".equals(dataType)) {
+            return tunable ? "Toggle Switch" : "Boolean Box";
+        }
+        if ("command".equals(dataType)) {
+            return "Command";
+        }
+        return "Text Display";
+    }
+
+    /** Maps Dash data types to Elastic data_type strings, or null for multi-topic widgets. */
+    private static String mapToElasticDataType(String dataType) {
+        return switch (dataType) {
+            case "double" -> "double";
+            case "integer" -> "int";
+            case "boolean" -> "boolean";
+            case "string" -> "string";
+            case "doubleArray" -> "double[]";
+            case "stringArray" -> "string[]";
+            default -> null; // command has no data_type
+        };
+    }
+
+    /** Formats a double with a fractional part for JSON (e.g., 256.0, not 256). */
+    private static String formatDouble(double d) {
+        if (d == Math.floor(d) && !Double.isInfinite(d)) {
+            return String.format("%.1f", d);
+        }
+        return Double.toString(d);
+    }
+
+    /** Escapes special characters for JSON string values. */
+    private static String escapeJson(String s) {
+        StringBuilder sb = new StringBuilder(s.length() + 8);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '\\' -> sb.append("\\\\");
+                case '"' -> sb.append("\\\"");
+                case '\n' -> sb.append("\\n");
+                case '\r' -> sb.append("\\r");
+                case '\t' -> sb.append("\\t");
+                case '\b' -> sb.append("\\b");
+                case '\f' -> sb.append("\\f");
+                default -> {
+                    if (c < 0x20) {
+                        sb.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
+                }
+            }
+        }
+        return sb.toString();
     }
 
     // ======================== UTILITY METHODS ========================
@@ -504,6 +797,8 @@ public class Dash {
         Shuffleboard.selectTab(tabName);
         currentTab = Shuffleboard.getTab(tabName);
         tabCache.put(tabName, currentTab);
+        // Purge widget tracking entries for this tab
+        widgets.removeIf(w -> w.tabName().equals(tabName));
     }
 
     /**

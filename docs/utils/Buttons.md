@@ -503,6 +503,28 @@ Buttons.whileTrueContinuous(
 
 Provide haptic feedback to the driver/operator.
 
+### Convenience Methods (Recommended)
+
+Auto-detects the configured controller type (Xbox or PS5) — no casting required. No-op for joystick controllers.
+
+```java
+// Rumble the operator controller (1 second at full intensity)
+Buttons.rumbleOperator(1000, 1.0);
+
+// Rumble the driver controller (500ms at 70% intensity)
+Buttons.rumbleDriver(500, 0.7);
+
+// Stop rumble immediately
+Buttons.stopRumbleOperator();
+Buttons.stopRumbleDriver();
+```
+
+**Usage in a trigger:**
+```java
+HubActivation.shiftChangeSoonTrigger(5.0)
+    .onTrue(Commands.runOnce(() -> Buttons.rumbleOperator(1000, 1.0)));
+```
+
 ### Xbox Rumble
 
 ```java
@@ -536,9 +558,9 @@ public class IntakeCommand extends Command {
 
     @Override
     public void end(boolean interrupted) {
-        // Rumble when game piece acquired
+        // Rumble when game piece acquired (auto-detects controller type)
         if (!interrupted && hasPiece()) {
-            Buttons.rumbleXbox(Buttons.getXboxController(), 300, 0.5);
+            Buttons.rumbleOperator(300, 0.5);
         }
     }
 }

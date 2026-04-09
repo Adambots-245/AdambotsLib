@@ -150,8 +150,17 @@ motor.configureExternalPulseWidthSensor(
     1.0    // discontinuity point (1.0 = full wrap)
 );
 
+// Pulse-width encoder with explicit sensor phase (when sensor is mounted backwards)
+motor.configureExternalPulseWidthSensor(
+    1.0, 0.25, 1.0,
+    true   // opposeMotor: sensor counts opposite to motor rotation
+);
+
 // Quadrature encoder on data port
 motor.configureExternalQuadratureSensor(1.0, 8192);  // 1:1 ratio, 8192 edges/rev
+
+// Quadrature with explicit sensor phase
+motor.configureExternalQuadratureSensor(1.0, 8192, true);
 
 // Remote CANcoder on CAN bus
 motor.configureRemoteCANcoder(9, 1.0);  // CAN ID 9, 1:1 ratio
@@ -159,6 +168,8 @@ motor.configureRemoteCANcoder(9, 1.0);  // CAN ID 9, 1:1 ratio
 // Fused CANcoder (Pro) — fuses with commutation sensor for higher bandwidth
 motor.configureFusedCANcoder(9, 1.0, 12.8);  // CAN ID 9, 1:1 mechanism, 12.8:1 rotor-to-sensor
 ```
+
+**Sensor Phase:** For data-port sensors (PulseWidth, Quadrature), `opposeMotor` flips the reported sensor direction. To calibrate: drive the motor with positive output and `opposeMotor=false`. If the sensor velocity is positive, the phase is correct. If negative, set `opposeMotor=true`. Phoenix 6 automatically inverts the sensor along with motor invert, so this only needs to reflect the mechanical relationship.
 
 ### Simulation Support
 

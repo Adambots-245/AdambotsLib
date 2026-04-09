@@ -27,6 +27,7 @@ import com.ctre.phoenix6.configs.TalonFXSConfigurator;
 import com.ctre.phoenix6.signals.ExternalFeedbackSensorSourceValue;
 import com.ctre.phoenix6.signals.GravityTypeValue;
 import com.ctre.phoenix6.signals.MotorArrangementValue;
+import com.ctre.phoenix6.signals.SensorPhaseValue;
 
 import com.ctre.phoenix6.sim.TalonFXSSimState;
 
@@ -152,6 +153,8 @@ public class MinionMotor implements BaseMotor {
     private double extAbsoluteSensorOffset = 0, extDiscontinuityPoint = 1.0;
     @NotLogged
     private int extQuadratureEdgesPerRotation = 4096;
+    @NotLogged
+    private SensorPhaseValue extSensorPhase = SensorPhaseValue.Aligned;
 
     /**
      * Functional interface for applying a configuration and returning a StatusCode.
@@ -428,10 +431,32 @@ public class MinionMotor implements BaseMotor {
     @Override
     public void configureExternalPulseWidthSensor(double sensorToMechanismRatio,
             double absoluteSensorOffset, double discontinuityPoint) {
+        configureExternalPulseWidthSensor(sensorToMechanismRatio, absoluteSensorOffset, discontinuityPoint, false);
+    }
+
+    /**
+     * Configures a pulse-width absolute encoder with explicit sensor phase.
+     *
+     * <p>Sensor phase controls whether the sensor counts in the same direction as the motor.
+     * To determine phase: drive the motor positive with {@code opposeMotor=false}. If sensor
+     * velocity is positive, the phase is correct. If negative, set {@code opposeMotor=true}.
+     *
+     * <p>Note: Phoenix 6 automatically inverts sensor direction when motor invert changes,
+     * so this parameter only needs to reflect the mechanical sensor-to-shaft relationship.
+     *
+     * @param sensorToMechanismRatio Gear ratio from sensor to mechanism output
+     * @param absoluteSensorOffset   Offset in rotations (0 to 1) to zero the sensor
+     * @param discontinuityPoint     Wrap point in rotations (1.0 for full wrap, 0.5 for ±180°)
+     * @param opposeMotor            true if the sensor counts opposite to motor rotation
+     */
+    @Override
+    public void configureExternalPulseWidthSensor(double sensorToMechanismRatio,
+            double absoluteSensorOffset, double discontinuityPoint, boolean opposeMotor) {
         extFeedbackSource = ExternalFeedbackSensorSourceValue.PulseWidth;
         extSensorToMechRatio = sensorToMechanismRatio;
         extAbsoluteSensorOffset = absoluteSensorOffset;
         extDiscontinuityPoint = discontinuityPoint;
+        extSensorPhase = opposeMotor ? SensorPhaseValue.Opposed : SensorPhaseValue.Aligned;
         applyExternalFeedbackConfig();
     }
 
@@ -443,9 +468,22 @@ public class MinionMotor implements BaseMotor {
      */
     @Override
     public void configureExternalQuadratureSensor(double sensorToMechanismRatio, int edgesPerRotation) {
+        configureExternalQuadratureSensor(sensorToMechanismRatio, edgesPerRotation, false);
+    }
+
+    /**
+     * Configures a quadrature encoder with explicit sensor phase.
+     *
+     * @param sensorToMechanismRatio Gear ratio from sensor to mechanism output
+     * @param edgesPerRotation       Quadrature edges per rotation
+     * @param opposeMotor            true if the sensor counts opposite to motor rotation
+     */
+    @Override
+    public void configureExternalQuadratureSensor(double sensorToMechanismRatio, int edgesPerRotation, boolean opposeMotor) {
         extFeedbackSource = ExternalFeedbackSensorSourceValue.Quadrature;
         extSensorToMechRatio = sensorToMechanismRatio;
         extQuadratureEdgesPerRotation = edgesPerRotation;
+        extSensorPhase = opposeMotor ? SensorPhaseValue.Opposed : SensorPhaseValue.Aligned;
         applyExternalFeedbackConfig();
     }
 
@@ -495,6 +533,7 @@ public class MinionMotor implements BaseMotor {
         config.AbsoluteSensorOffset = extAbsoluteSensorOffset;
         config.AbsoluteSensorDiscontinuityPoint = extDiscontinuityPoint;
         config.QuadratureEdgesPerRotation = extQuadratureEdgesPerRotation;
+        config.SensorPhase = extSensorPhase;
 
         boolean success = applyConfigWithRetry(() -> configurator.apply(config));
         if (!success) {

@@ -757,6 +757,23 @@ public interface BaseMotor extends BaseActuator{
     }
 
     /**
+     * Configures a pulse-width absolute encoder with explicit sensor phase.
+     *
+     * <p>Sensor phase controls whether the sensor counts in the same direction as the motor.
+     * Supported by TalonFXS (MinionMotor) only.
+     *
+     * @param sensorToMechanismRatio Gear ratio from sensor to mechanism output
+     * @param absoluteSensorOffset   Offset in rotations (0 to 1) to zero the sensor
+     * @param discontinuityPoint     Wrap point in rotations (1.0 for full wrap, 0.5 for ±180°)
+     * @param opposeMotor            true if the sensor counts opposite to motor rotation
+     * @throws UnsupportedOperationException if this motor does not support external pulse-width sensors
+     */
+    default void configureExternalPulseWidthSensor(double sensorToMechanismRatio,
+            double absoluteSensorOffset, double discontinuityPoint, boolean opposeMotor) {
+        throw new UnsupportedOperationException(getMotorType() + " does not support external pulse-width sensors");
+    }
+
+    /**
      * Configures a quadrature encoder connected to the motor controller's data port.
      *
      * <p>Supported by TalonFXS (MinionMotor) only.
@@ -766,6 +783,20 @@ public interface BaseMotor extends BaseActuator{
      * @throws UnsupportedOperationException if this motor does not support external quadrature sensors
      */
     default void configureExternalQuadratureSensor(double sensorToMechanismRatio, int edgesPerRotation) {
+        throw new UnsupportedOperationException(getMotorType() + " does not support external quadrature sensors");
+    }
+
+    /**
+     * Configures a quadrature encoder with explicit sensor phase.
+     *
+     * <p>Supported by TalonFXS (MinionMotor) only.
+     *
+     * @param sensorToMechanismRatio Gear ratio from sensor to mechanism output
+     * @param edgesPerRotation       Quadrature edges per rotation
+     * @param opposeMotor            true if the sensor counts opposite to motor rotation
+     * @throws UnsupportedOperationException if this motor does not support external quadrature sensors
+     */
+    default void configureExternalQuadratureSensor(double sensorToMechanismRatio, int edgesPerRotation, boolean opposeMotor) {
         throw new UnsupportedOperationException(getMotorType() + " does not support external quadrature sensors");
     }
 

@@ -12,6 +12,7 @@ Simple, clean API for adding telemetry data to Shuffleboard without dealing with
 - [Tab Management](#tab-management)
 - [Tunable Values](#tunable-values)
 - [Command Buttons](#command-buttons)
+- [Elastic Dashboard Export](#elastic-dashboard-export)
 - [Advanced Features](#advanced-features)
 - [Complete Examples](#complete-examples)
 - [API Reference](#api-reference)
@@ -503,6 +504,66 @@ public class RobotContainer {
 
 ---
 
+## Elastic Dashboard Export
+
+If you're using [Elastic Dashboard](https://github.com/Gold872/elastic_dashboard) instead of Shuffleboard (recommended for competition — Elastic uses far less NetworkTables bandwidth and won't kill the radio), Dash can automatically export your dashboard layout as an Elastic JSON file.
+
+This means you only need to write your `Dash.add()` calls once, and they work for both Shuffleboard (during development) and Elastic (during matches).
+
+### Basic Export
+
+```java
+public class Robot extends TimedRobot {
+    @Override
+    public void robotInit() {
+        // Set up all your dashboard elements as usual
+        Dash.useTab("Telemetry");
+        Dash.add("Robot Speed", () -> swerve.getSpeed());
+        Dash.add("Gyro Angle", () -> gyro.getAngle());
+        Dash.add("At Target", () -> elevator.isAtTarget());
+
+        Dash.useTab("Tuning");
+        kP = Dash.addTunable("Arm kP", 0.5);
+        Dash.addCommand("Reset Gyro", swerve.resetGyroCommand());
+
+        // Export the layout for Elastic to load
+        Dash.exportElasticLayout();
+    }
+}
+```
+
+This writes `elastic-layout.json` to the robot's deploy directory (`Filesystem.getDeployDirectory()`). Copy the file to your laptop and open it in Elastic via **File → Open Layout**, or use Elastic's remote layout download feature if enabled.
+
+### Custom Path
+
+```java
+Dash.exportElasticLayout("/home/lvuser/deploy/my-layout.json");
+```
+
+### What Gets Exported
+
+| Dash type | Elastic widget |
+|---|---|
+| `add(name, doubleSupplier)` | Text Display |
+| `add(name, longSupplier)` | Text Display |
+| `add(name, booleanSupplier)` | Boolean Box (green/red) |
+| `add(name, stringSupplier)` | Text Display |
+| `addDoubleArray` / `addStringArray` | Text Display |
+| `addTunable(name, double)` | Text Display (editable) |
+| `addTunable(name, boolean)` | Toggle Switch |
+| `addTunable(name, String)` | Text Display (editable) |
+| `addCommand(name, command)` | Command |
+
+### Auto-Layout
+
+Widgets without explicit positions are auto-arranged left-to-right, top-to-bottom in an 8-column grid. Widgets created with `Dash.add(name, supplier, column, row)` use their specified positions.
+
+### NetworkTables Topics
+
+Elastic widgets are bound to topics at `/Shuffleboard/{tabName}/{widgetName}` — the same paths Shuffleboard publishes to. This means you can switch between dashboards without changing any robot code.
+
+---
+
 ## Advanced Features
 
 ### Clear Tab
@@ -912,6 +973,16 @@ static void addCommand(String name, Command command)
 static void addCommand(String name, Command command, int column, int row)
 ```
 Add command button to Shuffleboard. Button runs the command when pressed.
+
+---
+
+### Elastic Dashboard Export
+
+```java
+static void exportElasticLayout()
+static void exportElasticLayout(String filePath)
+```
+Exports the current dashboard layout as an Elastic Dashboard JSON file. The no-arg overload writes to the robot's deploy directory (`Filesystem.getDeployDirectory()`). Call after all `add()` calls are complete. See [Elastic Dashboard Export](#elastic-dashboard-export) for full details.
 
 ---
 
