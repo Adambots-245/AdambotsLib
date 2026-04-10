@@ -189,6 +189,22 @@ public interface BaseMotor extends BaseActuator{
      */
     void set(ControlMode mode, double value);
 
+    /**
+     * Sets position target with an expected velocity for feedforward.
+     *
+     * <p>Used for continuous tracking loops where the target is moving and
+     * you want the motor to anticipate the velocity, not just chase position.
+     *
+     * <p>The motor controller applies kV × velocity as feedforward voltage
+     * on top of the PID position correction. This reduces tracking lag
+     * compared to position-only control.
+     *
+     * @param position target in mechanism rotations
+     * @param velocity expected velocity in mechanism RPS (for kV feedforward)
+     */
+    default void setPositionWithVelocityFF(double position, double velocity) {
+        set(ControlMode.POSITION, position); // fallback: ignore velocity
+    }
 
     /**
      * Configures PID gains for closed-loop control.

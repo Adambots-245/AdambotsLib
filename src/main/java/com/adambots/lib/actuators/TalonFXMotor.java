@@ -395,6 +395,14 @@ public class TalonFXMotor implements BaseMotor {
      *              and 0.0 represents stopped.
      */
     @Override
+    public void setPositionWithVelocityFF(double position, double velocity) {
+        motor.setControl(positionVoltageRequest
+            .withPosition(position)
+            .withVelocity(velocity)
+            .withEnableFOC(focFlag));
+    }
+
+    @Override
     public void set(double speed) {
         motor.setControl(dutyCycleRequest.withOutput(speed).withEnableFOC(focFlag));
     }
