@@ -403,6 +403,15 @@ public class TalonFXMotor implements BaseMotor {
     }
 
     @Override
+    public void setPositionWithVelocityFF(double position, double velocity, int slot) {
+        motor.setControl(positionVoltageRequest
+            .withPosition(position)
+            .withVelocity(velocity)
+            .withSlot(slot)
+            .withEnableFOC(focFlag));
+    }
+
+    @Override
     public void set(double speed) {
         motor.setControl(dutyCycleRequest.withOutput(speed).withEnableFOC(focFlag));
     }

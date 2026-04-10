@@ -899,6 +899,15 @@ public class MinionMotor implements BaseMotor {
     }
 
     @Override
+    public void setPositionWithVelocityFF(double position, double velocity, int slot) {
+        motor.setControl(positionRequest
+            .withPosition(position)
+            .withVelocity(velocity)
+            .withSlot(slot)
+            .withEnableFOC(focFlag));
+    }
+
+    @Override
     public void set(double speed) {
         set(ControlMode.PERCENT_OUTPUT, speed);
     }

@@ -207,6 +207,20 @@ public interface BaseMotor extends BaseActuator{
     }
 
     /**
+     * Sets position target with velocity feedforward using a specific PID slot.
+     *
+     * <p>Allows different PID tuning for tracking (e.g., slot 1) vs
+     * go-to-angle (e.g., slot 0).
+     *
+     * @param position target in mechanism rotations
+     * @param velocity expected velocity in mechanism RPS (for kV feedforward)
+     * @param slot PID slot index to use (0-2 on TalonFX, 0 only on MinionMotor)
+     */
+    default void setPositionWithVelocityFF(double position, double velocity, int slot) {
+        setPositionWithVelocityFF(position, velocity); // fallback ignores slot
+    }
+
+    /**
      * Configures PID gains for closed-loop control.
      *
      * <p>Most motor controllers support multiple PID gain slots (0-2 or 0-3) for different
