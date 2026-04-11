@@ -21,6 +21,8 @@ import com.ctre.phoenix6.configs.SoftwareLimitSwitchConfigs;
 import com.ctre.phoenix6.configs.MotorOutputConfigs;
 import com.ctre.phoenix6.configs.HardwareLimitSwitchConfigs;
 import com.ctre.phoenix6.configs.Slot0Configs;
+import com.ctre.phoenix6.configs.Slot1Configs;
+import com.ctre.phoenix6.configs.Slot2Configs;
 import com.ctre.phoenix6.configs.CommutationConfigs;
 import com.ctre.phoenix6.configs.ExternalFeedbackConfigs;
 import com.ctre.phoenix6.configs.TalonFXSConfiguration;
@@ -116,6 +118,18 @@ public class MinionMotor implements BaseMotor {
     private double slot0_kS = 0, slot0_kA = 0, slot0_kG = 0;
     @NotLogged
     private GravityTypeValue slot0_gravityType = GravityTypeValue.Elevator_Static;
+
+    // Local tracking for Slot1Configs
+    @NotLogged
+    private double slot1_kP = 0, slot1_kI = 0, slot1_kD = 0, slot1_kV = 0;
+    @NotLogged
+    private double slot1_kS = 0, slot1_kA = 0, slot1_kG = 0;
+
+    // Local tracking for Slot2Configs
+    @NotLogged
+    private double slot2_kP = 0, slot2_kI = 0, slot2_kD = 0, slot2_kV = 0;
+    @NotLogged
+    private double slot2_kS = 0, slot2_kA = 0, slot2_kG = 0;
 
     // Local tracking for CurrentLimitsConfigs — defaults match Phoenix 6 factory defaults
     @NotLogged
@@ -336,11 +350,7 @@ public class MinionMotor implements BaseMotor {
     /**
      * Sets PID gains for closed-loop control.
      *
-     * <p><strong>Note:</strong> MinionMotor (TalonFXS) only supports PID slot 0.
-     * If a non-zero slot index is passed, a warning is logged and the gains are
-     * applied to slot 0.
-     *
-     * @param slotIdx PID slot index (only 0 is supported on MinionMotor)
+     * @param slotIdx PID slot index (0-2)
      * @param kP Proportional gain
      * @param kI Integral gain
      * @param kD Derivative gain
@@ -348,20 +358,17 @@ public class MinionMotor implements BaseMotor {
      */
     @Override
     public void setPID(int slotIdx, double kP, double kI, double kD, double kF) {
-        if (slotIdx != 0) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "MinionMotor: Only PID slot 0 is supported. Slot " + slotIdx + " requested — applying to slot 0.", false);
+        switch (slotIdx) {
+            case 0 -> { slot0_kP = kP; slot0_kI = kI; slot0_kD = kD; slot0_kV = kF; applySlot0(); }
+            case 1 -> { slot1_kP = kP; slot1_kI = kI; slot1_kD = kD; slot1_kV = kF; applySlot1(); }
+            case 2 -> { slot2_kP = kP; slot2_kI = kI; slot2_kD = kD; slot2_kV = kF; applySlot2(); }
+            default -> edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "MinionMotor: Invalid PID slot " + slotIdx + ". Valid range: 0-2.", false);
         }
-        slot0_kP = kP; slot0_kI = kI; slot0_kD = kD; slot0_kV = kF;
-        applySlot0();
     }
 
     /**
      * Sets PID and feedforward gains with full Phoenix 6 support.
-     *
-     * <p><strong>Note:</strong> MinionMotor (TalonFXS) only supports PID slot 0.
-     * If a non-zero slot index is passed, a warning is logged and the gains are
-     * applied to slot 0.
      *
      * <p>Phoenix 6 provides separate feedforward gains for different control scenarios:
      * <ul>
@@ -375,7 +382,7 @@ public class MinionMotor implements BaseMotor {
      * {@link #configureGravity(GravityType)} to set the gravity compensation type.
      * Without it, kG defaults to Elevator_Static behavior.
      *
-     * @param slotIdx The PID slot index to configure (only 0 is supported on MinionMotor)
+     * @param slotIdx The PID slot index to configure (0-2)
      * @param kP Proportional gain
      * @param kI Integral gain
      * @param kD Derivative gain
@@ -386,13 +393,25 @@ public class MinionMotor implements BaseMotor {
      */
     public void setPID(int slotIdx, double kP, double kI, double kD,
                        double kV, double kS, double kA, double kG) {
-        if (slotIdx != 0) {
-            edu.wpi.first.wpilibj.DriverStation.reportWarning(
-                "MinionMotor: Only PID slot 0 is supported. Slot " + slotIdx + " requested — applying to slot 0.", false);
+        switch (slotIdx) {
+            case 0 -> {
+                slot0_kP = kP; slot0_kI = kI; slot0_kD = kD;
+                slot0_kV = kV; slot0_kS = kS; slot0_kA = kA; slot0_kG = kG;
+                applySlot0();
+            }
+            case 1 -> {
+                slot1_kP = kP; slot1_kI = kI; slot1_kD = kD;
+                slot1_kV = kV; slot1_kS = kS; slot1_kA = kA; slot1_kG = kG;
+                applySlot1();
+            }
+            case 2 -> {
+                slot2_kP = kP; slot2_kI = kI; slot2_kD = kD;
+                slot2_kV = kV; slot2_kS = kS; slot2_kA = kA; slot2_kG = kG;
+                applySlot2();
+            }
+            default -> edu.wpi.first.wpilibj.DriverStation.reportWarning(
+                "MinionMotor: Invalid PID slot " + slotIdx + ". Valid range: 0-2.", false);
         }
-        slot0_kP = kP; slot0_kI = kI; slot0_kD = kD;
-        slot0_kV = kV; slot0_kS = kS; slot0_kA = kA; slot0_kG = kG;
-        applySlot0();
     }
 
     @Override
@@ -929,6 +948,44 @@ public class MinionMotor implements BaseMotor {
         if (!success) {
             edu.wpi.first.wpilibj.DriverStation.reportError(
                 "MinionMotor: Failed to apply Slot0 config after retries", false);
+        }
+    }
+
+    /**
+     * Builds Slot1Configs from local state and applies it.
+     */
+    private void applySlot1() {
+        var config = new Slot1Configs();
+        config.kP = slot1_kP;
+        config.kI = slot1_kI;
+        config.kD = slot1_kD;
+        config.kV = slot1_kV;
+        config.kS = slot1_kS;
+        config.kA = slot1_kA;
+        config.kG = slot1_kG;
+        boolean success = applyConfigWithRetry(() -> configurator.apply(config));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "MinionMotor: Failed to apply Slot1 config after retries", false);
+        }
+    }
+
+    /**
+     * Builds Slot2Configs from local state and applies it.
+     */
+    private void applySlot2() {
+        var config = new Slot2Configs();
+        config.kP = slot2_kP;
+        config.kI = slot2_kI;
+        config.kD = slot2_kD;
+        config.kV = slot2_kV;
+        config.kS = slot2_kS;
+        config.kA = slot2_kA;
+        config.kG = slot2_kG;
+        boolean success = applyConfigWithRetry(() -> configurator.apply(config));
+        if (!success) {
+            edu.wpi.first.wpilibj.DriverStation.reportError(
+                "MinionMotor: Failed to apply Slot2 config after retries", false);
         }
     }
 
