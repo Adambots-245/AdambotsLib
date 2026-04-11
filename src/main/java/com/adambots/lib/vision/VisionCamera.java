@@ -560,6 +560,22 @@ public class VisionCamera implements VisionCameraInterface {
                 }
             }
 
+            // Raw distance filter: reject frames where ANY target's camera-to-tag
+            // distance exceeds the configured max. Uses the raw PnP measurement,
+            // NOT the field-layout-based distance which depends on the estimated
+            // pose and is unreliable when the pose is wrong.
+            boolean tooFar = false;
+            for (PhotonTrackedTarget target : result.getTargets()) {
+                double rawDist = target.getBestCameraToTarget().getTranslation().getNorm();
+                if (rawDist > config.maxTagDistanceMeters()) {
+                    tooFar = true;
+                    break;
+                }
+            }
+            if (tooFar) {
+                continue;
+            }
+
             // Update with the result
             visionEst = poseEstimator.update(result);
 
