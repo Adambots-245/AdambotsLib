@@ -184,6 +184,7 @@ public class VisionConfigBuilder {
         private VisionStdDevs multiTagStdDevs = VisionStdDevs.DEFAULT_MULTI_TAG;
         private int[] allowedTagIDs = new int[0];
         private double maxTagDistanceMeters = VisionCameraConfig.DEFAULT_MAX_TAG_DISTANCE;
+        private double minTagAreaPercent = 0.0;
         private PoseStrategy poseStrategy = VisionCameraConfig.DEFAULT_POSE_STRATEGY;
 
         /**
@@ -338,6 +339,21 @@ public class VisionConfigBuilder {
         }
 
         /**
+         * Sets the minimum tag image area percentage to accept.
+         * <p>Tags smaller than this area in the camera frame are rejected
+         * as they produce unreliable PnP results. The area is a percentage
+         * of the total image area (0-100).
+         * <p>Default is 0.0 (disabled — all tags accepted regardless of size).
+         *
+         * @param percent Minimum tag area percentage (e.g., 0.5 for 0.5% of image)
+         * @return This builder for chaining
+         */
+        public CameraBuilder minTagArea(double percent) {
+            this.minTagAreaPercent = percent;
+            return this;
+        }
+
+        /**
          * Sets the pose estimation strategy for this camera.
          * <p>Default is {@link PoseStrategy#MULTI_TAG_PNP_ON_COPROCESSOR}.
          *
@@ -376,6 +392,7 @@ public class VisionConfigBuilder {
                 multiTagStdDevs,
                 allowedTagIDs,
                 maxTagDistanceMeters,
+                minTagAreaPercent,
                 poseStrategy
             );
 

@@ -66,6 +66,7 @@ import edu.wpi.first.wpilibj.RobotBase;
  *     VisionStdDevs.DEFAULT_MULTI_TAG,
  *     new int[]{6, 7, 8, 9, 10, 11},
  *     4.0,  // Max tag distance in meters
+ *     0.0,  // Min tag area percent (0.0 = disabled)
  *     PoseStrategy.MULTI_TAG_PNP_ON_COPROCESSOR
  * );
  *
@@ -574,6 +575,22 @@ public class VisionCamera implements VisionCameraInterface {
             }
             if (tooFar) {
                 continue;
+            }
+
+            // Tag area filter: reject frames where ANY target's image area
+            // is below the configured minimum. Small tags produce unreliable
+            // PnP results regardless of reported distance.
+            if (config.minTagAreaPercent() > 0) {
+                boolean tooSmall = false;
+                for (PhotonTrackedTarget target : result.getTargets()) {
+                    if (target.getArea() < config.minTagAreaPercent()) {
+                        tooSmall = true;
+                        break;
+                    }
+                }
+                if (tooSmall) {
+                    continue;
+                }
             }
 
             // Update with the result

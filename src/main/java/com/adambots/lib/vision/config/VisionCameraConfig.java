@@ -66,6 +66,7 @@ import edu.wpi.first.math.geometry.Translation3d;
  *     VisionStdDevs.DEFAULT_MULTI_TAG,
  *     new int[]{6, 7, 8, 9, 10, 11},  // Allowed tags
  *     4.0,  // Max tag distance (meters) - use default
+ *     0.0,  // Min tag area percent (0.0 = disabled)
  *     PoseStrategy.MULTI_TAG_PNP_ON_COPROCESSOR  // Pose strategy
  * );
  * }</pre>
@@ -78,6 +79,7 @@ import edu.wpi.first.math.geometry.Translation3d;
  * @param multiTagStdDevs Standard deviations for multi-tag pose estimates
  * @param allowedTagIDs Array of AprilTag IDs this camera should process (empty = all tags)
  * @param maxTagDistanceMeters Maximum distance (meters) for single-tag pose estimation (default 4.0)
+ * @param minTagAreaPercent Minimum tag image area percentage to accept (0.0 = disabled)
  * @param poseStrategy PhotonVision pose estimation strategy (default MULTI_TAG_PNP_ON_COPROCESSOR)
  *
  * @see VisionStdDevs
@@ -92,6 +94,7 @@ public record VisionCameraConfig(
     VisionStdDevs multiTagStdDevs,
     int[] allowedTagIDs,
     double maxTagDistanceMeters,
+    double minTagAreaPercent,
     PoseStrategy poseStrategy
 ) {
 
