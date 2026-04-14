@@ -33,6 +33,7 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj.RobotBase;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 
 /**
@@ -220,6 +221,13 @@ public class PhotonVision implements VisionSystem {
       if (poseEst.isPresent()) {
         var pose = poseEst.get();
         Pose2d estimatedPose2d = pose.estimatedPose.toPose2d();
+
+        // Reject stale measurements — high latency means the robot has moved
+        // significantly since the image was captured
+        double latency = Timer.getFPGATimestamp() - pose.timestampSeconds;
+        if (latency > 0.2) {
+          continue;
+        }
 
         if (RobotBase.isSimulation()) {
           visionSim.getDebugField().getObject("VisionEstimation")
