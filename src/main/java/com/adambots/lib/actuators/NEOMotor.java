@@ -24,7 +24,7 @@ import edu.wpi.first.units.measure.*;
  * Implementation for REV NEO and NEO Vortex motors using SPARK MAX controller
  */
 @Logged
-public class NEOMotor implements BaseMotor {
+public final class NEOMotor implements BaseMotor {
     @NotLogged
     private final SparkMax motor;
 
@@ -437,6 +437,22 @@ public class NEOMotor implements BaseMotor {
     @Override
     public String getMotorType() {
         return "NEOMotor (SPARK MAX)";
+    }
+
+    /**
+     * Package-private: returns the underlying REV SparkMax for bridging
+     * into YAMS SparkWrapper. Not part of the public API.
+     */
+    com.revrobotics.spark.SparkMax rawMotor() {
+        return motor;
+    }
+
+    /**
+     * Package-private: default WPILib DCMotor model (NEO).
+     * Teams can override per-mechanism via the mechanism's config.
+     */
+    edu.wpi.first.math.system.plant.DCMotor dcMotorModel() {
+        return edu.wpi.first.math.system.plant.DCMotor.getNEO(1);
     }
 
     @Override

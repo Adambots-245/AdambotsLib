@@ -13,7 +13,7 @@ import edu.wpi.first.units.measure.*;
  * This prevents null checks throughout robot code and eliminates Epilogue logging errors.
  */
 @Logged
-public class DummyMotor implements BaseMotor {
+public final class DummyMotor implements BaseMotor {
 
     @Override
     public void set(double speed) {}

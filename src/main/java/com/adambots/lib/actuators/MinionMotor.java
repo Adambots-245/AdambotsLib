@@ -48,7 +48,7 @@ import edu.wpi.first.units.measure.*;
  * to avoid unnecessary delays during operation.
  */
 @Logged
-public class MinionMotor implements BaseMotor {
+public final class MinionMotor implements BaseMotor {
     @NotLogged
     private final TalonFXS motor;
 
@@ -1047,6 +1047,22 @@ public class MinionMotor implements BaseMotor {
     @Override
     public String getMotorType() {
         return "MinionMotor (TalonFXS)";
+    }
+
+    /**
+     * Package-private: returns the underlying Phoenix 6 TalonFXS for bridging
+     * into YAMS TalonFXSWrapper. Not part of the public API.
+     */
+    com.ctre.phoenix6.hardware.TalonFXS rawMotor() {
+        return motor;
+    }
+
+    /**
+     * Package-private: returns the WPILib DCMotor model for this motor's physics.
+     */
+    edu.wpi.first.math.system.plant.DCMotor dcMotorModel() {
+        // CTRE Minion brushless motor model
+        return edu.wpi.first.math.system.plant.DCMotor.getKrakenX60(1);
     }
 
     @Override

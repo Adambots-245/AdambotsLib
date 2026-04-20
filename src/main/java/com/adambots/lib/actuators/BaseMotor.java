@@ -53,7 +53,8 @@ import edu.wpi.first.units.measure.*;
  * @see MinionMotor
  */
 @Logged
-public interface BaseMotor extends BaseActuator{
+public sealed interface BaseMotor extends BaseActuator
+        permits TalonFXMotor, MinionMotor, NEOMotor, DummyMotor {
 
     /**
      * Control modes for motor operation.

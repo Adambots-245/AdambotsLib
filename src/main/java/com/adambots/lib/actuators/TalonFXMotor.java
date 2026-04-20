@@ -56,7 +56,7 @@ import edu.wpi.first.units.measure.*;
  * @see com.ctre.phoenix6.hardware.TalonFX
  */
 @Logged
-public class TalonFXMotor implements BaseMotor {
+public final class TalonFXMotor implements BaseMotor {
     @NotLogged
     private final TalonFX motor;
 
@@ -1180,6 +1180,31 @@ public class TalonFXMotor implements BaseMotor {
     @Override
     public String getMotorType() {
         return isKraken ? "TalonFXMotor (Kraken X60)" : "TalonFXMotor (Falcon 500)";
+    }
+
+    /**
+     * Package-private: returns the underlying Phoenix 6 TalonFX for bridging
+     * into YAMS SmartMotorController wrappers. Not part of the public API.
+     */
+    TalonFX rawMotor() {
+        return motor;
+    }
+
+    /**
+     * Package-private: returns the WPILib DCMotor model for this motor's physics,
+     * used by YAMS for simulation. Kraken → Kraken X60, Falcon → Falcon 500.
+     */
+    edu.wpi.first.math.system.plant.DCMotor dcMotorModel() {
+        return isKraken
+            ? edu.wpi.first.math.system.plant.DCMotor.getKrakenX60(1)
+            : edu.wpi.first.math.system.plant.DCMotor.getFalcon500(1);
+    }
+
+    /**
+     * Package-private: true if this is a Kraken (vs Falcon), for FOC-capable detection.
+     */
+    boolean isKrakenX60() {
+        return isKraken;
     }
 
     @Override
