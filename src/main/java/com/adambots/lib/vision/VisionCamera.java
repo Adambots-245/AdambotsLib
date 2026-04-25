@@ -501,35 +501,57 @@ public class VisionCamera implements VisionCameraInterface {
     }
 
     /**
-     * Updates the latest results, cached with a maximum refresh rate of 1req/15ms.
-     * Sorts the list by timestamp.
+     * Refresh the cached pipeline results from NetworkTables without running
+     * pose estimation. Useful for cameras where the pose result is unwanted
+     * (e.g., turret-mounted alignment cameras) — the caller can iterate
+     * {@link #getResultsList()} directly to inspect targets.
+     *
+     * <p>Subject to the same 15 ms debounce as {@link #getEstimatedGlobalPose()}
+     * so back-to-back calls don't flood NT reads. Does not clear
+     * {@code estimatedRobotPose} — the last pose-estimator result persists
+     * until {@link #updateUnreadResults()} runs again.
+     *
+     * @return true if new pipeline results were fetched on this call; false
+     *         if the camera is disabled, the call landed inside the debounce
+     *         window, or NetworkTables had no unread frames.
      */
-    private void updateUnreadResults() {
+    public boolean refreshResults() {
+        if (!enabled) return false;
+
         double currentTimestamp = Microseconds.of(NetworkTablesJNI.now()).in(Seconds);
         double debounceTime = Milliseconds.of(15).in(Seconds);
 
-        // Always clear stale results so callers don't see old frames
         resultsList.clear();
         hasTarget = false;
+
+        if ((currentTimestamp - lastReadTimestamp) < debounceTime) {
+            return false;
+        }
+
+        resultsList = RobotBase.isReal()
+            ? camera.getAllUnreadResults()
+            : cameraSim.getCamera().getAllUnreadResults();
+        lastReadTimestamp = currentTimestamp;
+
+        resultsList.sort((PhotonPipelineResult a, PhotonPipelineResult b) ->
+            a.getTimestampSeconds() >= b.getTimestampSeconds() ? 1 : -1);
+
+        if (!resultsList.isEmpty()
+            && resultsList.get(resultsList.size() - 1).targets.size() > 0) {
+            hasTarget = true;
+        }
+        return !resultsList.isEmpty();
+    }
+
+    /**
+     * Updates the latest results AND runs pose estimation on them. Cached with a
+     * maximum refresh rate of 1req/15ms. Sorts the list by timestamp.
+     */
+    private void updateUnreadResults() {
+        // Pose estimator's contract: empty until update() runs successfully on this tick.
         estimatedRobotPose = Optional.empty();
-
-        // Only fetch new results if debounce time has passed
-        if ((currentTimestamp - lastReadTimestamp) >= debounceTime) {
-            resultsList = RobotBase.isReal()
-                ? camera.getAllUnreadResults()
-                : cameraSim.getCamera().getAllUnreadResults();
-            lastReadTimestamp = currentTimestamp;
-
-            resultsList.sort((PhotonPipelineResult a, PhotonPipelineResult b) -> {
-                return a.getTimestampSeconds() >= b.getTimestampSeconds() ? 1 : -1;
-            });
-
-            if (!resultsList.isEmpty()) {
-                if (resultsList.get(resultsList.size() - 1).targets.size() > 0) {
-                    hasTarget = true;
-                }
-                updateEstimatedGlobalPose();
-            }
+        if (refreshResults() && !resultsList.isEmpty()) {
+            updateEstimatedGlobalPose();
         }
     }
 
