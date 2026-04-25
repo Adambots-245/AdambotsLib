@@ -1,6 +1,10 @@
 package com.adambots.lib.mechanisms.config;
 
 import static edu.wpi.first.units.Units.Amps;
+import static edu.wpi.first.units.Units.KilogramSquareMeters;
+import static edu.wpi.first.units.Units.RotationsPerSecond;
+import static edu.wpi.first.units.Units.RotationsPerSecondPerSecond;
+import static edu.wpi.first.units.Units.Volts;
 
 import com.adambots.lib.actuators.BaseMotor;
 import com.adambots.lib.visualization.MechanismVisualizer;
@@ -16,7 +20,6 @@ import edu.wpi.first.wpilibj2.command.Subsystem;
 
 import yams.mechanisms.config.FlyWheelConfig;
 import yams.motorcontrollers.SmartMotorController;
-import yams.motorcontrollers.SmartMotorController.ClosedLoopControllerSlot;
 import yams.motorcontrollers.SmartMotorControllerConfig;
 import yams.motorcontrollers.SmartMotorControllerConfig.TelemetryVerbosity;
 
@@ -177,8 +180,16 @@ public final class AdambotsFlyWheelConfig {
             : new SmartMotorControllerConfig();
 
         if (kP != null) {
-            ClosedLoopControllerSlot slotEnum = MotorConfigHelpers.slotOf(pidSlot);
-            cfg = cfg.withClosedLoopController(kP, kI, kD, slotEnum);
+            cfg = cfg.withClosedLoopController(kP, kI, kD, MotorConfigHelpers.slotOf(pidSlot));
+        }
+
+        if (expoKV != null && expoKA != null) {
+            Voltage v = voltageCompensation != null ? voltageCompensation : Volts.of(12);
+            double volts = v.in(Volts);
+            cfg = cfg.withExponentialProfile(
+                v,
+                RotationsPerSecond.of(volts / expoKV),
+                RotationsPerSecondPerSecond.of(volts / expoKA));
         }
 
         if (feedforward != null) {
@@ -205,7 +216,7 @@ public final class AdambotsFlyWheelConfig {
         FlyWheelConfig fCfg = new FlyWheelConfig(smartMotor);
         if (wheelDiameter != null) fCfg = fCfg.withDiameter(wheelDiameter);
         if (mass != null) fCfg = fCfg.withMass(mass);
-        if (momentOfInertia != null) fCfg = fCfg.withMOI(momentOfInertia);
+        if (momentOfInertia != null) fCfg = fCfg.withMOI(KilogramSquareMeters.of(momentOfInertia));
         if (minSpeed != null && maxSpeed != null) fCfg = fCfg.withSoftLimit(minSpeed, maxSpeed);
         if (telemetryName != null && telemetryVerbosity != null) {
             fCfg = fCfg.withTelemetry(telemetryName, telemetryVerbosity);
@@ -217,4 +228,7 @@ public final class AdambotsFlyWheelConfig {
     public MechanismVisualizer getVisualizer() { return visualizer; }
     public int getVisualizerIndex() { return visualizerIndex; }
     public Translation3d getVisualizerOffset() { return visualizerOffset; }
+
+    /** True if {@code withFOC(true)} was requested. Honored on Phoenix motors. */
+    public boolean isFocEnabled() { return focEnabled; }
 }

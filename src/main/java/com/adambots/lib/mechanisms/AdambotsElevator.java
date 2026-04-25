@@ -48,7 +48,7 @@ public final class AdambotsElevator {
         config.validateAgainst(motor);
 
         SmartMotorController smart = MotorBridge.toSmart(
-            motor, config.buildMotorConfig(), config.getSimMotorOverride());
+            motor, config.buildMotorConfig(), config.getSimMotorOverride(), config.isFocEnabled());
 
         this.inner = new Elevator(config.buildYamsConfig(smart));
 

@@ -45,7 +45,7 @@ public final class AdambotsFlyWheel {
         config.validateAgainst(motor);
 
         SmartMotorController smart = MotorBridge.toSmart(
-            motor, config.buildMotorConfig(), config.getSimMotorOverride());
+            motor, config.buildMotorConfig(), config.getSimMotorOverride(), config.isFocEnabled());
 
         this.inner = new FlyWheel(config.buildYamsConfig(smart));
 

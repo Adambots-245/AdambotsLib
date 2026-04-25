@@ -5,9 +5,9 @@ import static edu.wpi.first.units.Units.Degrees;
 import static edu.wpi.first.units.Units.Kilograms;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 import static edu.wpi.first.units.Units.RotationsPerSecondPerSecond;
+import static edu.wpi.first.units.Units.Volts;
 
 import com.adambots.lib.actuators.BaseMotor;
-import com.adambots.lib.actuators.MotorBridge;
 import com.adambots.lib.visualization.MechanismVisualizer;
 
 import edu.wpi.first.math.controller.ArmFeedforward;
@@ -17,12 +17,10 @@ import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.Distance;
 import edu.wpi.first.units.measure.Mass;
 import edu.wpi.first.units.measure.Voltage;
-import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.Subsystem;
 
 import yams.mechanisms.config.ArmConfig;
 import yams.motorcontrollers.SmartMotorController;
-import yams.motorcontrollers.SmartMotorController.ClosedLoopControllerSlot;
 import yams.motorcontrollers.SmartMotorControllerConfig;
 import yams.motorcontrollers.SmartMotorControllerConfig.TelemetryVerbosity;
 
@@ -243,19 +241,11 @@ public final class AdambotsArmConfig {
 
     /** Validates Pro feature usage against motor type and logs warnings. */
     public void validateAgainst(BaseMotor motor) {
-        boolean isPhoenix = MotorBridge.isPhoenix(motor);
-        if (focEnabled && !isPhoenix) {
-            DriverStation.reportWarning(
-                "AdambotsArm [" + (telemetryName != null ? telemetryName : "unnamed") +
-                "]: withFOC(true) requested on non-Phoenix motor (" + motor.getMotorType() +
-                "). FOC is ignored.", false);
-        }
-        if ((expoKV != null || expoKA != null) && !isPhoenix) {
-            DriverStation.reportWarning(
-                "AdambotsArm [" + (telemetryName != null ? telemetryName : "unnamed") +
-                "]: withMotionMagicExpo() requested on non-Phoenix motor (" + motor.getMotorType() +
-                "). Exponential profile is ignored — falling back to trapezoid.", false);
-        }
+        MotorConfigHelpers.warnProFeaturesOnNonPhoenix(
+            motor,
+            "AdambotsArm[" + (telemetryName != null ? telemetryName : "unnamed") + "]",
+            focEnabled,
+            expoKV != null || expoKA != null);
     }
 
     /** Builds the YAMS motor config. Package-private — used by AdambotsArm. */
@@ -266,8 +256,7 @@ public final class AdambotsArmConfig {
 
         // PID
         if (kP != null) {
-            ClosedLoopControllerSlot slotEnum = slotOf(pidSlot);
-            cfg = cfg.withClosedLoopController(kP, kI, kD, slotEnum);
+            cfg = cfg.withClosedLoopController(kP, kI, kD, MotorConfigHelpers.slotOf(pidSlot));
         }
 
         // Trapezoidal profile (independent of PID slot)
@@ -277,8 +266,18 @@ public final class AdambotsArmConfig {
                 RotationsPerSecondPerSecond.of(trapezoidAccelRPSps));
         }
 
+        // Exponential (Motion Magic Expo) profile — Phoenix-native; non-Phoenix wrappers ignore.
+        if (expoKV != null && expoKA != null) {
+            Voltage v = voltageCompensation != null ? voltageCompensation : Volts.of(12);
+            double volts = v.in(Volts);
+            cfg = cfg.withExponentialProfile(
+                v,
+                RotationsPerSecond.of(volts / expoKV),
+                RotationsPerSecondPerSecond.of(volts / expoKA));
+        }
+
         if (armFeedforward != null) {
-            cfg = cfg.withFeedforward(armFeedforward, slotOf(pidSlot));
+            cfg = cfg.withFeedforward(armFeedforward, MotorConfigHelpers.slotOf(pidSlot));
         }
 
         // Limits + gearing
@@ -336,12 +335,6 @@ public final class AdambotsArmConfig {
     public Translation3d getVisualizerPivot() { return visualizerPivot; }
     public Distance getLength() { return length; }
 
-    private static ClosedLoopControllerSlot slotOf(int i) {
-        return switch (i) {
-            case 0 -> ClosedLoopControllerSlot.SLOT_0;
-            case 1 -> ClosedLoopControllerSlot.SLOT_1;
-            case 2 -> ClosedLoopControllerSlot.SLOT_2;
-            default -> throw new IllegalArgumentException("Invalid PID slot: " + i);
-        };
-    }
+    /** True if {@code withFOC(true)} was requested. Honored on Phoenix motors. */
+    public boolean isFocEnabled() { return focEnabled; }
 }

@@ -33,28 +33,39 @@ public final class MotorBridge {
      * of the default inferred from the motor type. This lets teams override the
      * sim physics model (e.g., use Minion-specific params when available).
      *
+     * <p>{@code focEnabled} is honored only on Phoenix wrappers ({@link TalonFXWrapper},
+     * {@link TalonFXSWrapper}) where FOC is applicable. Non-Phoenix wrappers ignore
+     * it; the calling config's {@code validateAgainst(motor)} should have already
+     * logged a warning for misuse.
+     *
      * @param motor           the BaseMotor to bridge
      * @param smartConfig     the YAMS SmartMotorControllerConfig to apply
      * @param dcMotorOverride optional DCMotor model override; null uses the default
+     * @param focEnabled      whether FOC should be enabled on Phoenix wrappers
      * @return a configured YAMS SmartMotorController
      * @throws IllegalArgumentException if the motor type cannot be bridged (DummyMotor)
      */
     public static SmartMotorController toSmart(
             BaseMotor motor,
             SmartMotorControllerConfig smartConfig,
-            DCMotor dcMotorOverride) {
+            DCMotor dcMotorOverride,
+            boolean focEnabled) {
 
         if (motor instanceof TalonFXMotor t) {
-            return new TalonFXWrapper(
+            TalonFXWrapper w = new TalonFXWrapper(
                 t.rawMotor(),
                 dcMotorOverride != null ? dcMotorOverride : t.dcMotorModel(),
                 smartConfig);
+            if (focEnabled) w.enableFOC(); else w.disableFOC();
+            return w;
         }
         if (motor instanceof MinionMotor m) {
-            return new TalonFXSWrapper(
+            TalonFXSWrapper w = new TalonFXSWrapper(
                 m.rawMotor(),
                 dcMotorOverride != null ? dcMotorOverride : m.dcMotorModel(),
                 smartConfig);
+            if (focEnabled) w.enableFOC(); else w.disableFOC();
+            return w;
         }
         if (motor instanceof NEOMotor n) {
             return new SparkWrapper(
@@ -72,13 +83,25 @@ public final class MotorBridge {
     }
 
     /**
+     * Wraps a BaseMotor into a YAMS SmartMotorController, defaulting {@code focEnabled}
+     * to false. Prefer the four-argument overload from mechanism wrappers so the user's
+     * {@code withFOC(...)} setting is honored.
+     */
+    public static SmartMotorController toSmart(
+            BaseMotor motor,
+            SmartMotorControllerConfig smartConfig,
+            DCMotor dcMotorOverride) {
+        return toSmart(motor, smartConfig, dcMotorOverride, false);
+    }
+
+    /**
      * Wraps a BaseMotor into a YAMS SmartMotorController with the motor's
      * default DCMotor model.
      */
     public static SmartMotorController toSmart(
             BaseMotor motor,
             SmartMotorControllerConfig smartConfig) {
-        return toSmart(motor, smartConfig, null);
+        return toSmart(motor, smartConfig, null, false);
     }
 
     /**

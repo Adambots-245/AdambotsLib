@@ -49,7 +49,7 @@ public final class AdambotsPivot {
         config.validateAgainst(motor);
 
         SmartMotorController smart = MotorBridge.toSmart(
-            motor, config.buildMotorConfig(), config.getSimMotorOverride());
+            motor, config.buildMotorConfig(), config.getSimMotorOverride(), config.isFocEnabled());
 
         this.inner = new Pivot(config.buildYamsConfig(smart));
 

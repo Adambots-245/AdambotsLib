@@ -55,7 +55,7 @@ public final class AdambotsArm {
         config.validateAgainst(motor);
 
         SmartMotorController smart = MotorBridge.toSmart(
-            motor, config.buildMotorConfig(), config.getSimMotorOverride());
+            motor, config.buildMotorConfig(), config.getSimMotorOverride(), config.isFocEnabled());
 
         this.inner = new Arm(config.buildYamsConfig(smart));
 
