@@ -21,6 +21,11 @@ Measure physical properties with validated, reliable interfaces:
 - **[Proximity Sensors](sensors/proximity/README.md)** - Object detection (Limit Switch, PhotoEye)
 - **[Distance Sensors](sensors/distance/README.md)** - Range measurement (Ultrasonic, LIDAR, CANrange)
 
+### Mechanisms
+Composition wrappers over [YAMS](https://github.com/Yet-Another-Software-Suite/YAMS) positional and velocity mechanisms, exposed through a `BaseMotor`-native API:
+
+- **[Mechanisms Overview](mechanisms/README.md)** - Arm, Pivot, Elevator, FlyWheel with fluent config and visualizer wiring
+
 ### Subsystems
 Pre-built command-based subsystems for common robot components:
 
